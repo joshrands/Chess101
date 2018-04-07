@@ -1,21 +1,24 @@
 
 class Piece:
-	# team? 
+	# team?
 
-	def __init__(self, row=0, col=0, targets=[]):
+	def __init__(self, row=0, col=0):
 		self.row = row
 		self.col = col
+		self.targets = []
 
 	# abstract method calcTargets
-	def calcTargets(self): 
+	def calcTargets(self):
 		raise NotImplementedError()
-	
+
 	# abstract method move
 	def move(self, newRow, newCol):
 		# calculate new targets
 		self.row = newRow
-		self.col = newCol 	
+		self.col = newCol
 
 	def print(self):
-		print(name, " at ", row, ", ", col)
+		raise NotImplementedError()
 
+	def getTargets():
+		return targets
