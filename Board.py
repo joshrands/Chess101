@@ -27,40 +27,77 @@ class Board(SampleBase):
         self.createPlayers()
         self.initializeGameBoard()
 
-        
-
         while True:
             offset_canvas = self.matrix.CreateFrameCanvas()
-            
-            # Do player 1's turn
-            self.doTurn(offset_canvas, self.teamR)
-#            x = input("Player 1 go: ")
-            #self.lightCell(offset_canvas, 4, 3, 64, 180, 232)
             self.lightPieces(offset_canvas, self.teamR)			
+            offset_canvas = self.matrix.SwapOnVSync(offset_canvas)
 
+            # Do player 1's turn
+            offset_canvas = self.matrix.CreateFrameCanvas()
+            self.doTurn(offset_canvas, self.teamR)
+            offset_canvas = self.matrix.CreateFrameCanvas()
+            self.doTurn(offset_canvas, self.teamL)
+            offset_canvas = self.matrix.CreateFrameCanvas()
+            
             offset_canvas = self.matrix.SwapOnVSync(offset_canvas)
 
     ### Member Functions ###
     def doTurn(self, canvas, team):
-        bool checkMate = False
+        checkMate = False
         if (checkMate):
             print("Check mate!")
 
-        bool check = False
+        check = False
         if (check):
             print("Check!")
-
-        # move a piece!
+        
+        move = False
+        row = 0
+        col = 0
         print("Player:", team.name, "'s move.") 
-        row = input("Enter row for desired piece: ")
-        col = input("Enter col for desired piece: ")
-        # TODO: Make sure to check if this is valid piece 
+           
+        while (move == False):
+            # move a piece!
+            row = int(input("Enter row for desired piece: "))
+            col = int(input("Enter col for desired piece: "))
+            # TODO: Make sure to check if this is valid piece 
+            if (self.grid[row][col] != None and self.grid[row][col].team == team):
+                move = True
+            else:
+                print("Invalid piece.")
+
         print("Calculating targets...")
-        self.lightTargets(canvas, self.grid[row][col]) 
+        self.lightTargets(canvas, self.grid[row][col])
+        self.lightPieces(canvas, self.teamR)
+        canvas = self.matrix.SwapOnVSync(canvas)
+    
+        validMove = False
+        # check if valid move
+        while (validMove == False):
+            targetRow = int(input("Enter a row for target: "))
+            targetCol = int(input("Enter a col for target: "))
+            for cell in self.grid[row][col].getTargets():
+                if (cell.row == targetRow and cell.col == targetCol):
+                    validMove = True
+                    print("Moving piece...")
+                    self.grid[targetRow][targetCol] = self.grid[row][col]
+                    self.grid[targetRow][targetCol].move(targetRow, targetCol) 
+                    self.grid[row][col] = None
+                     
+            canvas = self.matrix.CreateFrameCanvas()
+            self.lightPieces(canvas, self.teamR)
+            canvas = self.matrix.SwapOnVSync(canvas)
+
+    def clearBoard(self, canvas):
+        for x in range(0, 8):
+            for y in range(0, 8):
+                self.lightCell(x, y, 0, 0, 0)
 
     def lightTargets(self, canvas, piece):
+        piece.calcTargets(self.grid)
         targets = piece.getTargets()
         for cell in targets:
+            print("Target: ", cell.row, cell.col)
             self.lightCell(canvas, cell.row, cell.col, 255, 255, 255)
 
     def lightPieces(self, offset_canvas, team):
@@ -128,7 +165,7 @@ class Board(SampleBase):
 
     def lightCell(self, canvas, x, y, r, g, b):
         #offset_canvas = self.matrix.CreateFrameCanvas()
-        print(x, y, r, g, b)
+        #print(x, y, r, g, b)
         for i in range(0, 4):
             for j in range(0, 4):
                 canvas.SetPixel(x*4 + i, y*4 + j, r, g, b)
