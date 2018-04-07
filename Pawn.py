@@ -53,7 +53,7 @@ class Pawn(Piece):
         super().move(self, newRow, newCol)
         if (self.enPassantable):
             self.enPassantable = False
-        if (self.row == self.startingRow and self.col == self.startingCol):
+        if (self.row == self.startingRow and self.col == self.startingCol and (newRow - self.row) == 2 * self.direction):
             self.enPassantable = True
 
     def printPiece(self):
