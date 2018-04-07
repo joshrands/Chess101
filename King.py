@@ -24,11 +24,11 @@ class King(Piece):
         self.bladeWalker(checkerTown, 0, -1, self.row, self.col)
 
         #castling situation
-        if (!self.touched):
-            if (isinstance(checkerTown[self.row][self.col - 5],Rook) and !(checkerTown[self.row][self.col - 5].touched)):
+        if (self.touched == false):
+            if (isinstance(checkerTown[self.row][self.col - 5],Rook) and checkerTown[self.row][self.col - 5].touched == false):
                 if (checkerTown[self.row][self.col - 1] == None && checkerTown[self.row][self.col - 2] == None && checkerTown[self.row][self.col - 3] == None and checkerTown[self.row][self.col - 4] == None):
                     self.targets.append(Cell(self.row, self.col - 3))
-            elif (isinstance(checkerTown[self.row][self.col + 4], Rook) and !(checkerTown[self.row][self.col + 4].touched)):
+            elif (isinstance(checkerTown[self.row][self.col + 4], Rook) and checkerTown[self.row][self.col + 4].touched == false):
                 if (checkerTown[self.row][self.col + 1] == None && checkerTown[self.row][self.col + 2] == None && checkerTown[self.row][self.col + 3] == None):
                     self.targets.append(Cell(self.row, self.col + 3))
 
@@ -37,9 +37,9 @@ class King(Piece):
         oldCol = self.col
         #check if castled
         if (newRow == oldRow and newCol == oldCol - 3):
-            return Cell(oldRow, oldCol - 2)
+            return Cell(oldRow, oldCol - 5), Cell(oldRow, oldCol - 2)
         elif (newRow == oldRow and newCol == oldCol + 3):
-            return Cell(oldRow, oldCol + 2)
+            return Cell(oldRow, oldCol + 4), Cell(oldRow, oldCol + 2)
         else:
             return None
 		# calculate new targets
