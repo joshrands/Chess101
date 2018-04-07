@@ -7,6 +7,7 @@ from Rook import Rook
 from Knight import Knight
 from King import King
 from Queen import Queen
+import time
 
 class Board(SampleBase):
     
@@ -28,8 +29,8 @@ class Board(SampleBase):
         while True:
             offset_canvas = self.matrix.CreateFrameCanvas()
 
-            x = input("Player 1 go: ")
-
+#            x = input("Player 1 go: ")
+            time.sleep(.1)
             #self.lightCell(offset_canvas, 4, 3, 64, 180, 232)
             self.lightPieces(offset_canvas, self.teamR)			
 
