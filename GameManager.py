@@ -7,8 +7,13 @@ class GameManager:
     def __init__(self):
         # make stuff
         print("Hello world!")
+		self.board = Board()
+
+	def startGame(self):
+		self.board.process()
 
 #    def setGameProperties():
-
-board = Board()
-board.process()
+game = GameManager()
+game.startGame()
+#board = Board()
+#board.process()
