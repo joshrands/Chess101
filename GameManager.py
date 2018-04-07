@@ -5,8 +5,8 @@ from Board import Board
 class GameManager:
 
     def __init__(self):
-        # make stuff
-        print("Hello world!")
+		# make stuff
+		print("Hello world!")
 		self.board = Board()
 
 	def startGame(self):
