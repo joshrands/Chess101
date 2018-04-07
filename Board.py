@@ -43,6 +43,18 @@ class Board(SampleBase):
 
     ### Member Functions ###
     def doTurn(self, canvas, team):
+        # disable enPassantable
+        # calculate targets for all pieces
+        for row in self.grid:
+            for piece in row:
+                if (piece is Pawn and piece.team == team):
+                    piece.enPassantable = False
+                elif (piece != None):
+                    piece.calcTargets(self.grid)
+                    #print pieces that can be moved
+                    if (len(piece.getTargets()) > 0 and piece.team == team):
+                        piece.printPiece()
+
         checkMate = False
         if (checkMate):
             print("Check mate!")
@@ -81,7 +93,13 @@ class Board(SampleBase):
                     validMove = True
                     print("Moving piece...")
                     self.grid[targetRow][targetCol] = self.grid[row][col]
-                    self.grid[targetRow][targetCol].move(targetRow, targetCol) 
+                    if (self.grid[targetRow][targetCol] is Pawn):
+                        enemy = self.grid[targetRow][targetCol].move(targetRow, targetCol) 
+                        if (enemy != None):
+                            self.grid[enemy.row][enemy.col]
+                    else:
+                        self.grid[targetRow][targetCol].move(targetRow, targetCol)
+
                     self.grid[row][col] = None
                      
             canvas = self.matrix.CreateFrameCanvas()
