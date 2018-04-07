@@ -3,7 +3,10 @@ import Piece
 
 class Pawn(Piece):
     def __init__(self, row, col, team):
-        super().__init__(self, row, col, team)
+        self.row = row
+		self.col = col
+		self.targets = []
+		self.team = team
         self.startingRow = row
         self.startingCol = col
         if (self.row == 6):
@@ -40,7 +43,7 @@ class Pawn(Piece):
                 if (checkerTown[self.row][self.col - 1].enPassantable):
                     targets.append(Cell(self.row, self.col - 1))
             #check right
-            if (self.col != 8 and checkerTown[self.row][self.col + 1] is Pawn and checkerTown[self.row][self.col + 1].team != self.team):
+            if (self.col != 7 and checkerTown[self.row][self.col + 1] is Pawn and checkerTown[self.row][self.col + 1].team != self.team):
                 if (checkerTown[self.row][self.col + 1].enPassantable):
                     targets.append(Cell(self.row, self.col + 1))
 
