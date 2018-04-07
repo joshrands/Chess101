@@ -1,5 +1,5 @@
 #child class of Piece that represents a Pawn
-from Piece import Piece
+import Piece
 
 class Pawn(Piece):
     def __init__(self, row, col, team):
@@ -29,10 +29,11 @@ class Pawn(Piece):
 
             #check the square in front
             if (checkerTown[self.row + self.direction][self.column] != None):
-                targets.append(Cell(self.row + self.dire))
+                targets.append(Cell(self.row + self.direction, self.column))
             #if row and col = starting row and col then check 2 in front
             if (self.row == self.startingRow and self.col == self.startingCol):
                 if (checkerTown[self.row + 2 * self.direction][self.col] == None):
+                    targets.append(Cell(self.row + 2 * self.direction, self.col))
             #check for en passant
 
     #override move method to set enPassantable
@@ -41,7 +42,7 @@ class Pawn(Piece):
         if (self.row == self.startingRow and self.col == self.startingCol):
             self.enPassantable = True
         if (self.enPassantable):
-            self.enPassantable = false;
+            self.enPassantable = False;
 
     def printPiece(self):
         print("Pawn at " + self.row + ", " + self.col)

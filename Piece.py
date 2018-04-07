@@ -1,4 +1,3 @@
-from Board import Board
 from Team import Team
 from Cell import Cell
 
