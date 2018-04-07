@@ -28,6 +28,8 @@ class Board(SampleBase):
         while True:
             offset_canvas = self.matrix.CreateFrameCanvas()
 
+            x = input("Player 1 go: ")
+
             #self.lightCell(offset_canvas, 4, 3, 64, 180, 232)
             self.lightPieces(offset_canvas, self.teamR)			
 
