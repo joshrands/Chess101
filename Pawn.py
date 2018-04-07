@@ -42,7 +42,7 @@ class Pawn(Piece):
             #check for en passant
             #check left
             if (self.col != 0 and isinstance(checkerTown[self.row][self.col - 1], Pawn) and checkerTown[self.row][self.col - 1].team != self.team):
-                #if (checkerTown[self.row][self.col - 1].enPassantable):
+                if (checkerTown[self.row][self.col - 1].enPassantable):
                     print("Gonna kill him")
                     self.targets.append(Cell(self.row + self.direction, self.col - 1))
                     self.enPassantLoc = Cell(self.row + self.direction, self.col - 1)
