@@ -44,11 +44,11 @@ class Board(SampleBase):
         # create pieces in each team
         # create pawns for teamR
         for col in range(0, 8):
-            self.grid[1][col] = Pawn(1, col, self.teamR)	
+            #self.grid[1][col] = Pawn(1, col, self.teamR)	
 
-            # create bishop for teamR
-            self.grid[0][2] = Bishop(0, 2, self.teamR)
-            self.grid[0][5] = Bishop(0, 5, self.teamR)
+        # create bishop for teamR
+        self.grid[0][2] = Bishop(0, 2, self.teamR)
+        self.grid[0][5] = Bishop(0, 5, self.teamR)
 
     def createPlayers(self):
         nameR = input("Enter player 1 name: ")
