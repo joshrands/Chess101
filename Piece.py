@@ -1,4 +1,5 @@
-
+from Board import Board
+from Team import Team
 class Piece:
 	# team?
 
@@ -19,7 +20,7 @@ class Piece:
 		self.col = newCol
 
 	def printPiece(self, board):
-		raise NotImplementedError()
+		print ("Piece at " + self.row + ", " + self.col)
 
 	def getTargets():
 		return targets

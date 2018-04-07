@@ -1,5 +1,6 @@
 #child class of Piece that represents a Pawn
-import Piece.py
+from Piece import Piece
+
 class Pawn(Piece):
     def __init__(self, row=0, col=0, team):
         super().__init__(self, row, col, team)
@@ -21,6 +22,7 @@ class Pawn(Piece):
 
             #check for en passant
 
+    #override move method to set enPessantable
 
     def printPiece(self):
         print("Pawn at " + self.row + ", " + self.col)
