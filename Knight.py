@@ -2,6 +2,7 @@
 from Piece import Piece
 class Knight(Piece):
     def calcTargets(self, checkerTown):
+        print("Knighty Knight")
 
 #Overwrite default print with special Knight print
     def printPiece(self):
