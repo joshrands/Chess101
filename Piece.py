@@ -19,7 +19,7 @@ class Piece:
 		# calculate new targets
 		self.row = newRow
 		self.col = newCol
-		return None
+
 
 	def printPiece(self, board):
 		print ("Piece at", self.row , "," , self.col)

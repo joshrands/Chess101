@@ -12,6 +12,7 @@ class Knight(Piece):
                 self.targets.append(Cell(row + dir1, col + dir2))
 
     def calcTargets(self, checkerTown):
+        self.targets = []
         #check each of the knighty locations
         self.deathLoc(checkerTown, 2, 1, self.row, self.col)
         self.deathLoc(checkerTown, 2, -1, self.row, self.col)

@@ -11,6 +11,7 @@ class King(Piece):
                 self.targets.append(Cell(row + dir1, col + dir2))
 
     def calcTargets(self, checkerTown):
+        self.targets = []
         #Run a recurssive function in all directions
         self.bladeWalker(checkerTown, 1, 1, self.row, self.col)
         self.bladeWalker(checkerTown, -1, 1, self.row, self.col)

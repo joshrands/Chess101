@@ -12,6 +12,7 @@ class Rook(Piece):
                 self.targets.append(Cell(row + dir1, col + dir2))
 
     def calcTargets(self, checkerTown):
+        self.targets = []
         #Run a recurssive function in all directions
         self.bladeRunner(checkerTown, 1, 0, self.row, self.col)
         self.bladeRunner(checkerTown, 0, 1, self.row, self.col)
