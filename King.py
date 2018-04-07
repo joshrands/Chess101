@@ -16,9 +16,9 @@ class King(Piece):
 
     def bladeWalker(self, checkerTown, dir1, dir2, row, col):
         if (checkerTown[row + dir1][col + dir2] == None):
-            targets.append(Cell(row + dir1, col + dir2))
+            self.targets.append(Cell(row + dir1, col + dir2))
         elif (checkerTown[row + dir1][col + dir2].team != self.team):
-            targets.append(Cell(row + dir1, col + dir2))
+            self.targets.append(Cell(row + dir1, col + dir2))
 
 #Overwrite default print with special King print
     def printPiece(self):
