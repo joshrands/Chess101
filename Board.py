@@ -9,6 +9,7 @@ from King import King
 from Queen import Queen
 import time
 from Cell import Cell
+import random
 
 class Board(SampleBase):
     
@@ -42,14 +43,24 @@ class Board(SampleBase):
             offset_canvas = self.matrix.SwapOnVSync(offset_canvas)
 
     ### Member Functions ###
+    def victory(self, canvas, team):
+        for i in range(0, 100):
+            time.sleep(1)
+            x = random.randint(0, 8)
+            y = random.randint(0, 8)
+            canvas = self.matrix.CreateFrameCanvas()
+            self.lightCell(canvas, x, y, team.r, team.g, team.b)
+            canvas = self.matrix.SwapOnVSync(canvas)
+
     def doTurn(self, canvas, team):
         # disable enPassantable
         # calculate targets for all pieces
         for row in self.grid:
             for piece in row:
-                if (piece is Pawn and piece.team == team):
+                if (isinstance(piece, Pawn) and piece.team == team):
                     piece.enPassantable = False
-                elif (piece != None):
+                    #print("Yay")
+                if (piece != None):
                     piece.calcTargets(self.grid)
                     #print pieces that can be moved
                     if (len(piece.getTargets()) > 0 and piece.team == team):
@@ -73,10 +84,10 @@ class Board(SampleBase):
             row = int(input("Enter row for desired piece: "))
             col = int(input("Enter col for desired piece: "))
             # TODO: Make sure to check if this is valid piece 
-            if (self.grid[row][col] != None and self.grid[row][col].team == team):
+            if (self.grid[row][col] != None and self.grid[row][col].team == team and len(self.grid[row][col].getTargets()) > 0):
                 move = True
             else:
-                print("Invalid piece.")
+                print("Invalid piece, pick again.")
 
         print("Calculating targets...")
         self.lightTargets(canvas, self.grid[row][col])
@@ -93,10 +104,16 @@ class Board(SampleBase):
                     validMove = True
                     print("Moving piece...")
                     self.grid[targetRow][targetCol] = self.grid[row][col]
-                    if (self.grid[targetRow][targetCol] is Pawn):
+                    if (isinstance(self.grid[targetRow][targetCol], Pawn)):
                         enemy = self.grid[targetRow][targetCol].move(targetRow, targetCol) 
                         if (enemy != None):
                             self.grid[enemy.row][enemy.col]
+                    elif (isinstance(self.grid[targetRow][targetCol], King)):
+                        rookLocation, rookTarget = self.grid[targetRow][targetCol].move(targetRow, targetCol)
+                        if (rookLocation != None):
+                            # do castling
+                            self.grid[rookTarget.row][rookTarget.col] = self.grid[rookLocation.row][rookLocation.col]
+                            self.grid[rookLocation.row][rookTarget.col] = None 
                     else:
                         self.grid[targetRow][targetCol].move(targetRow, targetCol)
 
@@ -174,12 +191,12 @@ class Board(SampleBase):
         nameR = input("Enter player 1 name: ")
         print("Enter player 1 colors (rgb): ")	
         self.teamR.setName(nameR)
-#        self.teamR.setColor()
+        self.teamR.setColor()
 
         nameL = input("Enter player 2 name: ")		
         print("Enter player 2 colors (rgb): ")
         self.teamL.setName(nameL)
-#        self.teamL.setColor()
+        self.teamL.setColor()
 
     def lightCell(self, canvas, x, y, r, g, b):
         #offset_canvas = self.matrix.CreateFrameCanvas()
