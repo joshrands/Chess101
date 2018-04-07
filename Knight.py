@@ -1,5 +1,7 @@
 #child class of Piece that represents a Knight
 from Piece import Piece
+from Cell import Cell
+
 class Knight(Piece):
     def calcTargets(self, checkerTown):
         #check each of the knighty locations

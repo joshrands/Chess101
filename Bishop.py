@@ -1,5 +1,7 @@
 #child class of Piece that represents a Bishop
 from Piece import Piece
+from Cell import Cell
+
 class Bishop(Piece):
     def calcTargets(self, checkerTown):
         #Run a recurssive function in all directions

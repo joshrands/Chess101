@@ -1,5 +1,7 @@
 #child class of Piece that represents a King
 from Piece import Piece
+from Cell import Cell
+
 class King(Piece):
     def calcTargets(self, checkerTown):
         #Run a recurssive function in all directions
