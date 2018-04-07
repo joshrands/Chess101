@@ -54,9 +54,12 @@ class Pawn(Piece):
     #override move method to set enPassantable
     def move(self, newRow, newCol):
         # calculate new targets
+        oldRow = self.row
+        oldCol = self.col
+
         self.row = newRow
         self.col = newCol
-        if (self.row == self.startingRow and self.col == self.startingCol and (newRow - self.row) == 2 * self.direction):
+        if (oldRow == self.startingRow and oldCol == self.startingCol and (newRow - oldRow) == 2 * self.direction):
             self.enPassantable = True
             print("Pawn is en passantable")
         if (Cell(newRow, newCol) == self.enPassantLoc):
