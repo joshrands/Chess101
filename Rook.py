@@ -7,7 +7,7 @@ class Rook(Piece):
         if (row + dir1 >= 0 and row + dir1 <= 7 and col + dir2 >= 0 and col + dir2 <= 7):
             if (checkerTown[row + dir1][col + dir2] == None):
                 self.targets.append(Cell(row + dir1, col + dir2))
-                bladeRunner(checkerTown, dir1, dir2, row + dir1, col + dir2)
+                self.bladeRunner(checkerTown, dir1, dir2, row + dir1, col + dir2)
             elif (checkerTown[row + dir1][col + dir2].team != self.team):
                 self.targets.append(Cell(row + dir1, col + dir2))
 
