@@ -43,11 +43,13 @@ class Pawn(Piece):
             #check left
             if (self.col != 0 and checkerTown[self.row][self.col - 1] is Pawn and checkerTown[self.row][self.col - 1].team != self.team):
                 if (checkerTown[self.row][self.col - 1].enPassantable):
+                    print("Gonna kill him")
                     self.targets.append(Cell(self.row + self.direction, self.col - 1))
                     self.enPassantLoc = Cell(self.row + self.direction, self.col - 1)
             #check right
             if (self.col != 7 and checkerTown[self.row][self.col + 1] is Pawn and checkerTown[self.row][self.col + 1].team != self.team):
                 if (checkerTown[self.row][self.col + 1].enPassantable):
+                    print("Gonna kill him")
                     self.targets.append(Cell(self.row + self.direction, self.col + 1))
                     self.enPassantLoc = Cell(self.row + self.direction, self.col + 1)
 
@@ -61,10 +63,9 @@ class Pawn(Piece):
         self.col = newCol
         if (oldRow == self.startingRow and oldCol == self.startingCol and (newRow - oldRow) == 2 * self.direction):
             self.enPassantable = True
-            print("Pawn is en passantable")
-        if (Cell(newRow, newCol) == self.enPassantLoc):
+        if (newRow == self.enPassantLoc.row and newCol == self.enPassantLoc.col):
             return Cell(enPassantLoc.row - self.direction, enPassantLoc.col)
-        else :
+        else:
             return None
 
     def printPiece(self):
