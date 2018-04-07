@@ -31,8 +31,7 @@ class King(Piece):
             if (isinstance(checkerTown[self.row][self.col + 4], Rook) and checkerTown[self.row][self.col + 4].touched == false):
                 if (checkerTown[self.row][self.col + 1] == None and checkerTown[self.row][self.col + 2] == None and checkerTown[self.row][self.col + 3] == None):
                     self.targets.append(Cell(self.row, self.col + 3))
-
-	def move(self, newRow, newCol):
+    def move(self, newRow, newCol):
         oldRow = self.row
         oldCol = self.col
         #check if castled
