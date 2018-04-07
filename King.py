@@ -39,7 +39,7 @@ class King(Piece):
         if (newRow == oldRow and newCol == oldCol - 2):
             return Cell(oldRow, oldCol - 4), Cell(oldRow, oldCol - 1)
         elif (newRow == oldRow and newCol == oldCol + 2):
-            return Cell(oldRow, oldCol + 4), Cell(oldRow, oldCol + 1)
+            return Cell(oldRow, oldCol + 3), Cell(oldRow, oldCol + 1)
         else:
             return None, None
 		# calculate new targets
