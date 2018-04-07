@@ -15,6 +15,7 @@ class Pawn(Piece):
         else:
             self.direction = 1
         self.enPassantable = False
+        self.enPassantLoc = None
 
     #calcTargets, which is abstract in the parent
     def calcTargets(self, checkerTown):
@@ -58,7 +59,7 @@ class Pawn(Piece):
         if (self.row == self.startingRow and self.col == self.startingCol and (newRow - self.row) == 2 * self.direction):
             self.enPassantable = True
         if (Cell(newRow, newCol) == self.enPassantLoc):
-            return self.enPassantLoc
+            return Cell(enPassantLoc.row - self.direction, enPassantLoc.col)
         else :
             return None
 
