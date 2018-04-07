@@ -11,12 +11,15 @@ class Pawn(Piece):
             self.direction = 1;
 
     #calcTargets, which is abstract in the parent
-    def calcTargets(self, board):
-        #check the squares diagonal in the direction of self.direction for an enemy Piece
-        if (board[self.row + self.direction][])
-        #check the square in front
-        if (board[self.direction][self.column] != None and )
-        #if row and col = starting row and col then check 2 in front
+    def calcTargets(self, checkerTown):
+        if (self.row == 0 or self.row == 7):
+            #check the squares diagonal in the direction of self.direction for an enemy Piece
+            if (checkerTown[self.row + self.direction][])
+            #check the square in front
+            if (checkerTown[self.row + self.direction][self.column] != None and )
+            #if row and col = starting row and col then check 2 in front
+
+            #check for en passant
 
 
     def printPiece(self):
