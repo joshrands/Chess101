@@ -42,11 +42,11 @@ class Pawn(Piece):
             #check left
             if (self.col != 0 and checkerTown[self.row][self.col - 1] is Pawn and checkerTown[self.row][self.col - 1].team != self.team):
                 if (checkerTown[self.row][self.col - 1].enPassantable):
-                    self.targets.append(Cell(self.row, self.col - 1))
+                    self.targets.append(Cell(self.row + self.direction, self.col - 1))
             #check right
             if (self.col != 7 and checkerTown[self.row][self.col + 1] is Pawn and checkerTown[self.row][self.col + 1].team != self.team):
                 if (checkerTown[self.row][self.col + 1].enPassantable):
-                    self.targets.append(Cell(self.row, self.col + 1))
+                    self.targets.append(Cell(self.row + self.direction, self.col + 1))
 
     #override move method to set enPassantable
     def move(self, newRow, newCol):
