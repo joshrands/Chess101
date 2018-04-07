@@ -23,5 +23,5 @@ class Piece:
 	def printPiece(self, board):
 		print ("Piece at " + self.row + ", " + self.col)
 
-	def getTargets():
+	def getTargets(self):
 		return targets
