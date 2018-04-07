@@ -3,10 +3,10 @@ from Piece import Piece
 
 class Pawn(Piece):
     def __init__(self, row, col, team):
-self.row = row
-self.col = col
-self.targets = []
-self.team = team
+        self.row = row
+        self.col = col
+        self.targets = []
+        self.team = team
         self.startingRow = row
         self.startingCol = col
         if (self.row == 6):
