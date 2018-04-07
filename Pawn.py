@@ -28,21 +28,29 @@ class Pawn(Piece):
                     targets.append(Cell(self.row + self.direction, self.col + 1))
 
             #check the square in front
-            if (checkerTown[self.row + self.direction][self.column] != None):
+            if (checkerTown[self.row + self.direction][self.column] == None):
                 targets.append(Cell(self.row + self.direction, self.column))
             #if row and col = starting row and col then check 2 in front
-            if (self.row == self.startingRow and self.col == self.startingCol):
+            if (self.row == self.startingRow):
                 if (checkerTown[self.row + 2 * self.direction][self.col] == None):
                     targets.append(Cell(self.row + 2 * self.direction, self.col))
             #check for en passant
+            #check left
+            if (self.col != 0 and checkerTown[self.row][self.col - 1] is Pawn and checkerTown[self.row][self.col - 1].team != self.team):
+                if (checkerTown[self.row][self.col - 1].enPassantable):
+                    targets.append(Cell(self.row, self.col - 1))
+            #check right
+            if (self.col != 8 and checkerTown[self.row][self.col + 1] is Pawn and checkerTown[self.row][self.col + 1].team != self.team):
+                if (checkerTown[self.row][self.col + 1].enPassantable):
+                    targets.append(Cell(self.row, self.col + 1))
 
     #override move method to set enPassantable
     def move(self, newRow, newCol):
 		super().move(self, newRow, newCol)
-        if (self.row == self.startingRow and self.col == self.startingCol):
-            self.enPassantable = True
         if (self.enPassantable):
             self.enPassantable = False;
+        if (self.row == self.startingRow and self.col == self.startingCol):
+            self.enPassantable = True
 
     def printPiece(self):
         print("Pawn at " + self.row + ", " + self.col)
