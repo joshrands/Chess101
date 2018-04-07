@@ -1,6 +1,7 @@
 #child class of Piece that represents a King
 from Piece import Piece
 from Cell import Cell
+from Rook import Rook
 
 class King(Piece):
 
@@ -25,7 +26,7 @@ class King(Piece):
 
         #castling situation
         if (self.touched == False):
-            if (isinstance(checkerTown[self.row][self.col - 5],Rook) and checkerTown[self.row][self.col - 5].touched == False):
+            if (isinstance(checkerTown[self.row][self.col - 5], Rook) and checkerTown[self.row][self.col - 5].touched == False):
                 if (checkerTown[self.row][self.col - 1] == None and checkerTown[self.row][self.col - 2] == None and checkerTown[self.row][self.col - 3] == None and checkerTown[self.row][self.col - 4] == None):
                     self.targets.append(Cell(self.row, self.col - 3))
             if (isinstance(checkerTown[self.row][self.col + 4], Rook) and checkerTown[self.row][self.col + 4].touched == False):
