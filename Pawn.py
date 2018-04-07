@@ -57,10 +57,10 @@ class Pawn(Piece):
         self.col = newCol
         if (self.row == self.startingRow and self.col == self.startingCol and (newRow - self.row) == 2 * self.direction):
             self.enPassantable = True
-        if (Cell(newRow, newCol) == enPassantLoc):
-            return True
+        if (Cell(newRow, newCol) == self.enPassantLoc):
+            return self.enPassantLoc
         else :
-            return False
+            return None
 
     def printPiece(self):
         print("Pawn at " + self.row + ", " + self.col)
