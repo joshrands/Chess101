@@ -31,8 +31,8 @@ class Pawn(Piece):
                     targets.append(Cell(self.row + self.direction, self.col + 1))
 
             #check the square in front
-            if (checkerTown[self.row + self.direction][self.column] == None):
-                targets.append(Cell(self.row + self.direction, self.column))
+            if (checkerTown[self.row + self.direction][self.col] == None):
+                targets.append(Cell(self.row + self.direction, self.col))
             #if row and col = starting row and col then check 2 in front
             if (self.row == self.startingRow):
                 if (checkerTown[self.row + 2 * self.direction][self.col] == None):
