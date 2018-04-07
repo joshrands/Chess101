@@ -2,7 +2,7 @@
 from Piece import Piece
 
 class Pawn(Piece):
-    def __init__(self, row=0, col=0, team):
+    def __init__(self, row, col, team):
         super().__init__(self, row, col, team)
         self.startingRow = row
         self.startingCol = col
@@ -15,9 +15,7 @@ class Pawn(Piece):
     #calcTargets, which is abstract in the parent
     def calcTargets(self, checkerTown):
         targets = []
-        if (self.row == 0 or self.row == 7):
-            #should technically be a queen or something else now
-        else:
+        if (self.row != 0 and self.row != 7):
             #check the squares diagonal in the direction of self.direction for an enemy Piece
             #
             if (self.col != 0 and isinstance(Piece, checkerTown[self.row + self.direction][self.col - 1]):
@@ -26,11 +24,12 @@ class Pawn(Piece):
 
             #Check the diagonal to the right
             if (self.col != 7 and isinstance(Piece, checkerTown[self.row + self.direction][self.col + 1]):
-                if (checkerTown[self.row + self.direction][self.col - 1].team != self.team):
-                    targets.append(Cell(self.row + self.direction, self.col - 1))
+                if (checkerTown[self.row + self.direction][self.col + 1].team != self.team):
+                    targets.append(Cell(self.row + self.direction, self.col + 1))
 
             #check the square in front
             if (checkerTown[self.row + self.direction][self.column] != None):
+                targets.append(Cell(self.row + self.dire))
             #if row and col = starting row and col then check 2 in front
             if (self.row == self.startingRow and self.col == self.startingCol):
                 if (checkerTown[self.row + 2 * self.direction][self.col] == None):

@@ -5,7 +5,7 @@ from Cell import Cell
 class Piece:
 	# team?
 
-	def __init__(self, row=0, col=0, team):
+	def __init__(self, row, col, team):
 		self.row = row
 		self.col = col
 		self.targets = []
