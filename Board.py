@@ -83,15 +83,14 @@ class Board(SampleBase):
             # move a piece!
             row = int(input("Enter row for desired piece: "))
             col = int(input("Enter col for desired piece: "))
-            # TODO: Make sure to check if this is valid piece 
             if (self.grid[row][col] != None and self.grid[row][col].team == team and len(self.grid[row][col].getTargets()) > 0):
                 move = True
             else:
                 print("Invalid piece, pick again.")
 
         print("Calculating targets...")
-        self.lightTargets(canvas, self.grid[row][col])
         self.lightPieces(canvas, self.teamR)
+        self.lightTargets(canvas, self.grid[row][col])
         canvas = self.matrix.SwapOnVSync(canvas)
     
         validMove = False
@@ -107,21 +106,26 @@ class Board(SampleBase):
                     if (isinstance(self.grid[targetRow][targetCol], Pawn)):
                         enemy = self.grid[targetRow][targetCol].move(targetRow, targetCol) 
                         if (enemy != None):
-                            self.grid[enemy.row][enemy.col]
+                            self.grid[enemy.row][enemy.col] = None
+                            print("enPassant!")
+
                     elif (isinstance(self.grid[targetRow][targetCol], King)):
                         rookLocation, rookTarget = self.grid[targetRow][targetCol].move(targetRow, targetCol)
                         if (rookLocation != None):
                             # do castling
                             self.grid[rookTarget.row][rookTarget.col] = self.grid[rookLocation.row][rookLocation.col]
-                            self.grid[rookLocation.row][rookTarget.col] = None 
+                            self.grid[rookLocation.row][rookLocation.col] = None 
                     else:
                         self.grid[targetRow][targetCol].move(targetRow, targetCol)
 
                     self.grid[row][col] = None
-                     
-            canvas = self.matrix.CreateFrameCanvas()
-            self.lightPieces(canvas, self.teamR)
-            canvas = self.matrix.SwapOnVSync(canvas)
+            
+            if (validMove == False):
+                print("Invalid target.")
+            else:   
+                canvas = self.matrix.CreateFrameCanvas()
+                self.lightPieces(canvas, self.teamR)
+                canvas = self.matrix.SwapOnVSync(canvas)
 
     def clearBoard(self, canvas):
         for x in range(0, 8):
@@ -191,12 +195,12 @@ class Board(SampleBase):
         nameR = input("Enter player 1 name: ")
         print("Enter player 1 colors (rgb): ")	
         self.teamR.setName(nameR)
-        self.teamR.setColor()
+        #self.teamR.setColor()
 
         nameL = input("Enter player 2 name: ")		
         print("Enter player 2 colors (rgb): ")
         self.teamL.setName(nameL)
-        self.teamL.setColor()
+        #self.teamL.setColor()
 
     def lightCell(self, canvas, x, y, r, g, b):
         #offset_canvas = self.matrix.CreateFrameCanvas()
