@@ -43,20 +43,24 @@ class Pawn(Piece):
             if (self.col != 0 and checkerTown[self.row][self.col - 1] is Pawn and checkerTown[self.row][self.col - 1].team != self.team):
                 if (checkerTown[self.row][self.col - 1].enPassantable):
                     self.targets.append(Cell(self.row + self.direction, self.col - 1))
+                    self.enPassantLoc = Cell(self.row + self.direction, self.col - 1)
             #check right
             if (self.col != 7 and checkerTown[self.row][self.col + 1] is Pawn and checkerTown[self.row][self.col + 1].team != self.team):
                 if (checkerTown[self.row][self.col + 1].enPassantable):
                     self.targets.append(Cell(self.row + self.direction, self.col + 1))
+                    self.enPassantLoc = Cell(self.row + self.direction, self.col + 1)
 
     #override move method to set enPassantable
     def move(self, newRow, newCol):
         # calculate new targets
         self.row = newRow
         self.col = newCol
-        if (self.enPassantable):
-            self.enPassantable = False
         if (self.row == self.startingRow and self.col == self.startingCol and (newRow - self.row) == 2 * self.direction):
             self.enPassantable = True
+        if (Cell(newRow, newCol) == enPassantLoc):
+            return True
+        else :
+            return False
 
     def printPiece(self):
         print("Pawn at " + self.row + ", " + self.col)
