@@ -12,10 +12,10 @@ class Rook(Piece):
 
     def calcTargets(self, checkerTown):
         #Run a recurssive function in all directions
-        bladeRunner(checkerTown, 1, 0, self.row, self.col)
-        bladeRunner(checkerTown, 0, 1, self.row, self.col)
-        bladeRunner(checkerTown, -1, 0, self.row, self.col)
-        bladeRunner(checkerTown, 0, -1, self.row, self.col)
+        self.bladeRunner(checkerTown, 1, 0, self.row, self.col)
+        self.bladeRunner(checkerTown, 0, 1, self.row, self.col)
+        self.bladeRunner(checkerTown, -1, 0, self.row, self.col)
+        self.bladeRunner(checkerTown, 0, -1, self.row, self.col)
 
 #Overwrite default print with special Rook print
     def printPiece(self):

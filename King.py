@@ -11,14 +11,14 @@ class King(Piece):
 
     def calcTargets(self, checkerTown):
         #Run a recurssive function in all directions
-        bladeWalker(checkerTown, 1, 1, self.row, self.col)
-        bladeWalker(checkerTown, -1, 1, self.row, self.col)
-        bladeWalker(checkerTown, 1, -1, self.row, self.col)
-        bladeWalker(checkerTown, -1, -1, self.row, self.col)
-        bladeWalker(checkerTown, 1, 0, self.row, self.col)
-        bladeWalker(checkerTown, -1, 0, self.row, self.col)
-        bladeWalker(checkerTown, 0, 1, self.row, self.col)
-        bladeWalker(checkerTown, 0, -1, self.row, self.col)
+        self.bladeWalker(checkerTown, 1, 1, self.row, self.col)
+        self.bladeWalker(checkerTown, -1, 1, self.row, self.col)
+        self.bladeWalker(checkerTown, 1, -1, self.row, self.col)
+        self.bladeWalker(checkerTown, -1, -1, self.row, self.col)
+        self.bladeWalker(checkerTown, 1, 0, self.row, self.col)
+        self.bladeWalker(checkerTown, -1, 0, self.row, self.col)
+        self.bladeWalker(checkerTown, 0, 1, self.row, self.col)
+        self.bladeWalker(checkerTown, 0, -1, self.row, self.col)
 
 #Overwrite default print with special King print
     def printPiece(self):

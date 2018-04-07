@@ -12,10 +12,10 @@ class Bishop(Piece):
 
     def calcTargets(self, checkerTown):
         #Run a recurssive function in all directions
-        bladeRunner(checkerTown, 1, 1, self.row, self.col)
-        bladeRunner(checkerTown, -1, 1, self.row, self.col)
-        bladeRunner(checkerTown, 1, -1, self.row, self.col)
-        bladeRunner(checkerTown, -1, -1, self.row, self.col)
+        self.bladeRunner(checkerTown, 1, 1, self.row, self.col)
+        self.bladeRunner(checkerTown, -1, 1, self.row, self.col)
+        self.bladeRunner(checkerTown, 1, -1, self.row, self.col)
+        self.bladeRunner(checkerTown, -1, -1, self.row, self.col)
 
 #Overwrite default print with special bishop print
     def printPiece(self):
