@@ -63,7 +63,7 @@ class Pawn(Piece):
         self.col = newCol
         if (oldRow == self.startingRow and oldCol == self.startingCol and (newRow - oldRow) == 2 * self.direction):
             self.enPassantable = True
-        if (enPassantLoc != None and newRow == self.enPassantLoc.row and newCol == self.enPassantLoc.col):
+        if (self.enPassantLoc != None and newRow == self.enPassantLoc.row and newCol == self.enPassantLoc.col):
             return Cell(enPassantLoc.row - self.direction, enPassantLoc.col)
         else:
             return None
