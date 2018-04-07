@@ -1,6 +1,8 @@
 #!/usr/bin/env python
 from samplebase import SampleBase
 from Team import Team
+from Pawn import Pawn
+from Bishop import Bishop
 
 class Board(SampleBase):
     
@@ -8,25 +10,46 @@ class Board(SampleBase):
         super(Board, self).__init__(*args, **kwargs)
 		self.teamR = Team(255, 255, 255)
 		self.teamL = Team(255, 255, 255)
+		self.grid = [] * 8
+		for row in range(0, 8):
+				self.grid[row] = [NONE, NONE, NONE, NONE, NONE, NONE, NONE, NONE]	
  
 	# RUN GAME
     def run(self):
         print("Running game...")
        
-		self.createPlayers()	
+		self.createPlayers()
+		self.initializeGameBoard()
  
 		while True:
             offset_canvas = self.matrix.CreateFrameCanvas()
             
-            self.lightCell(offset_canvas, 4, 3, 64, 180, 232)
+            #self.lightCell(offset_canvas, 4, 3, 64, 180, 232)
+			self.lightPieces(offset_canvas, teamR)			
 
             offset_canvas = self.matrix.SwapOnVSync(offset_canvas)
 
 	### Member Functions ###
-	
-	def initializeGameBoard():
-		# create pieces in each team
+
+	def lightPieces(self, offset_canvas, team):
+		for row in self.grid:
+			for col in self.grid:
+				if (self.grid[row][col] != NONE):
+					# there is something here, check if right team
+					#if (self.grid[row][col].team 	
+					# light up cell!
+					self.lightCell(offset_canvas, row, col, team.r, team.g, team.b)
 		
+	def initializeGameBoard(self):
+		# create pieces in each team
+		# create pawns for teamR
+		for col in range(0, 8):
+			self.grid[1][col] = Pawn(1, col, self.teamR)	
+	
+		# create bishop for teamR
+		self.grid[0][2] = Bishop(0, 2, self.teamR)
+		self.grid[0][5] = Bishop(0, 5, self.teamR)
+	
 		# light up starting cells
 		# Right Team, starts at 0, 0
 		for row in range(0, 8):
