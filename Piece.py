@@ -24,4 +24,4 @@ class Piece:
 		print ("Piece at " + self.row + ", " + self.col)
 
 	def getTargets(self):
-		return targets
+		return self.targets
