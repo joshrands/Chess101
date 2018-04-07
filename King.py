@@ -3,16 +3,16 @@ from Piece import Piece
 class King(Piece):
     def calcTargets(self, checkerTown):
         #Run a recurssive function in all directions
-        bladeRunner(checkerTown, 1, 1, self.row, self.col)
-        bladeRunner(checkerTown, -1, 1, self.row, self.col)
-        bladeRunner(checkerTown, 1, -1, self.row, self.col)
-        bladeRunner(checkerTown, -1, -1, self.row, self.col)
-        bladeRunner(checkerTown, 1, 0, self.row, self.col)
-        bladeRunner(checkerTown, -1, 0, self.row, self.col)
-        bladeRunner(checkerTown, 0, 1, self.row, self.col)
-        bladeRunner(checkerTown, 0, -1, self.row, self.col)
+        bladeWalker(checkerTown, 1, 1, self.row, self.col)
+        bladeWalker(checkerTown, -1, 1, self.row, self.col)
+        bladeWalker(checkerTown, 1, -1, self.row, self.col)
+        bladeWalker(checkerTown, -1, -1, self.row, self.col)
+        bladeWalker(checkerTown, 1, 0, self.row, self.col)
+        bladeWalker(checkerTown, -1, 0, self.row, self.col)
+        bladeWalker(checkerTown, 0, 1, self.row, self.col)
+        bladeWalker(checkerTown, 0, -1, self.row, self.col)
 
-    def bladeRunner(self, checkerTown, dir1, dir2, row, col):
+    def bladeWalker(self, checkerTown, dir1, dir2, row, col):
         if (checkerTown[row + dir1][col + dir2] == None):
             targets.append(Cell(row + dir1, col + dir2))
         elif (checkerTown[row + dir1][col + dir2].team != self.team):
