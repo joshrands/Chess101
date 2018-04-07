@@ -24,4 +24,4 @@ class Queen(Piece):
 
 #Overwrite default print with special Queen print
     def printPiece(self):
-        print("Queen at " + self.row + ", " + self.col)
+        print("Queen at", self.row, "," , self.col)

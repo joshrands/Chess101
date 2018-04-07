@@ -22,6 +22,6 @@ class Knight(Piece):
         self.deathLoc(checkerTown, -1, 2, self.row, self.col)
         self.deathLoc(checkerTown, -1, -2, self.row, self.col)
 
-#Overwrite default print with special Knight print
+    #Overwrite default print with special Knight print
     def printPiece(self):
-        print("Knight at " + self.row + ", " + self.col)
+        print("Knight at" , self.row, ",", self.col)

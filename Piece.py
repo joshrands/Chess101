@@ -22,7 +22,7 @@ class Piece:
 		return None
 
 	def printPiece(self, board):
-		print ("Piece at " + self.row + ", " + self.col)
+		print ("Piece at", self.row , "," , self.col)
 
 	def getTargets(self):
 		return self.targets

@@ -20,4 +20,4 @@ class Bishop(Piece):
 
 #Overwrite default print with special bishop print
     def printPiece(self):
-        print("Bishop at " + self.row + ", " + self.col)
+        print("Bishop at", self.row , ",", self.col)

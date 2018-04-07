@@ -23,4 +23,4 @@ class King(Piece):
 
 #Overwrite default print with special King print
     def printPiece(self):
-        print("King at " + self.row + ", " + self.col)
+        print("King at", self.row ,"," , self.col)

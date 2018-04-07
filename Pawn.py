@@ -64,4 +64,4 @@ class Pawn(Piece):
             return None
 
     def printPiece(self):
-        print("Pawn at " + self.row + ", " + self.col)
+        print("Pawn at", self.row, ",", self.col)

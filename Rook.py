@@ -20,4 +20,4 @@ class Rook(Piece):
 
 #Overwrite default print with special Rook print
     def printPiece(self):
-        print("Rook at " + self.row + ", " + self.col)
+        print("Rook at", self.row, ",", self.col)
