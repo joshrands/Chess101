@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 from samplebase import SampleBase
 from Team import Team
-from Pawn import Pawn
+#from Pawn import Pawn
 from Bishop import Bishop
 
 class Board(SampleBase):
@@ -43,7 +43,7 @@ class Board(SampleBase):
     def initializeGameBoard(self):
         # create pieces in each team
         # create pawns for teamR
-        for col in range(0, 8):
+#        for col in range(0, 8):
             #self.grid[1][col] = Pawn(1, col, self.teamR)	
 
         # create bishop for teamR
