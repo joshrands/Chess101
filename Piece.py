@@ -1,6 +1,6 @@
-from Board.py import Board
-from Team.py import Team
-from Cell.py import Cell
+import Board.py
+import Team.py
+import Cell.py
 
 class Piece:
 	# team?
