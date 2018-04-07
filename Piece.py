@@ -2,10 +2,9 @@
 class Piece:
 	# team? 
 
-	def __init__(self, row=0, col=0, name="Pawn", targets=[]):
+	def __init__(self, row=0, col=0, targets=[]):
 		self.row = row
 		self.col = col
-		self.name = name
 
 	# abstract method calcTargets
 	def calcTargets(self): 
