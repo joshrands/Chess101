@@ -58,6 +58,7 @@ class Pawn(Piece):
         self.col = newCol
         if (self.row == self.startingRow and self.col == self.startingCol and (newRow - self.row) == 2 * self.direction):
             self.enPassantable = True
+            print("Pawn is en passantable")
         if (Cell(newRow, newCol) == self.enPassantLoc):
             return Cell(enPassantLoc.row - self.direction, enPassantLoc.col)
         else :
