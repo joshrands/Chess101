@@ -3,6 +3,10 @@ from samplebase import SampleBase
 from Team import Team
 from Pawn import Pawn
 from Bishop import Bishop
+from Rook import Rook
+from Knight import Knight
+from King import King
+from Queen import Queen
 
 class Board(SampleBase):
     
@@ -56,7 +60,12 @@ class Board(SampleBase):
         # create bishop for teamR
         self.grid[0][2] = Bishop(0, 2, self.teamR)
         self.grid[0][5] = Bishop(0, 5, self.teamR)
-        #
+        # create rook for teamR
+        self.grid[0][0] = Rook(0, 0, self.teamR)
+        self.grid[0][7] = Rook(0, 7, self.teamR)
+        self.grid[0][1] = Knight(0, 1, self.teamR)
+        self.grid[0][6] = Knight(0, 6, self.teamR)
+        self.grid[0][3] = King(0, 3, self.teamR) 
         
 
     def createPlayers(self):
