@@ -41,7 +41,7 @@ class King(Piece):
         elif (newRow == oldRow and newCol == oldCol + 3):
             return Cell(oldRow, oldCol + 4), Cell(oldRow, oldCol + 2)
         else:
-            return None
+            return None, None
 		# calculate new targets
 		self.row = newRow
 		self.col = newCol
