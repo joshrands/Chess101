@@ -8,6 +8,7 @@ from Knight import Knight
 from King import King
 from Queen import Queen
 import time
+from Cell import Cell
 
 class Board(SampleBase):
     
@@ -26,22 +27,47 @@ class Board(SampleBase):
         self.createPlayers()
         self.initializeGameBoard()
 
+        
+
         while True:
             offset_canvas = self.matrix.CreateFrameCanvas()
-
+            
+            # Do player 1's turn
+            self.doTurn(offset_canvas, self.teamR)
 #            x = input("Player 1 go: ")
-            time.sleep(.1)
             #self.lightCell(offset_canvas, 4, 3, 64, 180, 232)
             self.lightPieces(offset_canvas, self.teamR)			
 
             offset_canvas = self.matrix.SwapOnVSync(offset_canvas)
 
     ### Member Functions ###
+    def doTurn(self, canvas, team):
+        bool checkMate = False
+        if (checkMate):
+            print("Check mate!")
+
+        bool check = False
+        if (check):
+            print("Check!")
+
+        # move a piece!
+        print("Player:", team.name, "'s move.") 
+        row = input("Enter row for desired piece: ")
+        col = input("Enter col for desired piece: ")
+        # TODO: Make sure to check if this is valid piece 
+        print("Calculating targets...")
+        self.lightTargets(canvas, self.grid[row][col]) 
+
+    def lightTargets(self, canvas, piece):
+        targets = piece.getTargets()
+        for cell in targets:
+            self.lightCell(canvas, cell.row, cell.col, 255, 255, 255)
+
     def lightPieces(self, offset_canvas, team):
         r = 0
         c = 0
         for row in self.grid: 
-            print("Row:", r)
+            #print("Row:", r)
             c = 0
             for piece in row:
                 if (piece != None):
