@@ -26,8 +26,7 @@ class Board(SampleBase):
         print("Running game...")
 
         self.createPlayers()
-        #self.initializeGameBoard()
-        self.grid[4][5] = Queen(4,5,self.teamR)
+        self.initializeGameBoard()
 
         while True:
             offset_canvas = self.matrix.CreateFrameCanvas()
