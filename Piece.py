@@ -11,7 +11,7 @@ class Piece:
 		self.team = team
 
 	# abstract method calcTargets
-	def calcTargets(self):
+	def calcTargets(self, checkerTown):
 		raise NotImplementedError()
 
 	# abstract method move

@@ -1,5 +1,5 @@
 #child class of Piece that represents a Pawn
-import Piece
+from Piece import Piece
 
 class Pawn(Piece):
     def __init__(self, row, col, team):
