@@ -2,6 +2,7 @@
 from Piece import Piece
 class Bishop(Piece):
     def calcTargets(self, checkerTown):
+        print("Calculating targets")
 
 #Overwrite default print with special bishop print
     def printPiece(self):
