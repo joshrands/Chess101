@@ -3,7 +3,7 @@ from Piece import Piece
 
 class Pawn(Piece):
     def __init__(self, row, col, team):
-        super.__init__(self, row, col, team)
+        super().__init__(self, row, col, team)
         self.startingRow = row
         self.startingCol = col
         if (self.row == 6):
