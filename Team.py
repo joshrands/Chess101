@@ -10,9 +10,9 @@ class Team:
 		self.name = "Wendy"
 	
 	def setColor(self):
-		self.r = input("Enter red: ")
-		self.g = input("Enter green: ")
-		self.b = input("Enter blue: ")
+		self.r = int(input("Enter red: "))
+		self.g = int(input("Enter green: "))
+		self.b = int(input("Enter blue: "))
 
 	def setName(self, name):
 		self.name = name
