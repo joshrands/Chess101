@@ -26,20 +26,20 @@ class King(Piece):
 
         #castling situation
         if (self.touched == False):
-            if (isinstance(checkerTown[self.row][self.col - 5], Rook) and checkerTown[self.row][self.col - 5].touched == False):
-                if (checkerTown[self.row][self.col - 1] == None and checkerTown[self.row][self.col - 2] == None and checkerTown[self.row][self.col - 3] == None and checkerTown[self.row][self.col - 4] == None):
-                    self.targets.append(Cell(self.row, self.col - 3))
-            if (isinstance(checkerTown[self.row][self.col + 4], Rook) and checkerTown[self.row][self.col + 4].touched == False):
-                if (checkerTown[self.row][self.col + 1] == None and checkerTown[self.row][self.col + 2] == None and checkerTown[self.row][self.col + 3] == None):
-                    self.targets.append(Cell(self.row, self.col + 3))
+            if (isinstance(checkerTown[self.row][self.col - 4], Rook) and checkerTown[self.row][self.col - 4].touched == False):
+                if (checkerTown[self.row][self.col - 1] == None and checkerTown[self.row][self.col - 2] == None and checkerTown[self.row][self.col - 3] == None):
+                    self.targets.append(Cell(self.row, self.col - 2))
+            if (isinstance(checkerTown[self.row][self.col + 3], Rook) and checkerTown[self.row][self.col + 3].touched == False):
+                if (checkerTown[self.row][self.col + 1] == None and checkerTown[self.row][self.col + 2] == None):
+                    self.targets.append(Cell(self.row, self.col + 2))
     def move(self, newRow, newCol):
         oldRow = self.row
         oldCol = self.col
         #check if castled
-        if (newRow == oldRow and newCol == oldCol - 3):
-            return Cell(oldRow, oldCol - 5), Cell(oldRow, oldCol - 2)
-        elif (newRow == oldRow and newCol == oldCol + 3):
-            return Cell(oldRow, oldCol + 4), Cell(oldRow, oldCol + 2)
+        if (newRow == oldRow and newCol == oldCol - 2):
+            return Cell(oldRow, oldCol - 4), Cell(oldRow, oldCol - 1)
+        elif (newRow == oldRow and newCol == oldCol + 2):
+            return Cell(oldRow, oldCol + 4), Cell(oldRow, oldCol + 1)
         else:
             return None, None
 		# calculate new targets
