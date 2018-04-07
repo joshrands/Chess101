@@ -12,10 +12,8 @@ class Pawn(Piece):
         self.startingCol = col
         if (self.row == 6):
             self.direction = -1
-        elif (self.row == 1):
-            self.direction = 1;
         else:
-            self.direction = 0
+            self.direction = 1
         self.enPassantable = False
 
     #calcTargets, which is abstract in the parent
