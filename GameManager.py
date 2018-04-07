@@ -13,7 +13,7 @@ class GameManager:
         self.board.process()
 
 #    def setGameProperties():
+
 game = GameManager()
 game.startGame()
-#board = Board()
-#board.process()
+
