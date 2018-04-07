@@ -42,9 +42,9 @@ class King(Piece):
         else:
             return None, None
 		# calculate new targets
-		self.row = newRow
-		self.col = newCol
-		self.touched = True
+        self.row = newRow
+        self.col = newCol
+        self.touched = True
 
 #Overwrite default print with special King print
     def printPiece(self):
