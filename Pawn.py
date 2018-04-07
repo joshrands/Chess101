@@ -50,7 +50,9 @@ class Pawn(Piece):
 
     #override move method to set enPassantable
     def move(self, newRow, newCol):
-        super().move(self, newRow, newCol)
+        # calculate new targets
+		self.row = newRow
+		self.col = newCol
         if (self.enPassantable):
             self.enPassantable = False
         if (self.row == self.startingRow and self.col == self.startingCol and (newRow - self.row) == 2 * self.direction):
