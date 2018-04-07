@@ -26,10 +26,10 @@ class King(Piece):
         #castling situation
         if (self.touched == false):
             if (isinstance(checkerTown[self.row][self.col - 5],Rook) and checkerTown[self.row][self.col - 5].touched == false):
-                if (checkerTown[self.row][self.col - 1] == None && checkerTown[self.row][self.col - 2] == None && checkerTown[self.row][self.col - 3] == None and checkerTown[self.row][self.col - 4] == None):
+                if (checkerTown[self.row][self.col - 1] == None and checkerTown[self.row][self.col - 2] == None and checkerTown[self.row][self.col - 3] == None and checkerTown[self.row][self.col - 4] == None):
                     self.targets.append(Cell(self.row, self.col - 3))
-            elif (isinstance(checkerTown[self.row][self.col + 4], Rook) and checkerTown[self.row][self.col + 4].touched == false):
-                if (checkerTown[self.row][self.col + 1] == None && checkerTown[self.row][self.col + 2] == None && checkerTown[self.row][self.col + 3] == None):
+            if (isinstance(checkerTown[self.row][self.col + 4], Rook) and checkerTown[self.row][self.col + 4].touched == false):
+                if (checkerTown[self.row][self.col + 1] == None and checkerTown[self.row][self.col + 2] == None and checkerTown[self.row][self.col + 3] == None):
                     self.targets.append(Cell(self.row, self.col + 3))
 
 	def move(self, newRow, newCol):
