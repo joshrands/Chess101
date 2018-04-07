@@ -17,7 +17,7 @@ class Piece:
 		self.row = newRow
 		self.col = newCol
 
-	def print(self):
+	def printPiece(self):
 		raise NotImplementedError()
 
 	def getTargets():

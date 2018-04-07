@@ -16,5 +16,5 @@ class Pawn(Piece):
         //check the square in front
         //if row and col = starting row and col then check 2 in front
 
-    def print(self):
+    def printPiece(self):
         print("Pawn at " + self.row + ", " + self.col)
