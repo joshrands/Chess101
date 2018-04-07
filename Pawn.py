@@ -18,12 +18,12 @@ class Pawn(Piece):
         if (self.row != 0 and self.row != 7):
             #check the squares diagonal in the direction of self.direction for an enemy Piece
             #
-            if (self.col != 0 and isinstance(Piece, checkerTown[self.row + self.direction][self.col - 1]):
+            if (self.col != 0 and isinstance(Piece, checkerTown[self.row + self.direction][self.col - 1])):
                 if (checkerTown[self.row + self.direction][self.col - 1].team != self.team):
                     targets.append(Cell(self.row + self.direction, self.col - 1))
 
             #Check the diagonal to the right
-            if (self.col != 7 and isinstance(Piece, checkerTown[self.row + self.direction][self.col + 1]):
+            if (self.col != 7 and isinstance(Piece, checkerTown[self.row + self.direction][self.col + 1])):
                 if (checkerTown[self.row + self.direction][self.col + 1].team != self.team):
                     targets.append(Cell(self.row + self.direction, self.col + 1))
 
