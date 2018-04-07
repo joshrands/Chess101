@@ -9,6 +9,7 @@ class Piece:
 		self.col = col
 		self.targets = []
 		self.team = team
+		self.touched = False
 
 	# abstract method calcTargets
 	def calcTargets(self, checkerTown):
@@ -19,6 +20,7 @@ class Piece:
 		# calculate new targets
 		self.row = newRow
 		self.col = newCol
+		self.touched = True
 
 
 	def printPiece(self, board):
