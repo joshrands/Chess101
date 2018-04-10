@@ -33,8 +33,12 @@ class King(Piece):
                 if (checkerTown[self.row][self.col + 1] == None and checkerTown[self.row][self.col + 2] == None):
                     self.targets.append(Cell(self.row, self.col + 2))
     def move(self, newRow, newCol):
+		# calculate new targets
         oldRow = self.row
         oldCol = self.col
+        self.row = newRow
+        self.col = newCol
+        self.touched = True
         #check if castled
         if (newRow == oldRow and newCol == oldCol - 2):
             return Cell(oldRow, oldCol - 4), Cell(oldRow, oldCol - 1)
@@ -42,10 +46,6 @@ class King(Piece):
             return Cell(oldRow, oldCol + 3), Cell(oldRow, oldCol + 1)
         else:
             return None, None
-		# calculate new targets
-        self.row = newRow
-        self.col = newCol
-        self.touched = True
 
 #Overwrite default print with special King print
     def printPiece(self):

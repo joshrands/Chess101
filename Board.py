@@ -59,7 +59,6 @@ class Board(SampleBase):
             for piece in row:
                 if (isinstance(piece, Pawn) and piece.team == team):
                     piece.enPassantable = False
-                    #print("Yay")
                 if (piece != None):
                     piece.calcTargets(self.grid)
                     #print pieces that can be moved
@@ -115,6 +114,7 @@ class Board(SampleBase):
                             # do castling
                             self.grid[rookTarget.row][rookTarget.col] = self.grid[rookLocation.row][rookLocation.col]
                             self.grid[rookLocation.row][rookLocation.col] = None
+                            self.grid[rookTarget.row][rookTarget.col].move(rookTarget.row, rookTarget.col)
                     else:
                         self.grid[targetRow][targetCol].move(targetRow, targetCol)
 
