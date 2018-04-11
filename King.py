@@ -98,7 +98,10 @@ class King(Piece):
         #check perpindicular directions for rooks and queens, and kings for one space
 
         #iterate over the entire board and set every piece to not critical
-
+        for row in checkerTown:
+            for piece in row:
+                if (piece != None):
+                    piece.critical = False
 
         #checking diagonally to the upper right (or 1,1 direction)
         for i in ([-1,0,1]):
