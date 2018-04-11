@@ -32,6 +32,7 @@ class King(Piece):
             if (isinstance(checkerTown[self.row][self.col + 3], Rook) and checkerTown[self.row][self.col + 3].touched == False):
                 if (checkerTown[self.row][self.col + 1] == None and checkerTown[self.row][self.col + 2] == None):
                     self.targets.append(Cell(self.row, self.col + 2))
+
     def move(self, newRow, newCol):
 		# calculate new targets
         oldRow = self.row
@@ -46,6 +47,24 @@ class King(Piece):
             return Cell(oldRow, oldCol + 3), Cell(oldRow, oldCol + 1)
         else:
             return None, None
+
+    def amIGonnaDie(self, checkerTown, enemies, checkRow, checkCol, dir1, dir2):
+        #check if I am in check
+        #there are 8 possible directions that could be hindering me, plus knights
+        #check perpindicular directions for rooks and queens, and kings for one space
+        if (enemies == "all"):
+            dangerRow, dangerCol = amIGonnaDie(checkerTown, "dia", checkRow, checkCol, dir1, dir2)
+            if (dangerRow == -1 and dangerCol == -1):
+                dangerRow, dangerCol = amIGonnaDie(checkerTown, "diaShort", checkRow, checkCol, dir1, dir2)
+            if (dangerRow == -1 and dangerCol == -1):
+                dangerRow, dangerCol = amIGonnaDie(checkerTown, "perp", checkRow, checkCol, dir1, dir2)
+            if (dangerRow == -1 and dangerCol == -1):
+                dangerRow, dangerCol = amIGonnaDie(checkerTown, "perpShort", checkRow, checkCol, dir1, dir2)
+            if (dangerRow == -1 and dangerCol == -1):
+                dangerRow, dangerCol = amIGonnaDie(checkerTown, "knight", checkRow, checkCol, dir1, dir2)
+            return dangerRow, dangerCol
+        elif (enemies == "dia"):
+            
 
 #Overwrite default print with special King print
     def printPiece(self):
