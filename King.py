@@ -7,7 +7,6 @@ from Knight import Knight
 from Pawn import Pawn
 from Queen import Queen
 from Team import Team
-import Math
 
 class King(Piece):
 
@@ -40,7 +39,7 @@ class King(Piece):
                     self.targets.append(Cell(self.row, self.col + 2))
 
     def move(self, newRow, newCol):
-		# calculate new targets
+    # calculate new targets
         oldRow = self.row
         oldCol = self.col
         self.row = newRow
@@ -60,8 +59,11 @@ class King(Piece):
         #check perpindicular directions for rooks and queens, and kings for one space
 
         #checking diagonally to the upper right (or 1,1 direction)
-        for i in range(-1, 1):
-            for j in range(-1, 1):
+        for i in ([-1,0,1]):
+            for j in ([-1,0,1]):
+                if (i == 0 and j == 0):
+                    continue
+
                 enemyRow, enemyCol, scoutRow, scoutCol = self.iSpy(checkerTown, self.row + i, self.col + j, i, j)
 
                 if (i == 0 or j == 0):
@@ -69,67 +71,83 @@ class King(Piece):
                         if (enemyRow != -1):
                             #scout found an enemy piece
                             #check if it is a perpindicular moving piece making the scout critical
-                            if (isinstance(checkerTown[enemyRow][enemyCol], Rook) or isinstance(checkerTown[enemyRow][enemycol], Queen)):
+                            if (isinstance(checkerTown[enemyRow][enemyCol], Rook) or isinstance(checkerTown[enemyRow][enemyCol], Queen)):
                                 #scout is critical, mark him as such
                                 checkerTown[scoutRow][scoutCol].critical = True
                     elif (enemyRow != -1):
-                        if (isinstance(checkerTown[enemyRow][enemyCol], Rook) or isinstance(checkerTown[enemyRow][enemycol], Queen)):
+                        if (isinstance(checkerTown[enemyRow][enemyCol], Rook) or isinstance(checkerTown[enemyRow][enemyCol], Queen)):
                             #enemy placing the king in check has been found
                             #return its location
+                            print("ello 1")
                             return enemyRow, enemyCol
-                        elif (isinstance(checkTown[enemyRow][enemyCol], King)):
-                            if ((Math.abs(enemyRow - self.row) + Math.abs(enemyCol - self.col)) == 1):
+                        elif (isinstance(checkerTown[enemyRow][enemyCol], King)):
+                            if ((abs(enemyRow - self.row) + abs(enemyCol - self.col)) == 1):
                                 #enemy is a king one spot away so it could hypothetically put the king in check
+                                print("ello 2")
                                 return enemyRow, enemyCol
                 else:
                     if (scoutRow != -1):
                         if (enemyRow != -1):
                             #scout found an enemy piece
                             #check if it is a diagonal moving piece making the scout critical
-                            if (isinstance(checkerTown[enemyRow][enemyCol], Bishop) or isinstance(checkerTown[enemyRow][enemycol], Queen)):
+                            if (isinstance(checkerTown[enemyRow][enemyCol], Bishop) or isinstance(checkerTown[enemyRow][enemyCol], Queen)):
                                 #scout is critical, mark him as such
                                 checkerTown[scoutRow][scoutCol].critical = True
                     elif (enemyRow != -1):
-                        if (isinstance(checkerTown[enemyRow][enemyCol], Bishop) or isinstance(checkerTown[enemyRow][enemycol], Queen)):
+                        if (isinstance(checkerTown[enemyRow][enemyCol], Bishop) or isinstance(checkerTown[enemyRow][enemyCol], Queen)):
                             #enemy placing the king in check has been found
                             #return its location
+                            print("ello 3")
                             return enemyRow, enemyCol
                         elif (isinstance(checkerTown[enemyRow][enemyCol], King)):
-                            if ((Math.abs(enemyRow - self.row) + Math.abs(enemyCol - self.col)) == 2):
+                            if ((abs(enemyRow - self.row) + abs(enemyCol - self.col)) == 2):
                                 #enemy is a king one spot away so it could hupothetically put the king in check
+                                print("ello 4")
                                 return enemyRow, enemyCol
                         elif (isinstance(checkerTown[enemyRow][enemyCol], Pawn)):
                             if ((enemyRow - self.row) == self.direction):
+                                print("ello 5")
                                 return enemyRow, enemyCol
 
-                rowTargets = [2, 2, -2, -2, 1, 1, -1, -1]
-                colTargets = [1, -1, 1, -1, 2, -2, 2, -2]
-                for i in range(0, 8):
-                    knightRow, knightCol = knightInShiningArmor(checkerTown, rowTargets[i], colTargets[i], self.row, self.col):
-                    if (knightRow != -1 and knightCol != -1):
-                        return knightRow, knightCol
+        rowTargets = [2, 2, -2, -2, 1, 1, -1, -1]
+        colTargets = [1, -1, 1, -1, 2, -2, 2, -2]
+        for i in range(0, 8):
+            knightRow, knightCol = self.knightInShiningArmor(checkerTown, rowTargets[i], colTargets[i], self.row, self.col)
+            if (knightRow != -1 and knightCol != -1):
+                print("ello 6")
+                return knightRow, knightCol
 
-                return -1, -1
+        print("ello 7")
+        return -1, -1
 
 
 
     def iSpy(self, checkerTown, currentRow, currentCol, dir1, dir2):
-        nextLoc = (currentRow + dir1 >= 0 and currentRow + dir1 < 8 and currentCol + dir2 >= 0 and currentCol + dir2 < 8)
+        print("What do I spy, with my little eye?")
+        nextLoc = False
+        if (currentRow + dir1 >= 0 and currentRow + dir1 < 8 and currentCol + dir2 >= 0 and currentCol + dir2 < 8):
+            nextLoc = True
         if (currentRow >= 0 and currentRow < 8 and currentCol >= 0 and currentCol < 8):
+            print("Checking", currentRow,",",currentCol)
             if (checkerTown[currentRow][currentCol] != None):
                 if (checkerTown[currentRow][currentCol].team != self.team):
                     #enemy piece encountered
+                    print("Ho! An enemy afar!")
                     return currentRow, currentCol, -1, -1
-                elif nextLoc:
-                    return checkerTown[currentRow][currentCol].Kingsman(checkerTown, currentRow, currentCol, dir1, dir2), currentRow, currentCol
-            elif nextLoc:
-                return iSpy(checkerTown, currentRow + dir1, currentCOl + dir2, dir1, dir2)
+                elif (nextLoc):
+                    print("Ho, boy! Look for an enemy there behind yourself, won't you?")
+                    scoutRow, scoutCol = checkerTown[currentRow][currentCol].Kingsman(checkerTown, currentRow + dir1, currentCol + dir2, dir1, dir2)
+                    return scoutRow, scoutCol, currentRow, currentCol
+            elif (nextLoc):
+                print("I must search farther!")
+                return1, return2, return3, return4 = self.iSpy(checkerTown, currentRow + dir1, currentCol + dir2, dir1, dir2)
+                return return1, return2, return3, return4
         return -1, -1, -1, -1
 
 
     def knightInShiningArmor(self, checkerTown, dir1, dir2, row, col):
         if (row + dir1 >= 0 and row + dir1 <= 7 and col + dir2 >= 0 and col + dir2 <= 7):
-            if (ininstance(checkerTown[row + dir1][col + dir2], Knight) and checkerTown[row + dir1][col + dir2].team != self.team):
+            if (isinstance(checkerTown[row + dir1][col + dir2], Knight) and checkerTown[row + dir1][col + dir2].team != self.team):
                 return (row + dir1), (col + dir2)
         return -1, -1
 
@@ -141,8 +159,8 @@ class King(Piece):
 
 #test the check features of the king
 grid = []
-for row in range(0, 5):
-    grid.append([None, None, None, None, None])
+for row in range(0, 8):
+    grid.append([None, None, None, None, None, None, None, None])
 
 teamL = Team(255, 0, 0)
 teamL.name = "Zach Test L"
@@ -152,7 +170,7 @@ teamR.name = "Zach Test R"
 
 #place pieces that let us check the many king functionality
 #can attack directly
-grid[0][0] = Bishop(0,0,teamL)
+#grid[6][6] = Bishop(6,6,teamL)
 #can attack directly but only one always
 #grid[0][1] = King(0,1,teamL)
 #our king that we see if is in check
@@ -166,11 +184,12 @@ grid[1][1] = King(1,1,teamR)
 #enemy behind above
 #grid[4][4] = Bishop(4,4,teamL)
 #can attack like a knight
-#grid[3][0] = Knight(3,0,teamL)
+grid[3][0] = Knight(3,0,teamL)
 
 #check for check
-att1, att2 = grid[1,1].amIGonnaDie(grid)
+att1, att2 = grid[1][1].amIGonnaDie(grid)
 if (att1 == -1 and att2 == -1):
     print("King is not in check")
 else:
-    print("King is in check from piece at", att1, ",", att2)
+    print("King is in check from ")
+    grid[att1][att2].printPiece()
