@@ -17,6 +17,7 @@ class Pawn(Piece):
         self.enPassantable = False
         self.enPassantLoc = None
         self.critical = False
+        self.criticalTargets = []
 
     #calcTargets, which is abstract in the parent
     def calcTargets(self, checkerTown):
@@ -51,6 +52,10 @@ class Pawn(Piece):
                 if (checkerTown[self.row][self.col + 1].enPassantable):
                     self.targets.append(Cell(self.row + self.direction, self.col + 1))
                     self.enPassantLoc = Cell(self.row + self.direction, self.col + 1)
+
+        #if critical, check calculated targets against criticalTargets and only keep cells that appear on both
+        if (self.critical):
+            self.criticalMan()
 
     #override move method to set enPassantable
     def move(self, newRow, newCol):

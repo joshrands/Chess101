@@ -11,6 +11,7 @@ class Piece:
         self.team = team
         self.touched = False
         self.critical = False
+        self.criticalTargets = []
 
     # abstract method calcTargets
     def calcTargets(self, checkerTown):
@@ -38,7 +39,14 @@ class Piece:
         else:
             return -1, -1
 
+    def critcalMan(self):
+        newTargets = []
+        for critcalCell in self.criticalTargets:
+            for cell in self.targets:
+                if (criticalCell.row == cell.row and criticalCell.col = cell.col):
+                    newTargets.append(cell)
 
+        self.targets = newTargets
 
 
     def printPiece(self, board):

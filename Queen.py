@@ -23,6 +23,10 @@ class Queen(Piece):
         self.bladeRunner(checkerTown, 0, 1, self.row, self.col)
         self.bladeRunner(checkerTown, 0, -1, self.row, self.col)
 
+        #if critical, check calculated targets against criticalTargets and only keep cells that appear on both
+        if (self.critical):
+            self.criticalMan()
+
 #Overwrite default print with special Queen print
     def printPiece(self):
         print("Queen at", self.row, "," , self.col)
