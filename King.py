@@ -108,7 +108,7 @@ class King(Piece):
                     knightRow, knightCol = knightInShiningArmor(checkerTown, rowTargets[i], colTargets[i], self.row, self.col):
                     if (knightRow != -1 and knightCol != -1):
                         return knightRow, knightCol
-                        
+
                 return -1, -1
 
 
@@ -144,9 +144,33 @@ grid = []
 for row in range(0, 5):
     grid.append([None, None, None, None, None])
 
+teamL = Team(255, 0, 0)
+teamL.name = "Zach Test L"
+
+teamR = Team(0, 255, 0)
+teamR.name = "Zach Test R"
+
 #place pieces that let us check the many king functionality
-grid[0][0] = Bishop(0,0,self.teamL)
-grid[0][1] = King(0,1,self.teamL)
-grid[1][1] = King(1,1,self.teamR)
-grid[4][1] = Queen(4,1,self.teamL)
-grid[2]
+#can attack directly
+grid[0][0] = Bishop(0,0,teamL)
+#can attack directly but only one always
+#grid[0][1] = King(0,1,teamL)
+#our king that we see if is in check
+grid[1][1] = King(1,1,teamR)
+#can attack from far
+#grid[4][1] = Queen(4,1,teamL)
+#critical piece
+#grid[2][1] = Knight(2,1,teamR)
+#critical piece
+#grid[2][2] = Bishop(2,2,teamR)
+#enemy behind above
+#grid[4][4] = Bishop(4,4,teamL)
+#can attack like a knight
+#grid[3][0] = Knight(3,0,teamL)
+
+#check for check
+att1, att2 = grid[1,1].amIGonnaDie(grid)
+if (att1 == -1 and att2 == -1):
+    print("King is not in check")
+else:
+    print("King is in check from piece at", att1, ",", att2)
