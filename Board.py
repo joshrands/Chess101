@@ -66,12 +66,12 @@ class Board(SampleBase):
                 canvas.SetPixel(0, m, team.r, team.g, team.b)
                 canvas.SetPixel(31, m, team.r, team.g, team.b)
             for j in range(1, 30):
-                for k in range(0, 3):
+                for k in range(0, 5):
                     x = random.randint(0, 30) + 1
                     canvas.SetPixel(x, j, random.randint(0, 255), random.randint(0, 255), random.randint(0, 255))
                     time.sleep(.0001)
-            for j in range(0, 30):
-                for k in range(0, 3):
+            for j in range(1, 30):
+                for k in range(0, 5):
                     x = random.randint(0, 30) + 1
                     canvas.SetPixel(j, x, random.randint(0, 255), random.randint(0, 255), random.randint(0, 255))
                     time.sleep(.0001)
