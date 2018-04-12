@@ -25,7 +25,7 @@ class Queen(Piece):
 
         #if critical, check calculated targets against criticalTargets and only keep cells that appear on both
         if (self.critical):
-            self.criticalMan()
+            super().criticalMan()
 
 #Overwrite default print with special Queen print
     def printPiece(self):
