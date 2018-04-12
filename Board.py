@@ -76,7 +76,8 @@ class Board(SampleBase):
                         piece.printPiece()
                 elif (piece != None):
                     piece.calcTargets(self.grid)
-                    piece.skyFall(self.grid[kingRow][kingCol])
+                    if (check):
+                        piece.skyFall(self.grid[kingRow][kingCol])
                     #print pieces that can be moved
                     if (len(piece.getTargets()) > 0 and piece.team == team):
                         piece.printPiece()
