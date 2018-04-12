@@ -111,7 +111,7 @@ class King(Piece):
         #iterate over the entire board and set every piece to not critical
         for row in checkerTown:
             for piece in row:
-                if (piece != None):
+                if (piece != None and piece.team == self.team):
                     piece.critical = False
 
         #checking diagonally to the upper right (or 1,1 direction)
