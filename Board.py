@@ -74,8 +74,9 @@ class Board(SampleBase):
                 if (isinstance(piece, King)):
                     if (len(piece.getTargets()) > 0 and piece.team == team):
                         piece.printPiece()
-                if (piece != None):
+                elif (piece != None):
                     piece.calcTargets(self.grid)
+                    piece.skyFall(self.grid[kingRow][kingCol])
                     #print pieces that can be moved
                     if (len(piece.getTargets()) > 0 and piece.team == team):
                         piece.printPiece()
@@ -83,15 +84,6 @@ class Board(SampleBase):
         checkMate = False
         if (checkMate):
             print("Check mate!")
-
-        if (check):
-            for row in self.grid:
-                for piece in row:
-                    if (piece != None and piece.team == team):
-                        if (isinstance(piece, King)):
-                            print("King does not call skyFall")
-                        else:
-                            piece.skyFall(self.grid[kingRow][kingCol])
 
         move = False
         row = 0
