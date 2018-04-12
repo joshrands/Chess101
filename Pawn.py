@@ -65,7 +65,7 @@ class Pawn(Piece):
             for savingTarget in king.godSaveTheKing:
                 if (target.row == savingTarget.row and target.col == savingTarget.col):
                     newTargets.append(target)
-        if(enPassantLoc != None):
+        if(self.enPassantLoc != None):
             newTargets.append(Cell(self.enPassantLoc.row, self.enPassantLoc.col))
         self.targets = newTargets
 
