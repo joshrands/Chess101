@@ -36,8 +36,7 @@ class Piece:
                     return -1, -1
             elif nextLoc:
                 return self.Kingsman(checkerTown, currentRow + dir1, currentCol + dir2, dir1, dir2)
-        else:
-            return -1, -1
+        return -1, -1
 
     def critcalMan(self):
         newTargets = []
