@@ -83,6 +83,10 @@ class King(Piece):
 
         #re-run amIGonnaDie with the King's original values
         useless1, useless2 = self.amIGonnaDie(checkerTown)
+        if (useless1 != -1 and useless2 != -1):
+            return True
+        else:
+            return False
 
     def move(self, newRow, newCol):
     # calculate new targets

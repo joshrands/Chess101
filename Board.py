@@ -55,10 +55,17 @@ class Board(SampleBase):
     def doTurn(self, canvas, team):
         # disable enPassantable
         # calculate targets for all pieces
+
+        check = False
+        kingRow = -1;
+        kingCol = -1;
+
         for row in self.grid:
             for piece in row:
                 if (isinstance(piece, King) and piece.team == team):
-                    piece.calcTargets(self.grid)
+                    check = piece.calcTargets(self.grid)
+                    kingRow = piece.row
+                    kingCol = piece.col
 
         for row in self.grid:
             for piece in row:
@@ -77,9 +84,11 @@ class Board(SampleBase):
         if (checkMate):
             print("Check mate!")
 
-        check = False
         if (check):
-            print("Check!")
+            for row in self.grid:
+                for piece in row:
+                    if (piece != None and piece.team == team and isinstance(piece, King) == False):
+                        piece.skyFall(self.grid[kingRow][kingCol])
 
         move = False
         row = 0

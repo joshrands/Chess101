@@ -47,6 +47,14 @@ class Piece:
 
         self.targets = newTargets
 
+    def skyFall(self, king):
+        #refactor the targets because the king is in check and only godSaveTheKing spaces should appear as targets
+        newTargets = []
+        for target in self.targets:
+            for savingTarget in king.godSaveTheKing
+                if (target.row == savingTarget.row and target.col == savingTarget.col):
+                    newTargets.append(target)
+        self.targets = newTargets
 
     def printPiece(self, board):
         print ("Piece at", self.row , "," , self.col)
