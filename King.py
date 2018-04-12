@@ -72,7 +72,7 @@ class King(Piece):
 
         #now iterate through targetsToRemove and remove them from targets
         for toRemove in targetsToRemove:
-            targets.remove(toRemove)
+            self.targets.remove(toRemove)
 
         #re-run amIGonnaDie with the King's original values
         self.amIGonnaDie(checkerTown)
@@ -124,7 +124,7 @@ class King(Piece):
                         if (isinstance(checkerTown[enemyRow][enemyCol], Rook) or isinstance(checkerTown[enemyRow][enemyCol], Queen)):
                             #enemy placing the king in check has been found
                             #return its location
-                            (self.godSaveTheKing = self.pleaseGodSaveTheKing)(enemyRow, enemyCol)
+                            self.godSaveTheKing = self.pleaseGodSaveTheKing(enemyRow, enemyCol)
                             return enemyRow, enemyCol
                         elif (isinstance(checkerTown[enemyRow][enemyCol], King)):
                             if ((abs(enemyRow - self.row) + abs(enemyCol - self.col)) == 1):

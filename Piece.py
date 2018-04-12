@@ -43,7 +43,7 @@ class Piece:
         newTargets = []
         for critcalCell in self.criticalTargets:
             for cell in self.targets:
-                if (criticalCell.row == cell.row and criticalCell.col = cell.col):
+                if (criticalCell.row == cell.row and criticalCell.col == cell.col):
                     newTargets.append(cell)
 
         self.targets = newTargets
