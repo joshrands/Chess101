@@ -55,7 +55,10 @@ class King(Piece):
         #check amIGonnaDie() with a board and position changed
         targetsToRemove = []
         testKing = King(self.row, self.col, self.team)
+        print("About to theorize about possible moves. Targets: ")
+        print(self.targets)
         for cell in self.targets:
+            print("looping through potential moves now")
             originalPiece = checkerTown[cell.row][cell.col]
             checkerTown[cell.row][cell.col] = testKing
             checkerTown[self.row][self.col] = None
@@ -76,7 +79,7 @@ class King(Piece):
             self.targets.remove(toRemove)
 
         #re-run amIGonnaDie with the King's original values
-        self.amIGonnaDie(checkerTown)
+        #self.amIGonnaDie(checkerTown)
 
     def move(self, newRow, newCol):
     # calculate new targets
