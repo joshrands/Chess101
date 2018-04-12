@@ -42,6 +42,10 @@ class King(Piece):
         self.bladeWalker(checkerTown, 0, 1, self.row, self.col)
         self.bladeWalker(checkerTown, 0, -1, self.row, self.col)
 
+        #store variables for King's original position and such
+        oldRow = self.row
+        oldCol = self.col
+
         #castling situation
         if (self.touched == False):
             if (isinstance(checkerTown[self.row][self.col - 4], Rook) and checkerTown[self.row][self.col - 4].touched == False):
@@ -51,15 +55,25 @@ class King(Piece):
                 if (checkerTown[self.row][self.col + 1] == None and checkerTown[self.row][self.col + 2] == None):
                     self.targets.append(Cell(self.row, self.col + 2))
 
-        #store variables for King's original position and such
-        oldRow = self.row
-        oldCol = self.col
-
         #now that all targets have been calculated, iterate through them all and
         #check amIGonnaDie() with a board and position changed
         targetsToRemove = []
+
+        castleLeft = False;
+        castleLeftStep = True;
+        castleRight = False;
+        castleRightStep = True;
+        castleLeftCell = Cell(-1, -1)
+        castleRightCell = Cell(-1, -1)
+
         print(self.targets)
         for cell in self.targets:
+            if (cell.row == oldRow and cell.col == (oldCol - 2)):
+                castleLeft = True
+                castleLeftCell = cell
+            if (cell.row == oldRow and cell.col == (oldCol + 2)):
+                castleRight = True
+                castleRightCell = cell
             originalPiece = checkerTown[cell.row][cell.col]
             checkerTown[cell.row][cell.col] = self
             checkerTown[self.row][self.col] = None
@@ -67,6 +81,15 @@ class King(Piece):
             self.col = cell.col
             threat1, threat2 = self.amIGonnaDie(checkerTown)
             if (threat1 != -1 and threat2 != -1):
+                if (cell.row == oldRow and cell.col == (oldCol - 2)):
+                    castleLeft = False
+                if (cell.row == oldRow and cell.col == (oldCol + 2)):
+                    castleRight = False
+
+                if (cell.row == oldRow and cell.col == (oldCol - 1)):
+                    castleLeftStep = False
+                if (cell.row == oldRow and cell.col == (oldCol + 1)):
+                    castleRightStep = False
                 targetsToRemove.append(cell)
                 print("added cell to be removed as a king target")
 
@@ -76,6 +99,10 @@ class King(Piece):
             self.row = oldRow
             self.col = oldCol
 
+        if (castleLeft == True and castleLeftStep == False):
+            self.targets.remove(castleLeftCell)
+        if (castleRight == True and castleRightStep == False):
+            self.targets.remove(castleRightCell)
         #now iterate through targetsToRemove and remove them from targets
         for toRemove in targetsToRemove:
             print("removed king target")
@@ -227,41 +254,3 @@ class King(Piece):
 #Overwrite default print with special King print
     def printPiece(self):
         print("King at", self.row ,"," , self.col)
-
-
-#test the check features of the king
-grid = []
-for row in range(0, 8):
-    grid.append([None, None, None, None, None, None, None, None])
-
-teamL = Team(255, 0, 0)
-teamL.name = "Zach Test L"
-
-teamR = Team(0, 255, 0)
-teamR.name = "Zach Test R"
-
-#place pieces that let us check the many king functionality
-#can attack directly
-#grid[6][6] = Bishop(6,6,teamL)
-#can attack directly but only one always
-#grid[0][1] = King(0,1,teamL)
-#our king that we see if is in check
-grid[1][1] = King(1,1,teamR)
-#can attack from far
-#grid[4][1] = Queen(4,1,teamL)
-#critical piece
-#grid[2][1] = Knight(2,1,teamR)
-#critical piece
-#grid[2][2] = Bishop(2,2,teamR)
-#enemy behind above
-#grid[4][4] = Bishop(4,4,teamL)
-#can attack like a knight
-grid[3][0] = Knight(3,0,teamL)
-
-#check for check
-att1, att2 = grid[1][1].amIGonnaDie(grid)
-if (att1 == -1 and att2 == -1):
-    print("King is not in check")
-else:
-    print("King is in check from ")
-    grid[att1][att2].printPiece()
