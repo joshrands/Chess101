@@ -15,7 +15,7 @@ class Board(SampleBase):
 
     def __init__(self, *args, **kwargs):
         super(Board, self).__init__(*args, **kwargs)
-        self.teamR = Team(86, 0, 216)
+        self.teamR = Team(64, 180, 232)
         self.teamL = Team(255, 140, 0)
         self.grid = []
         for row in range(0, 8):
@@ -44,13 +44,29 @@ class Board(SampleBase):
 
     ### Member Functions ###
     def victory(self, canvas, team):
-        for i in range(0, 10000):
+        for i in range(0, 100):
             time.sleep(.01)
             x = random.randint(0, 8)
             y = random.randint(0, 8)
             canvas = self.matrix.CreateFrameCanvas()
             self.lightCell(canvas, x, y, team.r, team.g, team.b)
             canvas = self.matrix.SwapOnVSync(canvas)
+
+    def sethVictory(self, canvas, team):
+        for i in range(0, 1000):
+            time.sleep(.01)
+            canvas = self.matrix.CreateFrameCanvas()
+            for j in range(0, 30):
+                for k in range(0, 3)
+                    x = random.randint(30) + 1
+                    canvas.SetPixel(x, j, random.rantint(255), random.randint(255, random.randint(255)))
+                    time.sleep(.0001)
+            for j in range(0, 30):
+                for k in range(0, 3)
+                    x = random.randint(30) + 1
+                    canvas.SetPixel(j, x, random.rantint(255), random.randint(255, random.randint(255)))
+                    time.sleep(.0001)
+
 
     def doTurn(self, canvas, team):
         # disable enPassantable
@@ -91,7 +107,7 @@ class Board(SampleBase):
 
         if (checkMate):
             print("Check mate!")
-            self.victory(canvas, team)
+            self.sethVictory(canvas, team)
 
         move = False
         row = 0

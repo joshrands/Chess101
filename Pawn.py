@@ -21,6 +21,7 @@ class Pawn(Piece):
 
     #calcTargets, which is abstract in the parent
     def calcTargets(self, checkerTown):
+        self.enPassantLoc = None
         self.targets = []
         if (self.row != 0 and self.row != 7):
             #check the squares diagonal in the direction of self.direction for an enemy Piece
@@ -56,6 +57,18 @@ class Pawn(Piece):
         #if critical, check calculated targets against criticalTargets and only keep cells that appear on both
         if (self.critical):
             super().criticalMan()
+
+    def skyFall(self, king):
+        #refactor the targets because the king is in check and only godSaveTheKing spaces should appear as targets
+        newTargets = []
+        for target in self.targets:
+            for savingTarget in king.godSaveTheKing:
+                if (target.row == savingTarget.row and target.col == savingTarget.col):
+                    if (target.row == self.enPassantLoc.row and target.col == self.enPassantLoc.col):
+                        continue
+                    newTargets.append(target)
+        self.targets = newTargets
+
 
     #override move method to set enPassantable
     def move(self, newRow, newCol):
