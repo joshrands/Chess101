@@ -110,6 +110,7 @@ class King(Piece):
         #checking diagonally to the upper right (or 1,1 direction)
         for i in ([-1,0,1]):
             for j in ([-1,0,1]):
+                print("Check direction (",i,",",j,")")
                 if (i == 0 and j == 0):
                     continue
 
