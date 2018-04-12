@@ -15,6 +15,10 @@ class King(Piece):
         self.col = col
         self.targets = []
         self.team = team
+        if (self.row == 7):
+            self.direction = -1
+        else:
+            self.direction = 1
         self.touched = False
         self.critical = False
         self.godSaveTheKing = []
@@ -54,19 +58,17 @@ class King(Piece):
         #now that all targets have been calculated, iterate through them all and
         #check amIGonnaDie() with a board and position changed
         targetsToRemove = []
-        testKing = King(self.row, self.col, self.team)
-        print("About to theorize about possible moves. Targets: ")
         print(self.targets)
         for cell in self.targets:
-            print("looping through potential moves now")
             originalPiece = checkerTown[cell.row][cell.col]
-            checkerTown[cell.row][cell.col] = testKing
+            checkerTown[cell.row][cell.col] = self
             checkerTown[self.row][self.col] = None
-            #self.row = cell.row
-            #self.col = cell.col
-            threat1, threat2 = testKing.amIGonnaDie(checkerTown)
+            self.row = cell.row
+            self.col = cell.col
+            threat1, threat2 = self.amIGonnaDie(checkerTown)
             if (threat1 != -1 and threat2 != -1):
                 targetsToRemove.append(cell)
+                print("added cell to be removed as a king target")
 
             #reset the board to its original config
             checkerTown[oldRow][oldCol] = self
@@ -76,6 +78,7 @@ class King(Piece):
 
         #now iterate through targetsToRemove and remove them from targets
         for toRemove in targetsToRemove:
+            print("removed king target")
             self.targets.remove(toRemove)
 
         #re-run amIGonnaDie with the King's original values
@@ -110,7 +113,6 @@ class King(Piece):
         #checking diagonally to the upper right (or 1,1 direction)
         for i in ([-1,0,1]):
             for j in ([-1,0,1]):
-                print("Check direction (",i,",",j,")")
                 if (i == 0 and j == 0):
                     continue
 
@@ -173,7 +175,6 @@ class King(Piece):
 
 
     def iSpy(self, checkerTown, currentRow, currentCol, dir1, dir2):
-        print("What do I spy, with my little eye?")
         nextLoc = False
         if (currentRow + dir1 >= 0 and currentRow + dir1 < 8 and currentCol + dir2 >= 0 and currentCol + dir2 < 8):
             nextLoc = True
