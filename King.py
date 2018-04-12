@@ -79,7 +79,7 @@ class King(Piece):
             self.targets.remove(toRemove)
 
         #re-run amIGonnaDie with the King's original values
-        #self.amIGonnaDie(checkerTown)
+        useless1, useless2 = self.amIGonnaDie(checkerTown)
 
     def move(self, newRow, newCol):
     # calculate new targets
