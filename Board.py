@@ -57,6 +57,7 @@ class Board(SampleBase):
         # calculate targets for all pieces
 
         check = False
+        checkMate = False
         kingRow = -1;
         kingCol = -1;
 
@@ -66,6 +67,8 @@ class Board(SampleBase):
                     check = piece.calcTargets(self.grid)
                     kingRow = piece.row
                     kingCol = piece.col
+
+        piecesWithMoves = 0
 
         for row in self.grid:
             for piece in row:
@@ -80,11 +83,15 @@ class Board(SampleBase):
                         piece.skyFall(self.grid[kingRow][kingCol])
                     #print pieces that can be moved
                     if (len(piece.getTargets()) > 0 and piece.team == team):
+                        piecesWithMoves = piecesWithMoves + 1
                         piece.printPiece()
 
-        checkMate = False
+        if (piecesWithMoves == 0 and len(self.grid[kingRow][kingCol].targets) == 0):
+            checkMate = True
+
         if (checkMate):
             print("Check mate!")
+            self.victory(canvas, team)
 
         move = False
         row = 0
@@ -201,8 +208,6 @@ class Board(SampleBase):
         self.grid[7][6] = Knight(7, 6, self.teamL)
         self.grid[7][3] = Queen(7, 3, self.teamL)
         self.grid[7][4] = King(7, 4, self.teamL)
-
-
 
     def createPlayers(self):
         nameR = input("Enter player 1 name: ")

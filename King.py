@@ -172,6 +172,7 @@ class King(Piece):
         for i in range(0, 8):
             knightRow, knightCol = self.knightInShiningArmor(checkerTown, rowTargets[i], colTargets[i], self.row, self.col)
             if (knightRow != -1 and knightCol != -1):
+                self.godSaveTheKing = [Cell(knightRow, knightCol)]
                 return knightRow, knightCol
 
         return -1, -1
