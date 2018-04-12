@@ -39,6 +39,7 @@ class Piece:
         return -1, -1
 
     def critcalMan(self):
+        print("Seth is rite")
         newTargets = []
         for critcalCell in self.criticalTargets:
             for cell in self.targets:
