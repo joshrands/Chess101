@@ -15,7 +15,7 @@ class Board(SampleBase):
 
     def __init__(self, *args, **kwargs):
         super(Board, self).__init__(*args, **kwargs)
-        self.teamR = Team(64, 180, 232)
+        self.teamR = Team(86, 0, 216)
         self.teamL = Team(255, 140, 0)
         self.grid = []
         for row in range(0, 8):
