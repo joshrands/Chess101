@@ -67,12 +67,12 @@ class Board(SampleBase):
                 canvas.SetPixel(31, m, team.r, team.g, team.b)
             for j in range(1, 30):
                 for k in range(0, 5):
-                    x = random.randint(0, 30) + 1
+                    x = random.randint(0, 29) + 1
                     canvas.SetPixel(x, j, random.randint(0, 255), random.randint(0, 255), random.randint(0, 255))
                     time.sleep(.0001)
             for j in range(1, 30):
                 for k in range(0, 5):
-                    x = random.randint(0, 30) + 1
+                    x = random.randint(0, 29) + 1
                     canvas.SetPixel(j, x, random.randint(0, 255), random.randint(0, 255), random.randint(0, 255))
                     time.sleep(.0001)
             canvas = self.matrix.SwapOnVSync(canvas)
