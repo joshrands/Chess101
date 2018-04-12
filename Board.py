@@ -57,15 +57,16 @@ class Board(SampleBase):
             time.sleep(.01)
             canvas = self.matrix.CreateFrameCanvas()
             for j in range(0, 30):
-                for k in range(0, 3)
+                for k in range(0, 3):
                     x = random.randint(30) + 1
-                    canvas.SetPixel(x, j, random.rantint(255), random.randint(255, random.randint(255)))
+                    canvas.SetPixel(x, j, random.rantint(255), random.randint(255), random.randint(255))
                     time.sleep(.0001)
             for j in range(0, 30):
-                for k in range(0, 3)
+                for k in range(0, 3):
                     x = random.randint(30) + 1
-                    canvas.SetPixel(j, x, random.rantint(255), random.randint(255, random.randint(255)))
+                    canvas.SetPixel(j, x, random.rantint(255), random.randint(255), random.randint(255))
                     time.sleep(.0001)
+            canvas = self.matrix.SwapOnVSync(canvas)
 
 
     def doTurn(self, canvas, team):
