@@ -44,8 +44,8 @@ class Board(SampleBase):
 
     ### Member Functions ###
     def victory(self, canvas, team):
-        for i in range(0, 100):
-            time.sleep(1)
+        for i in range(0, 10000):
+            time.sleep(.01)
             x = random.randint(0, 8)
             y = random.randint(0, 8)
             canvas = self.matrix.CreateFrameCanvas()
