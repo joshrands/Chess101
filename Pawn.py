@@ -21,6 +21,7 @@ class Pawn(Piece):
 
     #calcTargets, which is abstract in the parent
     def calcTargets(self, checkerTown):
+        print("I don't think I can en passant anymore")
         self.enPassantLoc = None
         self.targets = []
         if (self.row != 0 and self.row != 7):
@@ -48,11 +49,13 @@ class Pawn(Piece):
                 if (checkerTown[self.row][self.col - 1].enPassantable):
                     self.targets.append(Cell(self.row + self.direction, self.col - 1))
                     self.enPassantLoc = Cell(self.row + self.direction, self.col - 1)
+                    print("I can en passant")
             #check right
             if (self.col != 7 and isinstance(checkerTown[self.row][self.col + 1], Pawn) and checkerTown[self.row][self.col + 1].team != self.team):
                 if (checkerTown[self.row][self.col + 1].enPassantable):
                     self.targets.append(Cell(self.row + self.direction, self.col + 1))
                     self.enPassantLoc = Cell(self.row + self.direction, self.col + 1)
+                    print("I can en passant")
 
         #if critical, check calculated targets against criticalTargets and only keep cells that appear on both
         if (self.critical):
@@ -65,6 +68,7 @@ class Pawn(Piece):
             for savingTarget in king.godSaveTheKing:
                 if (target.row == savingTarget.row and target.col == savingTarget.col):
                     if (target.row == self.enPassantLoc.row and target.col == self.enPassantLoc.col):
+                        print("not removing target because it is an en passant target")
                         continue
                     newTargets.append(target)
         self.targets = newTargets
