@@ -54,13 +54,14 @@ class King(Piece):
         #now that all targets have been calculated, iterate through them all and
         #check amIGonnaDie() with a board and position changed
         targetsToRemove = []
+        testKing = King(self.row, self.col, self.team)
         for cell in self.targets:
             originalPiece = checkerTown[cell.row][cell.col]
-            checkerTown[cell.row][cell.col] = self
+            checkerTown[cell.row][cell.col] = testKing
             checkerTown[self.row][self.col] = None
-            self.row = cell.row
-            self.col = cell.col
-            threat1, threat2 = self.amIGonnaDie(checkerTown)
+            #self.row = cell.row
+            #self.col = cell.col
+            threat1, threat2 = testKing.amIGonnaDie(checkerTown)
             if (threat1 != -1 and threat2 != -1):
                 targetsToRemove.append(cell)
 
