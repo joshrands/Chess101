@@ -57,8 +57,16 @@ class Board(SampleBase):
         # calculate targets for all pieces
         for row in self.grid:
             for piece in row:
+                if (isinstance(piece, King) and piece.team == team):
+                    piece.calcTargets(self.grid)
+
+        for row in self.grid:
+            for piece in row:
                 if (isinstance(piece, Pawn) and piece.team == team):
                     piece.enPassantable = False
+                if (isinstance(piece, King)):
+                    if (len(piece.getTargets()) > 0 and piece.team == team):
+                        piece.printPiece()
                 if (piece != None):
                     piece.calcTargets(self.grid)
                     #print pieces that can be moved
