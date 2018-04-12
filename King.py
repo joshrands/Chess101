@@ -130,7 +130,7 @@ class King(Piece):
                             if (isinstance(checkerTown[enemyRow][enemyCol], Rook) or isinstance(checkerTown[enemyRow][enemyCol], Queen)):
                                 #scout is critical, mark him as such
                                 checkerTown[scoutRow][scoutCol].critical = True
-                                checkerTown[scoutRow][scoutCol].criticalTargets = pleaseGodSaveTheKing(enemyRow, enemyCol)
+                                checkerTown[scoutRow][scoutCol].criticalTargets = self.pleaseGodSaveTheKing(enemyRow, enemyCol)
                     elif (enemyRow != -1):
                         if (isinstance(checkerTown[enemyRow][enemyCol], Rook) or isinstance(checkerTown[enemyRow][enemyCol], Queen)):
                             #enemy placing the king in check has been found
@@ -150,7 +150,7 @@ class King(Piece):
                             if (isinstance(checkerTown[enemyRow][enemyCol], Bishop) or isinstance(checkerTown[enemyRow][enemyCol], Queen)):
                                 #scout is critical, mark him as such
                                 checkerTown[scoutRow][scoutCol].critical = True
-                                checkerTown[scoutRow][scoutCol].criticalTargets = pleaseGodSaveTheKing(enemyRow, enemyCol)
+                                checkerTown[scoutRow][scoutCol].criticalTargets = self.pleaseGodSaveTheKing(enemyRow, enemyCol)
                     elif (enemyRow != -1):
                         if (isinstance(checkerTown[enemyRow][enemyCol], Bishop) or isinstance(checkerTown[enemyRow][enemyCol], Queen)):
                             #enemy placing the king in check has been found
