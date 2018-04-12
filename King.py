@@ -183,18 +183,14 @@ class King(Piece):
         if (currentRow + dir1 >= 0 and currentRow + dir1 < 8 and currentCol + dir2 >= 0 and currentCol + dir2 < 8):
             nextLoc = True
         if (currentRow >= 0 and currentRow < 8 and currentCol >= 0 and currentCol < 8):
-            print("Checking", currentRow,",",currentCol)
             if (checkerTown[currentRow][currentCol] != None):
                 if (checkerTown[currentRow][currentCol].team != self.team):
                     #enemy piece encountered
-                    print("Ho! An enemy afar!")
                     return currentRow, currentCol, -1, -1
                 elif (nextLoc):
-                    print("Ho, boy! Look for an enemy there behind yourself, won't you?")
                     scoutRow, scoutCol = checkerTown[currentRow][currentCol].Kingsman(checkerTown, currentRow + dir1, currentCol + dir2, dir1, dir2)
                     return scoutRow, scoutCol, currentRow, currentCol
             elif (nextLoc):
-                print("I must search farther!")
                 return1, return2, return3, return4 = self.iSpy(checkerTown, currentRow + dir1, currentCol + dir2, dir1, dir2)
                 return return1, return2, return3, return4
         return -1, -1, -1, -1

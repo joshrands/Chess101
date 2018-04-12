@@ -87,8 +87,11 @@ class Board(SampleBase):
         if (check):
             for row in self.grid:
                 for piece in row:
-                    if (piece != None and piece.team == team and isinstance(piece, King) == False):
-                        piece.skyFall(self.grid[kingRow][kingCol])
+                    if (piece != None and piece.team == team):
+                        if (isinstance(piece, King)):
+                            print("King does not call skyFall")
+                        else:
+                            piece.skyFall(self.grid[kingRow][kingCol])
 
         move = False
         row = 0
