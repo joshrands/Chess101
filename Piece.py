@@ -38,8 +38,15 @@ class Piece:
                 return self.Kingsman(checkerTown, currentRow + dir1, currentCol + dir2, dir1, dir2)
         return -1, -1
 
-    def critcalMan(self):
-        print("boo")
+    def criticalMan(self):
+        print("Seth is rite", test)
+        newTargets = []
+        for critcalCell in self.criticalTargets:
+            for cell in self.targets:
+                if (criticalCell.row == cell.row and criticalCell.col == cell.col):
+                    newTargets.append(cell)
+
+        self.targets = newTargets
 
     def skyFall(self, king):
         #refactor the targets because the king is in check and only godSaveTheKing spaces should appear as targets
