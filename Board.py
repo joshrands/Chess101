@@ -53,10 +53,10 @@ class Board(SampleBase):
             canvas = self.matrix.SwapOnVSync(canvas)
 
     def sethVictory(self, canvas, team):
-        if (team == teamL):
-            team = teamR
+        if (team == self.teamL):
+            team = self.teamR
         else:
-            team = teamL
+            team = self.teamL
         for i in range(0, 10000):
             time.sleep(.01)
             canvas = self.matrix.CreateFrameCanvas()
