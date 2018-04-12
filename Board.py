@@ -153,7 +153,7 @@ class Board(SampleBase):
                 self.lightCell(x, y, 0, 0, 0)
 
     def lightTargets(self, canvas, piece):
-        piece.calcTargets(self.grid)
+        #piece.calcTargets(self.grid)
         targets = piece.getTargets()
         for cell in targets:
             print("Target: ", cell.row, cell.col)
