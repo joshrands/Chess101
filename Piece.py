@@ -39,14 +39,7 @@ class Piece:
         return -1, -1
 
     def critcalMan(self):
-        print("Seth is rite")
-        newTargets = []
-        for critcalCell in self.criticalTargets:
-            for cell in self.targets:
-                if (criticalCell.row == cell.row and criticalCell.col == cell.col):
-                    newTargets.append(cell)
-
-        self.targets = newTargets
+        print("boo")
 
     def skyFall(self, king):
         #refactor the targets because the king is in check and only godSaveTheKing spaces should appear as targets

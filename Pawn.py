@@ -55,7 +55,17 @@ class Pawn(Piece):
 
         #if critical, check calculated targets against criticalTargets and only keep cells that appear on both
         if (self.critical):
-            super().criticalMan()
+            self.criticalMan()
+
+    def critcalMan(self):
+        print("Seth is rite")
+        newTargets = []
+        for critcalCell in self.criticalTargets:
+            for cell in self.targets:
+                if (criticalCell.row == cell.row and criticalCell.col == cell.col):
+                    newTargets.append(cell)
+
+        self.targets = newTargets
 
     #override move method to set enPassantable
     def move(self, newRow, newCol):
