@@ -19,6 +19,10 @@ class Bishop(Piece):
         self.bladeRunner(checkerTown, 1, -1, self.row, self.col)
         self.bladeRunner(checkerTown, -1, -1, self.row, self.col)
 
+        #if critical, check calculated targets against criticalTargets and only keep cells that appear on both
+        if (self.critical):
+            super().criticalMan()
+
 #Overwrite default print with special bishop print
     def printPiece(self):
         print("Bishop at", self.row , ",", self.col)

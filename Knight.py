@@ -23,6 +23,10 @@ class Knight(Piece):
         self.deathLoc(checkerTown, -1, 2, self.row, self.col)
         self.deathLoc(checkerTown, -1, -2, self.row, self.col)
 
+        #if critical, check calculated targets against criticalTargets and only keep cells that appear on both
+        if (self.critical):
+            super().criticalMan()
+
     #Overwrite default print with special Knight print
     def printPiece(self):
         print("Knight at" , self.row, ",", self.col)
