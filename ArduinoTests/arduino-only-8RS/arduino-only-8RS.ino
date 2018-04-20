@@ -44,29 +44,36 @@ void setup() {
 }
 
 void loop() {
-  /*
-  for (int i = 0; i < 8; i++) {
-    states[i] = digitalRead(REED_PORTS[i]);
-    if (states[i] == LOW) {
-      Serial.println("Switch " + String(i) + " activated");
-    }
-  }
-  */
-  /*
-  int proximity = digitalRead(COL1);
-  if (proximity == LOW) {
-    Serial.println("Switch activated");
-  }
-  */
-  setStates();
-  getStates();
-  
+  // set states of reed switches
+  //setStates();
+  //getStates();
+  delay(1);
+  detectChange();
 }
 
 void getStates() {
   for (int i = 0; i < 8; i++) {
     if (states[i] == LOW) {
       Serial.println("Switch " + String(i + 1) + " activated");
+    }
+  }
+}
+
+void detectChange() {
+  int oldStates[8];
+  for (int i = 0; i < 8; i++) {
+    oldStates[i] = states[i];
+  }
+  // update states
+  setStates();
+  // detect change
+  for (int i = 0; i < 8; i++) {
+    if (oldStates[i] != states[i]) {
+      if (states[i] == LOW) {
+        Serial.println("Switch " + String(i + 1) + " activated.");
+      } else {
+        Serial.println("Switch " + String(i + 1) + " deactivated.");
+      }
     }
   }
 }
