@@ -58,10 +58,11 @@ void receiveData(int byteCount) {
   // update states
   setStates();
   // set change state to default, no changes
-  changeState = -1;
+  changeState = 42;
   for (int i = 0; i < 8; i++) {
     if (oldStates[i] != states[i]) {
-      if (changeState != -1) {
+      Serial.println("Change detected in column " + String(i + 1));
+      if (changeState != 42) {
         // there has been a change, erase other changes (can only send one at a time)
         states[i] = oldStates[i];
       } else {
@@ -90,7 +91,7 @@ void loop() {
   //setStates();
   //getStates();
   delay(1);
-  detectChange();
+  //detectChange();
 }
 
 void getStates() {
