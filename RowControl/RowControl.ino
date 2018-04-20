@@ -102,7 +102,7 @@ void sendData(){
       Serial.println("Switch activated");
     }
   }
-  Wire.write(states, 8);
+//  Wire.write(states, 8);
   // send back data about reed switch for this reed switch
   // number stores proximity value of reed switch
   /*
