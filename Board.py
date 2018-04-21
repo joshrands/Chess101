@@ -48,11 +48,30 @@ class Board(SampleBase):
     ### Member Functions ###
     def detectLiftOff(self, team):
         # team is current team
-        print("Detecting lift off...")
-        
-
+#        print("Detecting lift off...")
+        # get all valid pieces that can move
+        validPieces = self.getTeamPieces(team)
+        # update board data
+        self.master.readData()
+        # check each piece and see if any have been lifted
+        valid = False
+        lifted = None
+        for piece in validPieces:
+            state = self.master.getCellState(piece.Row, piece.Col)
+            if (state == 0):
+                print("Yay you can move that good job")
+                valid = True
+                lifted = piece
         # if valid liftoff
-        return True
+        return valid, piece
+
+    def getTeamPieces(self, team):
+        validPieces = []
+        for piece in self.grid:
+            if (piece.team == team):
+                validPieces.append(piece)
+
+        return validPieces
 
     def detectLanding(self, piece):
         # return false if back to original
@@ -158,8 +177,14 @@ class Board(SampleBase):
         validMove = False
         # check if valid move
         while (validMove == False):
-            targetRow = int(input("Enter a row for target: "))
-            targetCol = int(input("Enter a col for target: "))
+            # add detect lift off
+            pieceLifted = False
+            liftedPiece = None
+            while (pieceLifted == False):
+                pieceLifted, liftedPiece = self.detectLiftOff(team)
+
+            #targetRow = int(input("Enter a row for target: "))
+            #targetCol = int(input("Enter a col for target: "))
             for cell in self.grid[row][col].getTargets():
                 if (cell.row == targetRow and cell.col == targetCol):
                     validMove = True
