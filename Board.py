@@ -10,6 +10,7 @@ from Queen import Queen
 import time
 from Cell import Cell
 import random
+from Master import Master
 
 class Board(SampleBase):
 
@@ -18,6 +19,8 @@ class Board(SampleBase):
         self.teamR = Team(64, 180, 232)
         self.teamL = Team(255, 140, 0)
         self.grid = []
+        self.master = Master()
+
         for row in range(0, 8):
             self.grid.append([None, None, None, None, None, None, None, None])
 
@@ -43,6 +46,20 @@ class Board(SampleBase):
             offset_canvas = self.matrix.SwapOnVSync(offset_canvas)
 
     ### Member Functions ###
+    def detectLiftOff(self, team):
+        # team is current team
+        print("Detecting lift off...")
+        
+
+        # if valid liftoff
+        return True
+
+    def detectLanding(self, piece):
+        # return false if back to original
+        # piece is piece that is moving
+        # return true if valid target
+        return False
+
     def victory(self, canvas, team):
         for i in range(0, 100000):
             time.sleep(.01)
