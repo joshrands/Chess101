@@ -47,65 +47,66 @@ class Board(SampleBase):
 
     ### Member Functions ###
     
-    def boardSetup(self):
-     
-
-    def setupTeam(self, team):
-        self.detectRooks(self.teamR)
-        self.detectKnights(self.teamR)
-        self.detectBishops(self.teamR)
-        self.detect 
-   
-    def detectPiece(self, team, piece, row, col):
-         if (team == self.teamR):
-            # setup teamR
-            print("Place " + piece + " here:")
-            placed = False
-            while not placed:
-                if (self.master.getCellStates 
-        else:
-            # setup teamL
-
-
- 
-    def detectRooks(self, team):
+    def interactiveSetup(self):
+    
+    def interactiveSetup(self, canvas, team):
         if (team == self.teamR):
-            # setup teamR
-            print("Place one Rook here:")
-            placed = False
-            
+            # setup Rook
+            self.detectPiece(canvas, team, "Rook", 0, 0)
+            self.detectPiece(canvas, team, "Rook", 0, 7)
+            # setup Knight
+            self.detectPiece(canvas, team, "Knight", 0, 1)
+            self.detectPiece(canvas, team, "Knight", 0, 6)
+            # setup bishop
+            self.detectPiece(canvas, team, "Bishop", 0, 2)
+            self.detectPiece(canvas, team, "Bishop", 0, 5) 
+            # setup Queen
+            self.detectPiece(canvas, team, "Queen", 0, 3)
+            # setup King
+            self.detectPiece(canvas, team, "King", 0, 4)
+            # setup Pawns
+            self.detectPawns(canvas, team, 1)
         else:
-            # setup teamL
+            # setup Rook
+            self.detectPiece(canvas, team, "Rook", 7, 0)
+            self.detectPiece(canvas, team, "Rook", 7, 7)
+            # setup Knight
+            self.detectPiece(canvas, team, "Knight", 7, 1)
+            self.detectPiece(canvas, team, "Knight", 7, 6)
+            # setup bishop
+            self.detectPiece(canvas, team, "Bishop", 7, 2)
+            self.detectPiece(canvas, team, "Bishop", 7, 5) 
+            # setup Queen
+            self.detectPiece(canvas, team, "Queen", 7, 3)
+            # setup King
+            self.detectPiece(canvas, team, "King", 7, 4)
+            # setup Pawns
+            self.detectPawns(canvas, team, 6)
+         
+    def detectPawns(self, canvas, team, row):
+        print("Please place pawns")
+        for col in range(8):
+            self.lightCell(canvas, row, col, team.r, team.g, team.b)
+        placed = False
+        while not placed:
+            placed = True
+            for col in range(8):
+                if (self.master.getCellState(row, col) == 1):
+                    placed = False
+            time.sleep(0.1)
+        print("Pawns placed.") 
 
-    def detectKnights(self, team):
-        if (team == self.teamR):
-            # setup teamR
-        else:
-            # setup teamL
-
-    def detectBishops(self, team):
-        if (team == self.teamR):
-            # setup teamR
-        else:
-            # setup teamL
-
-    def detectKing(self, team):
-        if (team == self.teamR):
-            # setup teamR
-        else:
-            # setup teamL
-
-    def detectQueen(self, team):
-        if (team == self.teamR):
-            # setup teamR
-        else:
-            # setup teamL
-
-    def detectPawns(self, team): 
-        if (team == self.teamR):
-            # setup teamR
-        else:
-            # setup teamL
+    def detectPiece(self, canvas, team, piece, row, col):
+        # setup teamR
+        print("Place " + piece + " here:")
+        # light up cell
+        self.lightCell(canvas, row, col, team.r, team.g, team.b) 
+        placed = False
+        while not placed:
+            if (self.master.getCellState(row, col) == 0):
+                placed = True
+            time.sleep(0.1)
+        print(piece + " set.") 
 
     def detectLiftOff(self, team):
         # team is current team
