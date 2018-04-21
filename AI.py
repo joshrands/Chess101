@@ -2,16 +2,17 @@ class AI:
     # print utility value of root node (assuming it is max)
     # print names of all nodes visited during search
     def __init__(self, game_tree, team):
-        self.game_tree = game_tree  # Whole tree
+        self.game_tree = game_tree  # Whole tree (only the root node, but this node will contain the children)
         self.team = team
         return
 
-    def alpha_beta_search(self, node):
+    def alpha_beta_search(self):
+
         infinity = float('inf')
         best_val = -infinity
         beta = infinity
 
-        successors = self.getSuccessors(node)
+        successors = self.getSuccessors(self.game_tree)
         best_state = None
         for state in successors: # for every node..
             value = self.min_value(state, best_val, beta)

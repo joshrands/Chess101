@@ -271,7 +271,7 @@ class Board(SampleBase):
         computerPlayer = AI(gameTree, team)
 
         #Tell the AI to return the best state (node)
-        bestMove = computerPlayer.alpha_beta_search(gameTree)
+        bestMove = computerPlayer.alpha_beta_search()
 
         #For now, print out the old/new cell of the 
         print "the best move involves moving the piece at square " + bestMove.oldCell.row + bestMove.oldCell.col + " to " + bestMove.newCell.row + bestMove.newCell.col
