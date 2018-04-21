@@ -10,7 +10,7 @@ from Queen import Queen
 import time
 from Cell import Cell
 import random
-from Master import Master
+import copy
 
 class Board(SampleBase):
 
@@ -18,9 +18,9 @@ class Board(SampleBase):
         super(Board, self).__init__(*args, **kwargs)
         self.teamR = Team(64, 180, 232)
         self.teamL = Team(255, 140, 0)
-        self.grid = []
-        self.master = Master()
+        self.moveablePieces = []
 
+        self.grid = []
         for row in range(0, 8):
             self.grid.append([None, None, None, None, None, None, None, None])
 
@@ -46,54 +46,8 @@ class Board(SampleBase):
             offset_canvas = self.matrix.SwapOnVSync(offset_canvas)
 
     ### Member Functions ###
-    def detectLiftOff(self, team):
-        # team is current team
-#        print("Detecting lift off...")
-        # get all valid pieces that can move
-        validPieces = self.getTeamPieces(team)
-        # update board data
-        self.master.readData()
-        # check each piece and see if any have been lifted
-        valid = False
-        lifted = None
-        for piece in validPieces:
-            state = self.master.getCellState(piece.row, piece.col)
-            if (state == 1 and valid == False):
-                print("Yay you can move that good job")
-                valid = True
-                lifted = piece
-
-        # if valid liftoff
-        return valid, lifted
-
-    def getTeamPieces(self, team):
-        validPieces = []
-        for row in self.grid:
-            for piece in row:
-                if (piece != None and piece.team == team):
-                    validPieces.append(piece)
-
-        return validPieces
-
-    def detectLanding(self, piece):
-        self.master.readData()
-        # return false if back to original
-        targets = piece.targets
-        # piece is piece that is moving
-        valid = False
-        activatedTarget = None
-        for cell in targets:
-            state = self.master.getCellState(cell.row, cell.col)
-            if (state == 0):
-                print("Are you sure? Too bad")
-                valid = True
-                activatedTarget = cell
-
-        # return true if valid target
-        return valid, activatedTarget
-
     def victory(self, canvas, team):
-        for i in range(0, 10):
+        for i in range(0, 100):
             time.sleep(.01)
             x = random.randint(0, 8)
             y = random.randint(0, 8)
@@ -143,7 +97,7 @@ class Board(SampleBase):
                     kingRow = piece.row
                     kingCol = piece.col
 
-        piecesWithMoves = 0
+        self.moveablePieces = []
 
         for row in self.grid:
             for piece in row:
@@ -158,10 +112,11 @@ class Board(SampleBase):
                         piece.skyFall(self.grid[kingRow][kingCol])
                     #print pieces that can be moved
                     if (len(piece.getTargets()) > 0 and piece.team == team):
-                        piecesWithMoves = piecesWithMoves + 1
                         piece.printPiece()
+                        self.moveablePieces.append(piece)
 
-        if (piecesWithMoves == 0 and len(self.grid[kingRow][kingCol].targets) == 0):
+        if (self.moveablePieces.length == 0 and len(self.grid[kingRow][kingCol].targets) == 0):
+            #What about a stalemate??
             checkMate = True
 
         if (checkMate):
@@ -175,17 +130,8 @@ class Board(SampleBase):
 
         while (move == False):
             # move a piece!
-#            row = int(input("Enter row for desired piece: "))
-#            col = int(input("Enter col for desired piece: "))
-            pieceLifted = False
-            liftedPiece = None
-            while (pieceLifted == False):
-                pieceLifted, liftedPiece = self.detectLiftOff(team)
-                print("Waiting for player move...")
-
-            row = liftedPiece.row
-            col = liftedPiece.col
-            print(row, col)
+            row = int(input("Enter row for desired piece: "))
+            col = int(input("Enter col for desired piece: "))
             if (self.grid[row][col] != None and self.grid[row][col].team == team and len(self.grid[row][col].getTargets()) > 0):
                 move = True
             else:
@@ -199,17 +145,8 @@ class Board(SampleBase):
         validMove = False
         # check if valid move
         while (validMove == False):
-            # add detect lift off
-            #targetRow = int(input("Enter a row for target: "))
-            #targetCol = int(input("Enter a col for target: "))
-            placed = False
-            while (not placed):
-                print("Please choose a target already")
-                placed, targetCell = self.detectLanding(self.grid[row][col])
-
-            targetRow = targetCell.row
-            targetCol = targetCell.col
-
+            targetRow = int(input("Enter a row for target: "))
+            targetCol = int(input("Enter a col for target: "))
             for cell in self.grid[row][col].getTargets():
                 if (cell.row == targetRow and cell.col == targetCol):
                     validMove = True
@@ -320,6 +257,53 @@ class Board(SampleBase):
             for j in range(0, 4):
                 canvas.SetPixel(x*4 + i, y*4 + j, r, g, b)
                 #canvas.SetPixel(x, y, 255, 255, 255)
+
+    def computerMove(self, team, depth=4):
+
+        #TODO in the following order, complete the task and print results to make sure. Write tests throughout if needed (Especially Hueristic!!)
+
+        #Create the whole tree recursively
+        root = Tree(self, None, None)
+        gameTree = addNodes(root, depth)
+
+        #Create a new AI object with tree
+        #figure out how to incorporate the team
+        computerPlayer = AI(gameTree, team)
+
+        #Tell the AI to return the best state (node)
+        bestMove = computerPlayer.alpha_beta_search(gameTree)
+
+        #For now, print out the old/new cell of the 
+        print "the best move involves moving the piece at square " + bestMove.oldCell.row + bestMove.oldCell.col + " to " + bestMove.newCell.row + bestMove.newCell.col
+
+    def addNodes(self, currentNode, depth):
+
+        #if the depth is 0, we've reached the "bottom" of the tree (as far as we initially told it to go)
+        if (depth == 0):
+            return
+
+        for piece in self.moveablePieces:
+            for target in piece.getTargets:
+                newBoard = copy.deepcopy(self)
+                for newPiece in newBoard.moveablePieces:
+                    #check to see if it's the same piece in question
+                    if (newPiece.row == piece.row && newPiece.col == piece.col):
+                        #If it is, make the move and add the child to the current node
+                        newPiece.move(target.row, target.col)
+                        currentNode.addChild(Tree(newBoard, Cell(piece.row, piece.col), Cell(newPiece.row, newPiece.col)))
+
+        #Once all children for this node are found, go another level deep
+
+        ########
+        # TODO #
+        ########
+        #I need to see if I can pass this child in by reference to the next function... I think this does it since I'm only modifying it
+        #https://stackoverflow.com/questions/986006/how-do-i-pass-a-variable-by-reference
+
+        for child in currentNode:
+            child.boardState.addNodes(child, depth-1)
+
+
 # Main function
 #if __name__ == "__main__":
 #    simple_square = Board()
