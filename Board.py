@@ -162,8 +162,16 @@ class Board(SampleBase):
 
         while (move == False):
             # move a piece!
-            row = int(input("Enter row for desired piece: "))
-            col = int(input("Enter col for desired piece: "))
+#            row = int(input("Enter row for desired piece: "))
+#            col = int(input("Enter col for desired piece: "))
+            pieceLifted = False
+            liftedPiece = None
+            while (pieceLifted == False):
+                pieceLifted, liftedPiece = self.detectLiftOff(team)
+                print("Waiting for player move...")
+
+            row = liftedPiece.row
+            col = liftedPiece.col
             if (self.grid[row][col] != None and self.grid[row][col].team == team and len(self.grid[row][col].getTargets()) > 0):
                 move = True
             else:
@@ -178,13 +186,8 @@ class Board(SampleBase):
         # check if valid move
         while (validMove == False):
             # add detect lift off
-            pieceLifted = False
-            liftedPiece = None
-            while (pieceLifted == False):
-                pieceLifted, liftedPiece = self.detectLiftOff(team)
-
-            #targetRow = int(input("Enter a row for target: "))
-            #targetCol = int(input("Enter a col for target: "))
+            targetRow = int(input("Enter a row for target: "))
+            targetCol = int(input("Enter a col for target: "))
             for cell in self.grid[row][col].getTargets():
                 if (cell.row == targetRow and cell.col == targetCol):
                     validMove = True
