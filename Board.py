@@ -46,6 +46,67 @@ class Board(SampleBase):
             offset_canvas = self.matrix.SwapOnVSync(offset_canvas)
 
     ### Member Functions ###
+    
+    def boardSetup(self):
+     
+
+    def setupTeam(self, team):
+        self.detectRooks(self.teamR)
+        self.detectKnights(self.teamR)
+        self.detectBishops(self.teamR)
+        self.detect 
+   
+    def detectPiece(self, team, piece, row, col):
+         if (team == self.teamR):
+            # setup teamR
+            print("Place " + piece + " here:")
+            placed = False
+            while not placed:
+                if (self.master.getCellStates 
+        else:
+            # setup teamL
+
+
+ 
+    def detectRooks(self, team):
+        if (team == self.teamR):
+            # setup teamR
+            print("Place one Rook here:")
+            placed = False
+            
+        else:
+            # setup teamL
+
+    def detectKnights(self, team):
+        if (team == self.teamR):
+            # setup teamR
+        else:
+            # setup teamL
+
+    def detectBishops(self, team):
+        if (team == self.teamR):
+            # setup teamR
+        else:
+            # setup teamL
+
+    def detectKing(self, team):
+        if (team == self.teamR):
+            # setup teamR
+        else:
+            # setup teamL
+
+    def detectQueen(self, team):
+        if (team == self.teamR):
+            # setup teamR
+        else:
+            # setup teamL
+
+    def detectPawns(self, team): 
+        if (team == self.teamR):
+            # setup teamR
+        else:
+            # setup teamL
+
     def detectLiftOff(self, team):
         # team is current team
 #        print("Detecting lift off...")
@@ -287,14 +348,14 @@ class Board(SampleBase):
         self.grid[0][3] = Queen(0, 3, self.teamR)
         self.grid[0][4] = King(0, 4, self.teamR)
 
-        # TEAM R
-        # create pawns for teamR
+        # TEAM L
+        # create pawns for teamL
         for col in range(0, 8):
             self.grid[6][col] = Pawn(6, col, self.teamL)
-        # create bishop for teamR
+        # create bishop for teamL
         self.grid[7][2] = Bishop(7, 2, self.teamL)
         self.grid[7][5] = Bishop(7, 5, self.teamL)
-        # create rook for teamR
+        # create rook for teamL
         self.grid[7][0] = Rook(7, 0, self.teamL)
         self.grid[7][7] = Rook(7, 7, self.teamL)
         self.grid[7][1] = Knight(7, 1, self.teamL)
