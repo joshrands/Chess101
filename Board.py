@@ -181,7 +181,7 @@ class Board(SampleBase):
             pieceLifted = False
             liftedPiece = None
             while (pieceLifted == False):
-                pieceLifted, liftedPiece = self.detectLiftOff(team))
+                pieceLifted, liftedPiece = self.detectLiftOff(team)
 
             #targetRow = int(input("Enter a row for target: "))
             #targetCol = int(input("Enter a col for target: "))
