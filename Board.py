@@ -67,9 +67,10 @@ class Board(SampleBase):
 
     def getTeamPieces(self, team):
         validPieces = []
-        for piece in self.grid:
-            if (piece != None and piece.team == team):
-                validPieces.append(piece)
+        for row in self.grid:
+            for piece in row:
+                if (piece != None and piece.team == team):
+                    validPieces.append(piece)
 
         return validPieces
 
