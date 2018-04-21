@@ -58,7 +58,7 @@ class Board(SampleBase):
         lifted = None
         for piece in validPieces:
             state = self.master.getCellState(piece.row, piece.col)
-            if (state == 0):
+            if (state == 1):
                 print("Yay you can move that good job")
                 valid = True
                 lifted = piece
