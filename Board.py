@@ -76,10 +76,21 @@ class Board(SampleBase):
         return validPieces
 
     def detectLanding(self, piece):
+        self.master.readData()
         # return false if back to original
+        targets = piece.targets
         # piece is piece that is moving
+        valid = False
+        activatedTarget = None
+        for cell in targets:
+            state = self.master.getCellState(cell.row, cell.col):
+            if (state == 0):
+                print("Are you sure? Too bad")
+                valid = True
+                activatedTarget = cell
+
         # return true if valid target
-        return False
+        return valid, activatedTarget
 
     def victory(self, canvas, team):
         for i in range(0, 10):
@@ -189,8 +200,16 @@ class Board(SampleBase):
         # check if valid move
         while (validMove == False):
             # add detect lift off
-            targetRow = int(input("Enter a row for target: "))
-            targetCol = int(input("Enter a col for target: "))
+            #targetRow = int(input("Enter a row for target: "))
+            #targetCol = int(input("Enter a col for target: "))
+            placed = False 
+            while (not placed):
+                print("Please choose a target already")
+                placed, targetCell = self.detectLanding(self.grid[row][col])
+
+            targetRow = targetCell.row
+            targetCol = targetCell.col
+
             for cell in self.grid[row][col].getTargets():
                 if (cell.row == targetRow and cell.col == targetCol):
                     validMove = True
