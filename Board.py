@@ -62,8 +62,9 @@ class Board(SampleBase):
                 print("Yay you can move that good job")
                 valid = True
                 lifted = piece
+
         # if valid liftoff
-        return valid, piece
+        return valid, lifted
 
     def getTeamPieces(self, team):
         validPieces = []
