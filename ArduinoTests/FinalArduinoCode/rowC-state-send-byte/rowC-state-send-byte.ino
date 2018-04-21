@@ -1,12 +1,16 @@
-// Arduino Control for Row B
+
+// Arduino Control for Row C
 // Josh & Dom
 
 #include <Wire.h>
+#include <math.h>
 
-char ROW = 'B';
+char ROW = 'C';
 int RPiInput = 0;
 int changeState = -1;
-#define SLAVE_ADDRESS 0x05
+int bitValue = 0;
+
+#define SLAVE_ADDRESS 0x06
 
 // define Reed switch ports
 const int COL1 = 2;
@@ -46,54 +50,21 @@ void setup() {
 void receiveData(int byteCount) {
   while(Wire.available()) {
     RPiInput = Wire.read();
-    // output received, print data
-    Serial.println("Data received: " + String(RPiInput));
   }
 
-  if (RPiInput == 42) {
-    // check for changes
-    int oldStates[8];
-    for (int i = 0; i < 8; i++) {
-      oldStates[i] = states[i];
-    }
-    // update states
-    setStates();
-    // set change state to default, no changes
-    changeState = 42;
-    for (int i = 0; i < 8; i++) {
-      if (oldStates[i] != states[i]) {
-        Serial.println("Change detected in column " + String(i + 1));
-        if (changeState != 42) {
-          // there has been a change, erase other changes (can only send one at a time)
-          states[i] = oldStates[i];
-        } else {
-          changeState = i; // 0-7 scale
-        }
-      }
-    }
-  } else {
-    // RPi is requesting a specific row state
-    setStates();
-    changeState = states[RPiInput];
-  }
-  // states updated, if any changes only one reflected. 
-  // send back changeState
-  
-  // RPiInput stores desired column, update data and send
-
+  // set states and update bitValue
+  setStates();
 }
 
 void sendData() {
-  setStates();
-  int bitValue = 0;
-  for (int i = 0; i < 8; i++) {
-    bitValue += states[i]*pow(2, i);
-  }
+  Serial.println(bitValue);
   // send back bitValue
   Wire.write(bitValue);
 }
 
-// Arduino side only:
+// Arduino side
+  // states updated, if any changes only one reflected. 
+  // send back changeState only:
 void loop() {
   // set states of reed switches
   //setStates();
@@ -138,6 +109,12 @@ void setStates() {
   states[5] = digitalRead(COL6);
   states[6] = digitalRead(COL7);
   states[7] = digitalRead(COL8);
+
+  bitValue = 0;
+  for (int i = 0; i < 8; i++) {
+    //Serial.println(states[i]);
+    bitValue = bitValue + round(states[i]*pow(2, i));
+  }
 }
 
 

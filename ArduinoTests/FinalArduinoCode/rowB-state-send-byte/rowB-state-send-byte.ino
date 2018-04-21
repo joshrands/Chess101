@@ -1,16 +1,16 @@
 
-// Arduino Control for Row A
+// Arduino Control for Row B
 // Josh & Dom
 
 #include <Wire.h>
 #include <math.h>
 
-char ROW = 'A';
+char ROW = 'B';
 int RPiInput = 0;
 int changeState = -1;
 int bitValue = 0;
 
-#define SLAVE_ADDRESS 0x04
+#define SLAVE_ADDRESS 0x05
 
 // define Reed switch ports
 const int COL1 = 2;
@@ -57,7 +57,7 @@ void receiveData(int byteCount) {
 }
 
 void sendData() {
-  //Serial.println(bitValue);
+  Serial.println(bitValue);
   // send back bitValue
   Wire.write(bitValue);
 }
@@ -112,6 +112,7 @@ void setStates() {
 
   bitValue = 0;
   for (int i = 0; i < 8; i++) {
+    //Serial.println(states[i]);
     bitValue = bitValue + round(states[i]*pow(2, i));
   }
 }
