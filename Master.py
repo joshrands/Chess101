@@ -88,9 +88,9 @@ class Master:
         return number
 
 # Test master class
-master = Master()
+#master = Master()
 
-while True:
+#while True:
     # loop through and detect changes
-    master.readData()
-    time.sleep(0.5)
+#    master.readData()
+#    time.sleep(0.5)
