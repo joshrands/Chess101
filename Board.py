@@ -83,7 +83,7 @@ class Board(SampleBase):
         valid = False
         activatedTarget = None
         for cell in targets:
-            state = self.master.getCellState(cell.row, cell.col):
+            state = self.master.getCellState(cell.row, cell.col)
             if (state == 0):
                 print("Are you sure? Too bad")
                 valid = True
@@ -202,7 +202,7 @@ class Board(SampleBase):
             # add detect lift off
             #targetRow = int(input("Enter a row for target: "))
             #targetCol = int(input("Enter a col for target: "))
-            placed = False 
+            placed = False
             while (not placed):
                 print("Please choose a target already")
                 placed, targetCell = self.detectLanding(self.grid[row][col])
