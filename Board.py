@@ -29,6 +29,13 @@ class Board(SampleBase):
         print("Running game...")
 
         self.createPlayers()
+
+        # Josh added this, hopefully it's okay  
+        offset_canvas = self.matrix.CreateFrameCanvas()
+        # begin interactive setup
+        self.interactiveSetup(offset_canvas, self.teamR)
+        self.interactiveSetup(offset_canvas, self.teamL)
+     
         self.initializeGameBoard()
 
         while True:
@@ -46,9 +53,6 @@ class Board(SampleBase):
             offset_canvas = self.matrix.SwapOnVSync(offset_canvas)
 
     ### Member Functions ###
-    
-    def interactiveSetup(self):
-    
     def interactiveSetup(self, canvas, team):
         if (team == self.teamR):
             # setup Rook
