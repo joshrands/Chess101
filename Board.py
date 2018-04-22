@@ -34,7 +34,7 @@ class Board(SampleBase):
         offset_canvas = self.matrix.CreateFrameCanvas()
         # begin interactive setup
         self.interactiveSetup(offset_canvas, self.teamR)
-        self.interactiveSetup(offset_canvas, self.teamL)
+        #self.interactiveSetup(offset_canvas, self.teamL)
      
         self.initializeGameBoard()
 
@@ -95,6 +95,7 @@ class Board(SampleBase):
         while not placed:
             placed = True
             for col in range(8):
+                self.master.readData()
                 if (self.master.getCellState(row, col) == 1):
                     placed = False
             time.sleep(0.1)
@@ -105,8 +106,10 @@ class Board(SampleBase):
         print("Place " + piece + " here:")
         # light up cell
         self.lightCell(canvas, row, col, team.r, team.g, team.b) 
+        canvas = self.matrix.SwapOnVSync(canvas)
         placed = False
         while not placed:
+            self.master.readData()
             if (self.master.getCellState(row, col) == 0):
                 placed = True
             time.sleep(0.1)
