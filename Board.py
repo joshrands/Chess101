@@ -34,7 +34,7 @@ class Board(SampleBase):
         offset_canvas = self.matrix.CreateFrameCanvas()
         # begin interactive setup
         self.interactiveSetup(offset_canvas, self.teamR)
-        #self.interactiveSetup(offset_canvas, self.teamL)
+#TODO: uncomment this        #self.interactiveSetup(offset_canvas, self.teamL)
      
         self.initializeGameBoard()
 
@@ -101,6 +101,7 @@ class Board(SampleBase):
             time.sleep(0.1)
         print("Pawns placed.") 
 
+    # detect landing
     def detectPiece(self, canvas, team, piece, row, col):
         # setup teamR
         print("Place " + piece + " here:")
@@ -115,6 +116,7 @@ class Board(SampleBase):
             time.sleep(0.1)
         print(piece + " set.") 
 
+    # detect lift off
     def detectLiftOff(self, team):
         # team is current team
 #        print("Detecting lift off...")
@@ -153,7 +155,19 @@ class Board(SampleBase):
         activatedTarget = None
         for cell in targets:
             state = self.master.getCellState(cell.row, cell.col)
-            if (state == 0):
+            # if the piece is an enemy piece, lift yours then lift enemy, then take
+            if (self.grid[cell.row][cell.col] != None):
+                # there is a piece here
+                if (state == 1):
+                    # enter while loop, wait for player to place theres
+                    activatedTarget = cell
+                    while (state == 1):
+                        self.master.readData()
+                        print("You are taking an enemy, please place your piece")
+                        state = self.master.getCellState(cell.row, cell.col)                    
+                    valid = True
+ 
+            elif (state == 0):
                 print("Are you sure? Too bad")
                 valid = True
                 activatedTarget = cell
