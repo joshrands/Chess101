@@ -140,9 +140,7 @@ class Board(SampleBase):
         # if valid liftoff
         return valid, lifted
 
-    def getTeamPieces(self, team, grid = []):
-        if (grid == []):
-            grid = self.grid
+    def getTeamPieces(self, team, grid=self.grid):
         validPieces = []
         for row in grid:
             for piece in row:
@@ -451,7 +449,6 @@ class Board(SampleBase):
 
         #change how the pieces are grabbed
         for piece in self.getTeamPieces(team, currentNode.boardState):
-            print("found a piece")
             #TODO Parameter for this guy?
             piece.calcTargets(currentNode.boardState)
             for target in piece.targets:
