@@ -222,7 +222,7 @@ class Board(SampleBase):
         kingRow = -1;
         kingCol = -1;
 
-        self.computerMove(teamL)
+        self.computerMove(team)
 
         #count total targets for this team for stalemate purposes
         count = 0;
