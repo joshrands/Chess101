@@ -35,8 +35,8 @@ class Board(SampleBase):
         # Josh added this, hopefully it's okay
         offset_canvas = self.matrix.CreateFrameCanvas()
         # begin interactive setup
-        #self.interactiveSetup(offset_canvas, self.teamR)
-#TODO: uncomment this        #self.interactiveSetup(offset_canvas, self.teamL)
+                                           #self.interactiveSetup(offset_canvas, self.teamR)
+#TODO: uncomment this and above line       #self.interactiveSetup(offset_canvas, self.teamL)
 
         self.initializeGameBoard()
 
@@ -227,7 +227,7 @@ class Board(SampleBase):
         for row in self.grid:
             for piece in row:
                 #increment number of moves
-                count += piece.targets.size;
+                count += piece.targets.length;
                 if (isinstance(piece, King) and piece.team == team):
                     check = piece.calcTargets(self.grid)
                     kingRow = piece.row
