@@ -115,6 +115,9 @@ class King(Piece):
         else:
             return False
 
+    def getValue(self):
+        return 0
+
     def move(self, newRow, newCol):
     # calculate new targets
         oldRow = self.row

@@ -17,6 +17,9 @@ class Piece:
     def calcTargets(self, checkerTown):
         raise NotImplementedError()
 
+    def getValue(self):
+        raise NotImplementedError()
+
     # abstract method move
     def move(self, newRow, newCol):
         # calculate new targets

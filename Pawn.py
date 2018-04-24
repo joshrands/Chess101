@@ -58,6 +58,9 @@ class Pawn(Piece):
         if (self.critical):
             super().criticalMan()
 
+    def getValue(self):
+        return 5
+
     def skyFall(self, king):
         #refactor the targets because the king is in check and only godSaveTheKing spaces should appear as targets
         newTargets = []
