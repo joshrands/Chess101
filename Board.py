@@ -146,7 +146,8 @@ class Board(SampleBase):
         validPieces = []
         for row in grid:
             for piece in row:
-                print("test")
+                print(team)
+                print(piece.team)
                 if (piece != None and piece.team == team):
                     validPieces.append(piece)
 
