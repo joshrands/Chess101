@@ -451,12 +451,12 @@ class Board(SampleBase):
             piece.calcTargets(self.grid)
             for target in piece.targets:
                 newBoard = copy.deepcopy(self.grid)
-
-                #check to see if it's the same piece in question
-                if (newPiece.row == piece.row and newPiece.col == piece.col):
-                    #If it is, make the move and add the child to the current node
-                    newPiece.move(target.row, target.col)
-                    currentNode.addChild(Tree(newBoard, Cell(piece.row, piece.col), Cell(newPiece.row, newPiece.col)))
+                newPiece = newBoard[piece.row][piece.col]
+                #If it is, make the move and add the child to the current node
+                newPiece.move(target.row, target.col)
+                newBoard[piece.row][piece.col] = None
+                newBoard[target.row][target.col] = newPiece
+                currentNode.addChild(Tree(newBoard, Cell(piece.row, piece.col), Cell(target.row, target.col)))
 
         #Once all children for this node are found, go another level deep
 
