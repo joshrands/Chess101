@@ -23,7 +23,6 @@ class Tree(object):
     def getUtility(self):
         whiteCount = 0
         blackCount = 0
-
         for r in range(0,8):
             for piece in r:
                 if (piece == None):
@@ -33,5 +32,4 @@ class Tree(object):
                 else:
                     blackCount += piece.getValue()
         total = whiteCount-blackCount
-
     	return total
