@@ -424,7 +424,7 @@ class Board(SampleBase):
         for r in range(8):
             print(grid[r])
 
-    def computerMove(self, team, depth=2):
+    def computerMove(self, team, depth=4):
 
         #Create the whole tree recursively
         root = Tree(self, None, None)
