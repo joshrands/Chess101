@@ -28,7 +28,7 @@ class Tree(object):
             for piece in r:
                 if (piece == None):
                     continue
-                else if (piece.team == self.teamR):
+                elif (piece.team == self.teamR):
                     whiteCount += piece.getValue()
                 else:
                     blackCount += piece.getValue()
