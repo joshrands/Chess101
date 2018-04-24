@@ -22,12 +22,12 @@ class AI:
                 best_val = value
                 best_state = state
         print ("AlphaBeta:  Utility Value of Root Node: = " + str(best_val))
-        print ("AlphaBeta:  Best Piece to move is located at: " + best_state.oldCell.row + best_state.oldCell.col)
-        print ("AlphaBeta:  This piece should be moved to: " + best_state.newCell.row + best_state.newCell.col)
+        print ("AlphaBeta:  Best Piece to move is located at: " + str(best_state.oldCell.row) + str(best_state.oldCell.col))
+        print ("AlphaBeta:  This piece should be moved to: " + str(best_state.newCell.row) + str(best_state.newCell.col))
         return best_state
 
     def max_value(self, node, alpha, beta):
-        print ("AlphaBeta-->MAX: Visited Node :: " + node.oldCell.row + node.oldCell.col + " to " + node.newCell.row + node.newCell.col)
+        print ("AlphaBeta-->MAX: Visited Node :: " + str(node.oldCell.row) + str(node.oldCell.col) + " to " + str(node.newCell.row) + str(node.newCell.col))
         if self.isTerminal(node):
             return node.getUtility()
         infinity = float('inf')
@@ -42,7 +42,7 @@ class AI:
         return value
 
     def min_value(self, node, alpha, beta):
-        print ("AlphaBeta-->MIN: Visited Node :: " + node.oldCell.row + node.oldCell.col + " to " + node.newCell.row + node.newCell.col)
+        print ("AlphaBeta-->MIN: Visited Node :: " + str(node.oldCell.row) + str(node.oldCell.col) + " to " + str(node.newCell.row) + str(node.newCell.col))
         if self.isTerminal(node):
             return node.getUtility()
         infinity = float('inf')

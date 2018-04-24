@@ -438,7 +438,7 @@ class Board(SampleBase):
         bestMove = computerPlayer.alpha_beta_search()
 
         #For now, print out the old/new cell of the
-        print ("the best move involves moving the piece at square " + bestMove.oldCell.row + bestMove.oldCell.col + " to " + bestMove.newCell.row + bestMove.newCell.col)
+        print ("the best move involves moving the piece at square " + str(bestMove.oldCell.row) + str(bestMove.oldCell.col) + " to " + str(bestMove.newCell.row) + str(bestMove.newCell.col))
 
     def addNodes(self, currentNode, team, depth):
 
