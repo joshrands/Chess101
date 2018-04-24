@@ -35,7 +35,7 @@ class Board(SampleBase):
         # Josh added this, hopefully it's okay
         offset_canvas = self.matrix.CreateFrameCanvas()
         # begin interactive setup
-        self.interactiveSetup(offset_canvas, self.teamR)
+        #self.interactiveSetup(offset_canvas, self.teamR)
 #TODO: uncomment this        #self.interactiveSetup(offset_canvas, self.teamL)
 
         self.initializeGameBoard()
@@ -414,7 +414,7 @@ class Board(SampleBase):
                 canvas.SetPixel(x*4 + i, y*4 + j, r, g, b)
                 #canvas.SetPixel(x, y, 255, 255, 255)
 
-    def computerMove(self, team, depth=4):
+    def computerMove(self, team, depth=3):
 
         #Create the whole tree recursively
         root = Tree(self, None, None)
@@ -438,7 +438,7 @@ class Board(SampleBase):
 
         for piece in getTeamPieces(team):
             #TODO Parameter for this guy?
-            piece.calcTargets()
+            piece.calcTargets(self.grid)
             for target in piece.targets:
                 newBoard = copy.deepcopy(self)
                 for newPiece in newBoard.getTeamPieces(team):
