@@ -439,7 +439,7 @@ class Board(SampleBase):
         if (depth == 0):
             return
 
-        for piece in getTeamPieces(team):
+        for piece in self.getTeamPieces(team):
             #TODO Parameter for this guy?
             piece.calcTargets(self.grid)
             for target in piece.targets:
