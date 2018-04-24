@@ -424,8 +424,6 @@ class Board(SampleBase):
 
     def computerMove(self, team, depth=2):
 
-        self.printBoardStates()
-
         #Create the whole tree recursively
         root = Tree(self, None, None)
         self.addNodes(root, team, depth)
@@ -441,6 +439,8 @@ class Board(SampleBase):
         print ("the best move involves moving the piece at square " + str(bestMove.oldCell.row) + str(bestMove.oldCell.col) + " to " + str(bestMove.newCell.row) + str(bestMove.newCell.col))
 
     def addNodes(self, currentNode, team, depth):
+
+        self.printBoardStates()
 
         #if the depth is 0, we've reached the "bottom" of the tree (as far as we initially told it to go)
         if (depth == 0):
