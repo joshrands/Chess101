@@ -465,7 +465,7 @@ class Board(SampleBase):
                 currentNode.addChild(Tree(newBoard, Cell(piece.row, piece.col), Cell(target.row, target.col)))
 
         #Once all children for this node are found, go another level deep
-        print ("done adding children for depth " + str(depth) + []]"! boards created = " + str(len(currentNode.children)))
+        print ("done adding children for depth " + str(depth) + "! boards created = " + str(len(currentNode.children)))
         for child in currentNode.children:
             if (team == self.teamL):
                 team = self.teamR
