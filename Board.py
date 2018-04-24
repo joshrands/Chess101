@@ -418,9 +418,9 @@ class Board(SampleBase):
                 canvas.SetPixel(x*4 + i, y*4 + j, r, g, b)
                 #canvas.SetPixel(x, y, 255, 255, 255)
 
-    def printBoardStates(self):
+    def printBoardStates(self, grid = self.grid):
         for r in range(8):
-            print(self.grid[r])
+            print(grid[r])
 
     def computerMove(self, team, depth=2):
 
@@ -440,8 +440,6 @@ class Board(SampleBase):
 
     def addNodes(self, currentNode, team, depth):
 
-        self.printBoardStates()
-
         #if the depth is 0, we've reached the "bottom" of the tree (as far as we initially told it to go)
         if (depth == 0):
             return
@@ -456,6 +454,8 @@ class Board(SampleBase):
                 newPiece.move(target.row, target.col)
                 newBoard[piece.row][piece.col] = None
                 newBoard[target.row][target.col] = newPiece
+                #TODO comment this out once boardstates was complete
+                self.printBoardStates(newBoard)
                 currentNode.addChild(Tree(newBoard, Cell(piece.row, piece.col), Cell(target.row, target.col)))
 
         #Once all children for this node are found, go another level deep
