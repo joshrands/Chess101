@@ -21,13 +21,13 @@ class AI:
             if value > best_val:
                 best_val = value
                 best_state = state
-        print "AlphaBeta:  Utility Value of Root Node: = " + str(best_val)
-        print "AlphaBeta:  Best Piece to move is located at: " + best_state.getOldCell
-        print "AlphaBeta:  This piece should be moved to: " + best_state.getNewCell
+        print ("AlphaBeta:  Utility Value of Root Node: = " + str(best_val))
+        print ("AlphaBeta:  Best Piece to move is located at: " + best_state.getOldCell)
+        print ("AlphaBeta:  This piece should be moved to: " + best_state.getNewCell)
         return best_state
 
     def max_value(self, node, alpha, beta):
-        print "AlphaBeta-->MAX: Visited Node :: " + node.getOldCell + " to " + node.getNewCell
+        print ("AlphaBeta-->MAX: Visited Node :: " + node.getOldCell + " to " + node.getNewCell)
         if self.isTerminal(node):
             return node.getUtility()
         infinity = float('inf')
@@ -42,7 +42,7 @@ class AI:
         return value
 
     def min_value(self, node, alpha, beta):
-        print "AlphaBeta-->MIN: Visited Node :: " + node.getOldCell + " to " + node.getNewCell
+        print ("AlphaBeta-->MIN: Visited Node :: " + node.getOldCell + " to " + node.getNewCell)
         if self.isTerminal(node):
             return node.getUtility()
         infinity = float('inf')
