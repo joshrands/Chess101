@@ -31,7 +31,7 @@ class Board(SampleBase):
     def run(self):
         print("Running game...")
 
-        self.victory()
+        
 
         self.createPlayers()
 
