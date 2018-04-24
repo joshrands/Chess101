@@ -13,7 +13,7 @@ import random
 from Master import Master
 from Tree import Tree
 from AI import AI
-from copy import copy
+import copy
 
 class Board(SampleBase):
 
