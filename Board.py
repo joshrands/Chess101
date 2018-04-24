@@ -144,14 +144,13 @@ class Board(SampleBase):
         if (grid == None):
             grid = self.grid
         else:
-            print("got a grid sent in!")
+            print(team)
         validPieces = []
         for row in grid:
             for piece in row:
                 if (piece != None and piece.team == team):
                     validPieces.append(piece)
 
-        print ("total valid pieces = " + str(len(validPieces)))
         return validPieces
 
     def detectLanding(self, piece):
