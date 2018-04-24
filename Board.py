@@ -443,6 +443,7 @@ class Board(SampleBase):
         print ("the best move involves moving the piece at square " + str(bestMove.oldCell.row) + str(bestMove.oldCell.col) + " to " + str(bestMove.newCell.row) + str(bestMove.newCell.col))
 
     def addNodes(self, currentNode, team, depth):
+        print ("depth remaining: " + str(depth))
 
         #if the depth is 0, we've reached the "bottom" of the tree (as far as we initially told it to go)
         if (depth == 0):
@@ -470,7 +471,7 @@ class Board(SampleBase):
                 team = self.teamR
             else:
                 team = self.teamL
-            self.addNodes(child, team, depth - 1)
+            self.addNodes(child, team, depth-1)
 # Main function
 #if __name__ == "__main__":
 #    simple_square = Board()
