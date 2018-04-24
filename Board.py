@@ -222,16 +222,19 @@ class Board(SampleBase):
         kingRow = -1;
         kingCol = -1;
 
+        computerMove(teamL)
+
         #count total targets for this team for stalemate purposes
         count = 0;
         for row in self.grid:
             for piece in row:
-                #increment number of moves
-                count += len(piece.getTargets());
-                if (isinstance(piece, King) and piece.team == team):
-                    check = piece.calcTargets(self.grid)
-                    kingRow = piece.row
-                    kingCol = piece.col
+                if (isinstance(piece, Piece) and piece != None):
+                    #increment number of moves
+                    count += len(piece.getTargets());
+                    if (isinstance(piece, King) and piece.team == team):
+                        check = piece.calcTargets(self.grid)
+                        kingRow = piece.row
+                        kingCol = piece.col
         #check if there are no legal moves
         if (count == 0 and not check):
             draw = True; #stalemate

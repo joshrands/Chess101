@@ -10,7 +10,7 @@ class Tree(object):
         self.newCell = newCell
 
     def addChild(self, child):
-    	assert ininstance(child, Tree)
+    	assert isinstance(child, Tree)
     	self.children.append(child)
 
     def getBoardState(self):
