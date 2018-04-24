@@ -32,5 +32,6 @@ class Tree(object):
                     whiteCount += piece.getValue()
                 else:
                     blackCount += piece.getValue()
+        total = whiteCount-blackCount
 
-    	return (whiteCount-blackCount)
+    	return total
