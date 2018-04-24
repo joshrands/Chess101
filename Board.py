@@ -320,6 +320,49 @@ class Board(SampleBase):
             for j in range(0, 4):
                 canvas.SetPixel(x*4 + i, y*4 + j, r, g, b)
                 #canvas.SetPixel(x, y, 255, 255, 255)
+
+    def computerMove(self, team, depth=4):
+
+        #Create the whole tree recursively
+        root = Tree(self, None, None)
+        addNodes(root, team, depth)
+
+        #Create a new AI object with tree
+        #figure out how to incorporate the team
+        computerPlayer = AI(root, team)
+
+        #Tell the AI to return the best state (node)
+        bestMove = computerPlayer.alpha_beta_search()
+
+        #For now, print out the old/new cell of the
+        print ("the best move involves moving the piece at square " + bestMove.oldCell.row + bestMove.oldCell.col + " to " + bestMove.newCell.row + bestMove.newCell.col)
+
+    def addNodes(self, currentNode, team, depth):
+
+        #if the depth is 0, we've reached the "bottom" of the tree (as far as we initially told it to go)
+        if (depth == 0):
+            return
+
+        for piece in getTeamPieces(team):
+            #TODO Parameter for this guy?
+            piece.calcTargets()
+            for target in piece.targets:
+                newBoard = copy.deepcopy(self)
+                for newPiece in newBoard.getTeamPieces(team):
+                    #check to see if it's the same piece in question
+                    if (newPiece.row == piece.row and newPiece.col == piece.col):
+                        #If it is, make the move and add the child to the current node
+                        newPiece.move(target.row, target.col)
+                        currentNode.addChild(Tree(newBoard, Cell(piece.row, piece.col), Cell(newPiece.row, newPiece.col)))
+
+        #Once all children for this node are found, go another level deep
+
+        for child in currentNode.children:
+            if (team == teamL):
+                team = teamR
+            else:
+                team = teamL
+            child.boardState.addNodes(child, team, depth - 1)
 # Main function
 #if __name__ == "__main__":
 #    simple_square = Board()
