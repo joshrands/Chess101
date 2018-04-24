@@ -35,9 +35,11 @@ class Board(SampleBase):
 
         # Josh added this, hopefully it's okay
         offset_canvas = self.matrix.CreateFrameCanvas()
+        self.victory(offset_canvas, self.teamR)
         # begin interactive setup
-                                           #self.interactiveSetup(offset_canvas, self.teamR)
-#TODO: uncomment this and above line       #self.interactiveSetup(offset_canvas, self.teamL)
+        self.interactiveSetup(offset_canvas, self.teamR)
+#TODO: uncomment this and above line       
+        self.interactiveSetup(offset_canvas, self.teamL)
 
         self.initializeGameBoard()
 
@@ -146,8 +148,8 @@ class Board(SampleBase):
         validPieces = []
         for row in grid:
             for piece in row:
-                print(team)
-                print(piece.team)
+                #print(team)
+                #print(piece.team)
                 if (piece != None and piece.team == team):
                     validPieces.append(piece)
 
@@ -183,11 +185,11 @@ class Board(SampleBase):
         return valid, activatedTarget
 
     def victory(self, canvas, team):
-        for i in range(0, 10):
-            time.sleep(.01)
+        for i in range(0, 1000):
+            time.sleep(0.5)
             x = random.randint(0, 8)
             y = random.randint(0, 8)
-            canvas = self.matrix.CreateFrameCanvas()
+            #canvas = self.matrix.CreateFrameCanvas()
             self.lightCell(canvas, x, y, team.r, team.g, team.b)
             canvas = self.matrix.SwapOnVSync(canvas)
 
