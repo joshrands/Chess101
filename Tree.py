@@ -26,7 +26,7 @@ class Tree(object):
         whiteCount = 0
         blackCount = 0
         for r in range(0,8):
-            for piece in r:
+            for piece in self.boardState[r]:
                 if (piece == None):
                     continue
                 elif (piece.team == self.teamR):
