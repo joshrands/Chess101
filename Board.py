@@ -418,7 +418,13 @@ class Board(SampleBase):
                 canvas.SetPixel(x*4 + i, y*4 + j, r, g, b)
                 #canvas.SetPixel(x, y, 255, 255, 255)
 
+    def printBoardStates(self):
+        for r in range(8):
+            print(self.grid[r])
+
     def computerMove(self, team, depth=3):
+
+        self.printBoardStates()
 
         #Create the whole tree recursively
         root = Tree(self, None, None)
