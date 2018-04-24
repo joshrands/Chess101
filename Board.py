@@ -465,7 +465,7 @@ class Board(SampleBase):
                 team = self.teamR
             else:
                 team = self.teamL
-            child.boardState.addNodes(child, team, depth - 1)
+            self.addNodes(child, team, depth - 1)
 # Main function
 #if __name__ == "__main__":
 #    simple_square = Board()
