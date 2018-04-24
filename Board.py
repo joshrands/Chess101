@@ -418,7 +418,9 @@ class Board(SampleBase):
                 canvas.SetPixel(x*4 + i, y*4 + j, r, g, b)
                 #canvas.SetPixel(x, y, 255, 255, 255)
 
-    def printBoardStates(self, grid = self.grid):
+    def printBoardStates(self, grid = []):
+        if (grid == []):
+            grid = self.grid
         for r in range(8):
             print(grid[r])
 
