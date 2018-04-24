@@ -30,12 +30,12 @@ class Board(SampleBase):
 
         self.createPlayers()
 
-        # Josh added this, hopefully it's okay  
+        # Josh added this, hopefully it's okay
         offset_canvas = self.matrix.CreateFrameCanvas()
         # begin interactive setup
         self.interactiveSetup(offset_canvas, self.teamR)
 #TODO: uncomment this        #self.interactiveSetup(offset_canvas, self.teamL)
-     
+
         self.initializeGameBoard()
 
         while True:
@@ -63,7 +63,7 @@ class Board(SampleBase):
             self.detectPiece(canvas, team, "Knight", 0, 6)
             # setup bishop
             self.detectPiece(canvas, team, "Bishop", 0, 2)
-            self.detectPiece(canvas, team, "Bishop", 0, 5) 
+            self.detectPiece(canvas, team, "Bishop", 0, 5)
             # setup Queen
             self.detectPiece(canvas, team, "Queen", 0, 3)
             # setup King
@@ -79,14 +79,14 @@ class Board(SampleBase):
             self.detectPiece(canvas, team, "Knight", 7, 6)
             # setup bishop
             self.detectPiece(canvas, team, "Bishop", 7, 2)
-            self.detectPiece(canvas, team, "Bishop", 7, 5) 
+            self.detectPiece(canvas, team, "Bishop", 7, 5)
             # setup Queen
             self.detectPiece(canvas, team, "Queen", 7, 3)
             # setup King
             self.detectPiece(canvas, team, "King", 7, 4)
             # setup Pawns
             self.detectPawns(canvas, team, 6)
-         
+
     def detectPawns(self, canvas, team, row):
         print("Please place pawns")
         for col in range(8):
@@ -99,14 +99,14 @@ class Board(SampleBase):
                 if (self.master.getCellState(row, col) == 1):
                     placed = False
             time.sleep(0.1)
-        print("Pawns placed.") 
+        print("Pawns placed.")
 
     # detect landing
     def detectPiece(self, canvas, team, piece, row, col):
         # setup teamR
         print("Place " + piece + " here:")
         # light up cell
-        self.lightCell(canvas, row, col, team.r, team.g, team.b) 
+        self.lightCell(canvas, row, col, team.r, team.g, team.b)
         canvas = self.matrix.SwapOnVSync(canvas)
         placed = False
         while not placed:
@@ -114,7 +114,7 @@ class Board(SampleBase):
             if (self.master.getCellState(row, col) == 0):
                 placed = True
             time.sleep(0.1)
-        print(piece + " set.") 
+        print(piece + " set.")
 
     # detect lift off
     def detectLiftOff(self, team):
@@ -164,9 +164,9 @@ class Board(SampleBase):
                     while (state == 1):
                         self.master.readData()
                         print("You are taking an enemy, please place your piece")
-                        state = self.master.getCellState(cell.row, cell.col)                    
+                        state = self.master.getCellState(cell.row, cell.col)
                     valid = True
- 
+
             elif (state == 0):
                 print("Are you sure? Too bad")
                 valid = True
@@ -216,15 +216,24 @@ class Board(SampleBase):
 
         check = False
         checkMate = False
+        draw = False
         kingRow = -1;
         kingCol = -1;
 
+        #count total targets for this team for stalemate purposes
+        count = 0;
         for row in self.grid:
             for piece in row:
+                #increment number of moves
+                count += piece.targets.size;
                 if (isinstance(piece, King) and piece.team == team):
                     check = piece.calcTargets(self.grid)
                     kingRow = piece.row
                     kingCol = piece.col
+        #check if there are no legal moves
+        if (count == 0 and not check){
+            draw = True; #stalemate
+        }
 
         piecesWithMoves = 0
 
