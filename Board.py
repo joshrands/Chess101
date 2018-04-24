@@ -140,13 +140,18 @@ class Board(SampleBase):
         # if valid liftoff
         return valid, lifted
 
-    def getTeamPieces(self, team, grid=self.grid):
+    def getTeamPieces(self, team, grid=None):
+        if (grid == None):
+            grid = self.grid
+        else:
+            print("got a grid sent in!")
         validPieces = []
         for row in grid:
             for piece in row:
                 if (piece != None and piece.team == team):
                     validPieces.append(piece)
 
+        print ("total valid pieces = " + str(len(validPieces)))
         return validPieces
 
     def detectLanding(self, piece):
