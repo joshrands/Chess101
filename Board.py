@@ -422,7 +422,7 @@ class Board(SampleBase):
         for r in range(8):
             print(self.grid[r])
 
-    def computerMove(self, team, depth=3):
+    def computerMove(self, team, depth=2):
 
         self.printBoardStates()
 
