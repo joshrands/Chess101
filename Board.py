@@ -143,11 +143,10 @@ class Board(SampleBase):
     def getTeamPieces(self, team, grid=None):
         if (grid == None):
             grid = self.grid
-        else:
-            print(team)
         validPieces = []
         for row in grid:
             for piece in row:
+                print("test")
                 if (piece != None and piece.team == team):
                     validPieces.append(piece)
 
