@@ -229,7 +229,7 @@ class Board(SampleBase):
         count = 0;
         for row in self.grid:
             for piece in row:
-                if (isinstance(piece, Piece) and piece != None):
+                if (piece != None):
                     #increment number of moves
                     count += len(piece.getTargets());
                     if (isinstance(piece, King) and piece.team == team):
