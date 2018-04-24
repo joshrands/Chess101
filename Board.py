@@ -140,9 +140,11 @@ class Board(SampleBase):
         # if valid liftoff
         return valid, lifted
 
-    def getTeamPieces(self, team):
+    def getTeamPieces(self, team, grid = []):
+        if (grid == []):
+            grid = self.grid
         validPieces = []
-        for row in self.grid:
+        for row in grid:
             for piece in row:
                 if (piece != None and piece.team == team):
                     validPieces.append(piece)
@@ -427,7 +429,7 @@ class Board(SampleBase):
     def computerMove(self, team, depth=4):
 
         #Create the whole tree recursively
-        root = Tree(self, None, None)
+        root = Tree(self.grid, None, None)
         self.addNodes(root, team, depth)
 
         #Create a new AI object with tree
@@ -446,11 +448,12 @@ class Board(SampleBase):
         if (depth == 0):
             return
 
-        for piece in self.getTeamPieces(team):
+        #change how the pieces are grabbed
+        for piece in self.getTeamPieces(team, currentNode.boardState):
             #TODO Parameter for this guy?
-            piece.calcTargets(self.grid)
+            piece.calcTargets(currentNode.boardState)
             for target in piece.targets:
-                newBoard = copy.deepcopy(self.grid)
+                newBoard = copy.deepcopy(currentNode.boardState)
                 newPiece = newBoard[piece.row][piece.col]
                 #If it is, make the move and add the child to the current node
                 newPiece.move(target.row, target.col)
