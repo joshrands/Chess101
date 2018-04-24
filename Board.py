@@ -227,7 +227,7 @@ class Board(SampleBase):
         for row in self.grid:
             for piece in row:
                 #increment number of moves
-                count += piece.targets.length;
+                count += len(piece.targets);
                 if (isinstance(piece, King) and piece.team == team):
                     check = piece.calcTargets(self.grid)
                     kingRow = piece.row
