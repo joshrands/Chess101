@@ -1,4 +1,5 @@
 from Team import Team
+from Piece import Piece
 
 #Basic tree structure for holding the score/children of each node
 
