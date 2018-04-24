@@ -455,10 +455,10 @@ class Board(SampleBase):
         #Once all children for this node are found, go another level deep
 
         for child in currentNode.children:
-            if (team == teamL):
-                team = teamR
+            if (team == self.teamL):
+                team = self.teamR
             else:
-                team = teamL
+                team = self.teamL
             child.boardState.addNodes(child, team, depth - 1)
 # Main function
 #if __name__ == "__main__":
