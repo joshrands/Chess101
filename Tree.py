@@ -33,4 +33,4 @@ class Tree(object):
                 else:
                     blackCount += piece.getValue()
 
-    	return (whiteCount - blackCount)
+    	return (whiteCount-blackCount)
