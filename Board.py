@@ -421,7 +421,7 @@ class Board(SampleBase):
 
         #Create the whole tree recursively
         root = Tree(self, None, None)
-        addNodes(root, team, depth)
+        self.addNodes(root, team, depth)
 
         #Create a new AI object with tree
         #figure out how to incorporate the team
