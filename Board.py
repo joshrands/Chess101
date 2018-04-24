@@ -450,8 +450,8 @@ class Board(SampleBase):
             #TODO Parameter for this guy?
             piece.calcTargets(self.grid)
             for target in piece.targets:
-                newBoard = copy.deepcopy(self)
-                for newPiece in newBoard.getTeamPieces(team):
+                newBoard = copy.deepcopy(self.grid)
+
                     #check to see if it's the same piece in question
                     if (newPiece.row == piece.row and newPiece.col == piece.col):
                         #If it is, make the move and add the child to the current node
