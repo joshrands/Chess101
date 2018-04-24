@@ -16,9 +16,6 @@ class Tree(object):
         self.teamL = Team(255, 140, 0)
 
     def addChild(self, child):
-        print("trying to add child")
-    	assert isinstance(child, Tree)
-        print ("adding child")
     	self.children.append(child)
 
     def getBoardState(self):
