@@ -451,6 +451,7 @@ class Board(SampleBase):
 
         #change how the pieces are grabbed
         for piece in self.getTeamPieces(team, currentNode.boardState):
+            print("found a piece")
             #TODO Parameter for this guy?
             piece.calcTargets(currentNode.boardState)
             for target in piece.targets:
