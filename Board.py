@@ -17,19 +17,19 @@ import copy
 
 class Board(SampleBase):
 
-    def __init__(self, *args, **kwargs, grid = []):
+    def __init__(self, *args, **kwargs):
         super(Board, self).__init__(*args, **kwargs)
         self.teamR = Team(64, 180, 232)
         self.teamL = Team(255, 140, 0)
-        self.grid = grid
+        self.grid = []
         self.master = Master()
+
+        for row in range(0, 8):
+            self.grid.append([None, None, None, None, None, None, None, None])
 
     # RUN GAME
     def run(self):
         print("Running game...")
-
-        for row in range(0, 8):
-            self.grid.append([None, None, None, None, None, None, None, None])
 
         self.createPlayers()
 
@@ -460,9 +460,6 @@ class Board(SampleBase):
             else:
                 team = teamL
             child.boardState.addNodes(child, team, depth - 1)
-
-    def __deepcopy__(self):
-      return Board(self.grid)
 # Main function
 #if __name__ == "__main__":
 #    simple_square = Board()
