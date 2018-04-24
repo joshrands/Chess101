@@ -1,3 +1,5 @@
+import Team
+
 #Basic tree structure for holding the score/children of each node
 
 class Tree(object):
