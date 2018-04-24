@@ -29,6 +29,13 @@ class Board(SampleBase):
         print("Running game...")
 
         self.createPlayers()
+
+        # Josh added this, hopefully it's okay
+        offset_canvas = self.matrix.CreateFrameCanvas()
+        # begin interactive setup
+        self.interactiveSetup(offset_canvas, self.teamR)
+#TODO: uncomment this        #self.interactiveSetup(offset_canvas, self.teamL)
+
         self.initializeGameBoard()
 
         while True:
@@ -46,6 +53,70 @@ class Board(SampleBase):
             offset_canvas = self.matrix.SwapOnVSync(offset_canvas)
 
     ### Member Functions ###
+    def interactiveSetup(self, canvas, team):
+        if (team == self.teamR):
+            # setup Rook
+            self.detectPiece(canvas, team, "Rook", 0, 0)
+            self.detectPiece(canvas, team, "Rook", 0, 7)
+            # setup Knight
+            self.detectPiece(canvas, team, "Knight", 0, 1)
+            self.detectPiece(canvas, team, "Knight", 0, 6)
+            # setup bishop
+            self.detectPiece(canvas, team, "Bishop", 0, 2)
+            self.detectPiece(canvas, team, "Bishop", 0, 5)
+            # setup Queen
+            self.detectPiece(canvas, team, "Queen", 0, 3)
+            # setup King
+            self.detectPiece(canvas, team, "King", 0, 4)
+            # setup Pawns
+            self.detectPawns(canvas, team, 1)
+        else:
+            # setup Rook
+            self.detectPiece(canvas, team, "Rook", 7, 0)
+            self.detectPiece(canvas, team, "Rook", 7, 7)
+            # setup Knight
+            self.detectPiece(canvas, team, "Knight", 7, 1)
+            self.detectPiece(canvas, team, "Knight", 7, 6)
+            # setup bishop
+            self.detectPiece(canvas, team, "Bishop", 7, 2)
+            self.detectPiece(canvas, team, "Bishop", 7, 5)
+            # setup Queen
+            self.detectPiece(canvas, team, "Queen", 7, 3)
+            # setup King
+            self.detectPiece(canvas, team, "King", 7, 4)
+            # setup Pawns
+            self.detectPawns(canvas, team, 6)
+
+    def detectPawns(self, canvas, team, row):
+        print("Please place pawns")
+        for col in range(8):
+            self.lightCell(canvas, row, col, team.r, team.g, team.b)
+        placed = False
+        while not placed:
+            placed = True
+            for col in range(8):
+                self.master.readData()
+                if (self.master.getCellState(row, col) == 1):
+                    placed = False
+            time.sleep(0.1)
+        print("Pawns placed.")
+
+    # detect landing
+    def detectPiece(self, canvas, team, piece, row, col):
+        # setup teamR
+        print("Place " + piece + " here:")
+        # light up cell
+        self.lightCell(canvas, row, col, team.r, team.g, team.b)
+        canvas = self.matrix.SwapOnVSync(canvas)
+        placed = False
+        while not placed:
+            self.master.readData()
+            if (self.master.getCellState(row, col) == 0):
+                placed = True
+            time.sleep(0.1)
+        print(piece + " set.")
+
+    # detect lift off
     def detectLiftOff(self, team):
         # team is current team
 #        print("Detecting lift off...")
@@ -84,7 +155,19 @@ class Board(SampleBase):
         activatedTarget = None
         for cell in targets:
             state = self.master.getCellState(cell.row, cell.col)
-            if (state == 0):
+            # if the piece is an enemy piece, lift yours then lift enemy, then take
+            if (self.grid[cell.row][cell.col] != None):
+                # there is a piece here
+                if (state == 1):
+                    # enter while loop, wait for player to place theres
+                    activatedTarget = cell
+                    while (state == 1):
+                        self.master.readData()
+                        print("You are taking an enemy, please place your piece")
+                        state = self.master.getCellState(cell.row, cell.col)
+                    valid = True
+
+            elif (state == 0):
                 print("Are you sure? Too bad")
                 valid = True
                 activatedTarget = cell
@@ -133,15 +216,24 @@ class Board(SampleBase):
 
         check = False
         checkMate = False
+        draw = False
         kingRow = -1;
         kingCol = -1;
 
+        #count total targets for this team for stalemate purposes
+        count = 0;
         for row in self.grid:
             for piece in row:
+                #increment number of moves
+                count += piece.targets.size;
                 if (isinstance(piece, King) and piece.team == team):
                     check = piece.calcTargets(self.grid)
                     kingRow = piece.row
                     kingCol = piece.col
+        #check if there are no legal moves
+        if (count == 0 and not check){
+            draw = True; #stalemate
+        }
 
         piecesWithMoves = 0
 
@@ -287,14 +379,14 @@ class Board(SampleBase):
         self.grid[0][3] = Queen(0, 3, self.teamR)
         self.grid[0][4] = King(0, 4, self.teamR)
 
-        # TEAM R
-        # create pawns for teamR
+        # TEAM L
+        # create pawns for teamL
         for col in range(0, 8):
             self.grid[6][col] = Pawn(6, col, self.teamL)
-        # create bishop for teamR
+        # create bishop for teamL
         self.grid[7][2] = Bishop(7, 2, self.teamL)
         self.grid[7][5] = Bishop(7, 5, self.teamL)
-        # create rook for teamR
+        # create rook for teamL
         self.grid[7][0] = Rook(7, 0, self.teamL)
         self.grid[7][7] = Rook(7, 7, self.teamL)
         self.grid[7][1] = Knight(7, 1, self.teamL)
