@@ -1,3 +1,5 @@
+from Tree import Tree
+
 class AI:
     # print utility value of root node (assuming it is max)
     # print names of all nodes visited during search

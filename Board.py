@@ -11,6 +11,8 @@ import time
 from Cell import Cell
 import random
 from Master import Master
+from Tree import Tree
+from AI import AI
 
 class Board(SampleBase):
 
