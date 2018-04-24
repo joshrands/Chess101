@@ -231,9 +231,8 @@ class Board(SampleBase):
                     kingRow = piece.row
                     kingCol = piece.col
         #check if there are no legal moves
-        if (count == 0 and not check){
+        if (count == 0 and not check):
             draw = True; #stalemate
-        }
 
         piecesWithMoves = 0
 
