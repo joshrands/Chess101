@@ -31,16 +31,12 @@ class Board(SampleBase):
     def run(self):
         print("Running game...")
 
-
-
         self.createPlayers()
 
         # Josh added this, hopefully it's okay
         offset_canvas = self.matrix.CreateFrameCanvas()
-        self.victory(offset_canvas, self.teamR)
         # begin interactive setup
         self.interactiveSetup(offset_canvas, self.teamR)
-#TODO: uncomment this and above line
         self.interactiveSetup(offset_canvas, self.teamL)
 
         self.initializeGameBoard()
@@ -97,8 +93,19 @@ class Board(SampleBase):
     def detectMismatch(self, canvas):
         # read data into master
         self.master.readData()
+        # set color of piece that needs correction
+        r = 255
+        g = 0
+        b = 0
         # loop through valid pieces and make sure they are there        
-
+        teamRPieces = self.getTeamPieces(self.teamR)
+        teamLPieces = self.getTeamPieces(self.teamL)
+        for piece in teamRPieces:
+            state = self.master.getCellState(piece.row, piece.col)
+            while (state == 1):
+                print("Piece should be here")
+                # light cell warning color
+                self.lightCell(canvas, piece.row, piece.col, r, g, b) 
 
     def detectPawns(self, canvas, team, row):
         print("Please place pawns")
