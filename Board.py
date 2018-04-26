@@ -104,16 +104,28 @@ class Board(SampleBase):
             state = self.master.getCellState(piece.row, piece.col)
             while (state == 1):
                 print("Piece should be here")
+                print(piece.row, piece.col)
                 # light cell warning color
+                canvas = self.matrix.CreateFrameCanvas()
+                self.lightPieces(canvas, self.teamR)
+                self.lightPieces(canvas, self.teamL)
                 self.lightCell(canvas, piece.row, piece.col, r, g, b) 
+                canvas = self.matrix.SwapOnVSync(canvas)
+                time.sleep(0.01)        
                 state = self.master.getCellState(piece.row, piece.col)
                 self.master.readData()
         for piece in teamLPieces:
             state = self.master.getCellState(piece.row, piece.col)
             while (state == 1):
                 print("Piece should be here")
+                # print(piece.row, piece.col)
                 # light cell warning color
+                canvas = self.matrix.CreateFrameCanvas()
+                self.lightPieces(canvas, self.teamR)
+                self.lightPieces(canvas, self.teamL)
                 self.lightCell(canvas, piece.row, piece.col, r, g, b) 
+                canvas = self.matrix.SwapOnVSync(canvas)
+                # light cell warning color
                 state = self.master.getCellState(piece.row, piece.col)
                 self.master.readData()
         # mismatch complete return true
@@ -305,7 +317,7 @@ class Board(SampleBase):
             self.sethVictory(canvas, team)
 
         # check for mismatch
-        #self.detectMismatch(canvas)
+        self.detectMismatch(canvas)
 
         move = False
         row = 0
