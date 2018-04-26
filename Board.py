@@ -190,6 +190,11 @@ class Board(SampleBase):
         # piece is piece that is moving
         valid = False
         activatedTarget = None
+        # check regret
+        state = self.master.getCellState(piece.row, piece.col)
+        if (state == 0):
+            returnCell = Cell(piece.row, piece.col)
+            return True, returnCell 
         for cell in targets:
             state = self.master.getCellState(cell.row, cell.col)
             # if the piece is an enemy piece, lift yours then lift enemy, then take
@@ -300,7 +305,7 @@ class Board(SampleBase):
             self.sethVictory(canvas, team)
 
         # check for mismatch
-        self.detectMismatch(canvas)
+        #self.detectMismatch(canvas)
 
         move = False
         row = 0
@@ -308,6 +313,8 @@ class Board(SampleBase):
         print("Player:", team.name, "'s move.")
         
         while (move == False):
+            canvas = self.matrix.CreateFrameCanvas()
+          
             # move a piece!
 #            row = int(input("Enter row for desired piece: "))
 #            col = int(input("Enter col for desired piece: "))
@@ -334,17 +341,24 @@ class Board(SampleBase):
                 placed = False
                 returned = False
                 while (not placed):
-                    print("Please choose a target already")
+                    #print("Please choose a target already")
                     placed, targetCell = self.detectLanding(self.grid[row][col])
-                    if (targetCell != None and targetCell.row == row and targetCell.col == row):
-                        returned = True
+                    #print(placed, targetCell.row, targetCell.col, row, col)
+                    if placed:
+                        #print(targetCell.row, targetCell.col, row, col)
+                        if (targetCell.row == row and targetCell.col == col):
+                            print("Piece returned.")
+                            returned = True
                 if returned:
                     # go back to detecting which piece player wants to move
                     move = False  
+                    validMove = True # jank but whatever it'll work
+                    #self.clearBoard(canvas)
                     canvas = self.matrix.CreateFrameCanvas()
                     self.lightPieces(canvas, self.teamR)
                     canvas = self.matrix.SwapOnVSync(canvas)
-                    continue                
+                    print("Regret.")
+                    #continue                
 
                 if move:
                     targetRow = targetCell.row
@@ -383,10 +397,11 @@ class Board(SampleBase):
     def clearBoard(self, canvas):
         for x in range(0, 8):
             for y in range(0, 8):
-                self.lightCell(x, y, 0, 0, 0)
+                self.lightCell(canvas, x, y, 0, 0, 0)
 
     def lightTargets(self, canvas, piece):
         #piece.calcTargets(self.grid)
+        #:canvas = self.matrix.CreateFrameCanvas()
         targets = piece.getTargets()
         for cell in targets:
             print("Target: ", cell.row, cell.col)
