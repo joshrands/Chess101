@@ -106,6 +106,18 @@ class Board(SampleBase):
                 print("Piece should be here")
                 # light cell warning color
                 self.lightCell(canvas, piece.row, piece.col, r, g, b) 
+                state = self.master.getCellState(piece.row, piece.col)
+                self.master.readData()
+        for piece in teamLPieces:
+            state = self.master.getCellState(piece.row, piece.col)
+            while (state == 1):
+                print("Piece should be here")
+                # light cell warning color
+                self.lightCell(canvas, piece.row, piece.col, r, g, b) 
+                state = self.master.getCellState(piece.row, piece.col)
+                self.master.readData()
+        # mismatch complete return true
+        return True
 
     def detectPawns(self, canvas, team, row):
         print("Please place pawns")
