@@ -97,27 +97,32 @@ class Board(SampleBase):
     def detectMismatch(self, canvas):
         # read data into master
         self.master.readData()
-        
+        # loop through valid pieces and make sure they are there        
+
 
     def detectPawns(self, canvas, team, row):
         print("Please place pawns")
         for col in range(8):
-            self.lightCell(canvas, row, col, team.r, team.g, team.b)
+            self.lightCell(canvas, row, col, 255, 255, 255)
         placed = False
         while not placed:
             placed = True
+            self.master.readData()
             for col in range(8):
-                self.master.readData()
+                # why read every time? self.master.readData()
                 if (self.master.getCellState(row, col) == 1):
                     placed = False
+                else:
+                    self.lightCell(canvas, row, col, team.r, team.g, team.b)
+                    # pawn was placed, light cell team color 
             time.sleep(0.1)
         print("Pawns placed.")
 
     def detectPiece(self, canvas, team, piece, row, col):
         # setup teamR
         print("Place " + piece + " here:")
-        # light up cell
-        self.lightCell(canvas, row, col, team.r, team.g, team.b)
+        # light up cell white
+        self.lightCell(canvas, row, col, 255, 255, 255)
         canvas = self.matrix.SwapOnVSync(canvas)
         placed = False
         while not placed:
@@ -126,6 +131,7 @@ class Board(SampleBase):
                 placed = True
             time.sleep(0.1)
         print(piece + " set.")
+        self.lightCell(canvas, row, col, team.r, team.g, team.b) # light team color
 
     # detect lift off
     def detectLiftOff(self, team):
