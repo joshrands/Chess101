@@ -1,16 +1,16 @@
 
-// Arduino Control for Row D
+// Arduino Control for Row E
 // Josh & Dom
 
 #include <Wire.h>
 #include <math.h>
 
-char ROW = 'D';
+char ROW = 'E';
 int RPiInput = 0;
 int changeState = -1;
 int bitValue = 0;
 
-#define SLAVE_ADDRESS 0x07
+#define SLAVE_ADDRESS 0x08
 
 // define Reed switch ports
 const int COL1 = 2;
