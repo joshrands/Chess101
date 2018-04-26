@@ -94,6 +94,11 @@ class Board(SampleBase):
             # setup Pawns
             self.detectPawns(canvas, team, 6)
 
+    def detectMismatch(self, canvas):
+        # read data into master
+        self.master.readData()
+        
+
     def detectPawns(self, canvas, team, row):
         print("Please place pawns")
         for col in range(8):
