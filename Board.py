@@ -299,11 +299,34 @@ class Board(SampleBase):
             print("Check mate!")
             self.sethVictory(canvas, team)
 
+        # check for mismatch
+        self.detectMismatch(canvas)
+
         move = False
         row = 0
         col = 0
         print("Player:", team.name, "'s move.")
 
+        # Implement player turn
+        while (move == False):
+            # wait for player to choose a piece
+            pieceLifted = False
+            liftedPiece = None
+            while not pieceLifted:
+                pieceLifted, liftedPiece = self.detectLiftOff(team)
+                print("Waiting for player move...")
+
+            # piece chosen, light targets and wait for decision
+            print("Calculating targets...")
+            self.lightTargets(canvas, self.grid[row][col])
+            canvas = self.matrix.SwapOnVSync(canvas)
+    
+            # wait for player to make a decision
+            # either return and choose new piece, or move to target  
+            decision = False
+            while not decision:
+                print("Make a decision")         
+    
         while (move == False):
             # move a piece!
 #            row = int(input("Enter row for desired piece: "))
@@ -343,6 +366,7 @@ class Board(SampleBase):
             if returned:
                 # go back to detecting which piece player wants to move
                 # TODO: implement this 
+                 
                 continue                
 
             targetRow = targetCell.row
