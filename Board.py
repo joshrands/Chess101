@@ -306,27 +306,7 @@ class Board(SampleBase):
         row = 0
         col = 0
         print("Player:", team.name, "'s move.")
-
-        # Implement player turn
-        while (move == False):
-            # wait for player to choose a piece
-            pieceLifted = False
-            liftedPiece = None
-            while not pieceLifted:
-                pieceLifted, liftedPiece = self.detectLiftOff(team)
-                print("Waiting for player move...")
-
-            # piece chosen, light targets and wait for decision
-            print("Calculating targets...")
-            self.lightTargets(canvas, self.grid[row][col])
-            canvas = self.matrix.SwapOnVSync(canvas)
-    
-            # wait for player to make a decision
-            # either return and choose new piece, or move to target  
-            decision = False
-            while not decision:
-                print("Make a decision")         
-    
+        
         while (move == False):
             # move a piece!
 #            row = int(input("Enter row for desired piece: "))
@@ -344,6 +324,7 @@ class Board(SampleBase):
             self.lightTargets(canvas, self.grid[row][col])
             canvas = self.matrix.SwapOnVSync(canvas)
 
+            move = True # the player is moving a piece, is it valid? Will they continue? 
             validMove = False
             # check if valid move
             while (validMove == False):
@@ -365,7 +346,7 @@ class Board(SampleBase):
                     canvas = self.matrix.SwapOnVSync(canvas)
                     continue                
 
-                if not move:
+                if move:
                     targetRow = targetCell.row
                     targetCol = targetCell.col
 
