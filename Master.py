@@ -34,12 +34,12 @@ class Master:
         # loop through and compare every cell to gridStates
         self.fillRowData(self.rowA, 0)
         self.fillRowData(self.rowB, 1)
-        self.fillRowData(self.rowC, 2)
-        self.fillRowData(self.rowD, 3)
-        self.fillRowData(self.rowE, 4)
-        self.fillRowData(self.rowF, 5)
-        self.fillRowData(self.rowG, 6)
-        self.fillRowData(self.rowH, 7)
+#        self.fillRowData(self.rowC, 2)
+#        self.fillRowData(self.rowD, 3)
+#        self.fillRowData(self.rowE, 4)
+#        self.fillRowData(self.rowF, 5)
+#        self.fillRowData(self.rowG, 6)
+#        self.fillRowData(self.rowH, 7)
 
         self.printBoardStates()
 
@@ -78,12 +78,12 @@ class Master:
     def readData(self):
         self.fillRowData(self.rowA, 0)        
         self.fillRowData(self.rowB, 1)
-        self.fillRowData(self.rowC, 2)
-        self.fillRowData(self.rowD, 3)
-        self.fillRowData(self.rowE, 4)
-        self.fillRowData(self.rowF, 5)
-        self.fillRowData(self.rowG, 6)
-        self.fillRowData(self.rowH, 7)
+#        self.fillRowData(self.rowC, 2)
+#        self.fillRowData(self.rowD, 3)
+#        self.fillRowData(self.rowE, 4)
+#        self.fillRowData(self.rowF, 5)
+#        self.fillRowData(self.rowG, 6)
+#        self.fillRowData(self.rowH, 7)
        #print("Send data")
 
     def writeToRow(self, address, value):
