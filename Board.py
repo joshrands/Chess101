@@ -37,7 +37,7 @@ class Board(SampleBase):
         offset_canvas = self.matrix.CreateFrameCanvas()
         # begin interactive setup
         self.interactiveSetup(offset_canvas, self.teamR)
-        self.interactiveSetup(offset_canvas, self.teamL)
+#        self.interactiveSetup(offset_canvas, self.teamL)
 
         self.initializeGameBoard()
 
