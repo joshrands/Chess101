@@ -23,6 +23,9 @@ class Bishop(Piece):
         if (self.critical):
             super().criticalMan()
 
+    def getValue(self):
+        return 15
+
 #Overwrite default print with special bishop print
     def printPiece(self):
         print("Bishop at", self.row , ",", self.col)

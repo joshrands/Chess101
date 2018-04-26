@@ -23,6 +23,9 @@ class Rook(Piece):
         if (self.critical):
             super().criticalMan()
 
+    def getValue(self):
+        return 27
+
 #Overwrite default print with special Rook print
     def printPiece(self):
         print("Rook at", self.row, ",", self.col)

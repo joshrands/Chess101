@@ -27,6 +27,9 @@ class Queen(Piece):
         if (self.critical):
             super().criticalMan()
 
+    def getValue(self):
+        return 49
+
 #Overwrite default print with special Queen print
     def printPiece(self):
         print("Queen at", self.row, "," , self.col)

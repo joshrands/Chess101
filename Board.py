@@ -11,6 +11,9 @@ import time
 from Cell import Cell
 import random
 from Master import Master
+from Tree import Tree
+from AI import AI
+import copy
 
 class Board(SampleBase):
 
@@ -28,14 +31,18 @@ class Board(SampleBase):
     def run(self):
         print("Running game...")
 
+
+
         self.createPlayers()
 
-        # Josh added this, hopefully it's okay  
+        # Josh added this, hopefully it's okay
         offset_canvas = self.matrix.CreateFrameCanvas()
+        self.victory(offset_canvas, self.teamR)
         # begin interactive setup
         self.interactiveSetup(offset_canvas, self.teamR)
-#TODO: uncomment this        #self.interactiveSetup(offset_canvas, self.teamL)
-     
+#TODO: uncomment this and above line
+        self.interactiveSetup(offset_canvas, self.teamL)
+
         self.initializeGameBoard()
 
         while True:
@@ -63,7 +70,7 @@ class Board(SampleBase):
             self.detectPiece(canvas, team, "Knight", 0, 6)
             # setup bishop
             self.detectPiece(canvas, team, "Bishop", 0, 2)
-            self.detectPiece(canvas, team, "Bishop", 0, 5) 
+            self.detectPiece(canvas, team, "Bishop", 0, 5)
             # setup Queen
             self.detectPiece(canvas, team, "Queen", 0, 3)
             # setup King
@@ -79,14 +86,14 @@ class Board(SampleBase):
             self.detectPiece(canvas, team, "Knight", 7, 6)
             # setup bishop
             self.detectPiece(canvas, team, "Bishop", 7, 2)
-            self.detectPiece(canvas, team, "Bishop", 7, 5) 
+            self.detectPiece(canvas, team, "Bishop", 7, 5)
             # setup Queen
             self.detectPiece(canvas, team, "Queen", 7, 3)
             # setup King
             self.detectPiece(canvas, team, "King", 7, 4)
             # setup Pawns
             self.detectPawns(canvas, team, 6)
-         
+
     def detectPawns(self, canvas, team, row):
         print("Please place pawns")
         for col in range(8):
@@ -99,13 +106,13 @@ class Board(SampleBase):
                 if (self.master.getCellState(row, col) == 1):
                     placed = False
             time.sleep(0.1)
-        print("Pawns placed.") 
+        print("Pawns placed.")
 
     def detectPiece(self, canvas, team, piece, row, col):
         # setup teamR
         print("Place " + piece + " here:")
         # light up cell
-        self.lightCell(canvas, row, col, team.r, team.g, team.b) 
+        self.lightCell(canvas, row, col, team.r, team.g, team.b)
         canvas = self.matrix.SwapOnVSync(canvas)
         placed = False
         while not placed:
@@ -113,7 +120,7 @@ class Board(SampleBase):
             if (self.master.getCellState(row, col) == 0):
                 placed = True
             time.sleep(0.1)
-        print(piece + " set.") 
+        print(piece + " set.")
 
     # detect lift off
     def detectLiftOff(self, team):
@@ -136,9 +143,11 @@ class Board(SampleBase):
         # if valid liftoff
         return valid, lifted
 
-    def getTeamPieces(self, team):
+    def getTeamPieces(self, team, grid=None):
+        if (grid == None):
+            grid = self.grid
         validPieces = []
-        for row in self.grid:
+        for row in grid:
             for piece in row:
                 if (piece != None and piece.team == team):
                     validPieces.append(piece)
@@ -162,9 +171,9 @@ class Board(SampleBase):
                     while (state == 1):
                         self.master.readData()
                         print("You are taking an enemy, please place your piece")
-                        state = self.master.getCellState(cell.row, cell.col)                    
+                        state = self.master.getCellState(cell.row, cell.col)
                     valid = True
- 
+
             elif (state == 0):
                 print("Are you sure? Too bad")
                 valid = True
@@ -174,11 +183,11 @@ class Board(SampleBase):
         return valid, activatedTarget
 
     def victory(self, canvas, team):
-        for i in range(0, 10):
-            time.sleep(.01)
+        for i in range(0, 1000):
+            time.sleep(0.5)
             x = random.randint(0, 8)
             y = random.randint(0, 8)
-            canvas = self.matrix.CreateFrameCanvas()
+            #canvas = self.matrix.CreateFrameCanvas()
             self.lightCell(canvas, x, y, team.r, team.g, team.b)
             canvas = self.matrix.SwapOnVSync(canvas)
 
@@ -214,15 +223,26 @@ class Board(SampleBase):
 
         check = False
         checkMate = False
+        draw = False
         kingRow = -1;
         kingCol = -1;
 
+        self.computerMove(team)
+
+        #count total targets for this team for stalemate purposes
+        count = 0;
         for row in self.grid:
             for piece in row:
-                if (isinstance(piece, King) and piece.team == team):
-                    check = piece.calcTargets(self.grid)
-                    kingRow = piece.row
-                    kingCol = piece.col
+                if (piece != None):
+                    #increment number of moves
+                    count += len(piece.getTargets());
+                    if (isinstance(piece, King) and piece.team == team):
+                        check = piece.calcTargets(self.grid)
+                        kingRow = piece.row
+                        kingCol = piece.col
+        #check if there are no legal moves
+        if (count == 0 and not check):
+            draw = True; #stalemate
 
         piecesWithMoves = 0
 
@@ -408,6 +428,59 @@ class Board(SampleBase):
             for j in range(0, 4):
                 canvas.SetPixel(x*4 + i, y*4 + j, r, g, b)
                 #canvas.SetPixel(x, y, 255, 255, 255)
+
+    def printBoardStates(self, grid = []):
+        if (grid == []):
+            grid = self.grid
+        for r in range(8):
+            print(grid[r])
+
+    def computerMove(self, team, depth=4):
+
+        #Create the whole tree recursively
+        root = Tree(self.grid, None, None)
+        self.addNodes(root, team, depth)
+
+        #Create a new AI object with tree
+        #figure out how to incorporate the team
+        computerPlayer = AI(root, team)
+
+        #Tell the AI to return the best state (node)
+        bestMove = computerPlayer.alpha_beta_search()
+
+        #For now, print out the old/new cell of the
+        print ("the best move involves moving the piece at square " + str(bestMove.oldCell.row) + str(bestMove.oldCell.col) + " to " + str(bestMove.newCell.row) + str(bestMove.newCell.col))
+
+    def addNodes(self, currentNode, team, depth):
+        print ("depth remaining: " + str(depth))
+
+        #if the depth is 0, we've reached the "bottom" of the tree (as far as we initially told it to go)
+        if (depth == 0):
+            return
+
+        #change how the pieces are grabbed
+        for piece in self.getTeamPieces(team, currentNode.boardState):
+            #TODO Parameter for this guy?
+            piece.calcTargets(currentNode.boardState)
+            for target in piece.targets:
+                newBoard = copy.deepcopy(currentNode.boardState)
+                newPiece = newBoard[piece.row][piece.col]
+                #If it is, make the move and add the child to the current node
+                newPiece.move(target.row, target.col)
+                newBoard[piece.row][piece.col] = None
+                newBoard[target.row][target.col] = newPiece
+                #TODO comment this out once boardstates was complete
+                self.printBoardStates(newBoard)
+                currentNode.addChild(Tree(newBoard, Cell(piece.row, piece.col), Cell(target.row, target.col)))
+
+        #Once all children for this node are found, go another level deep
+        print ("done adding children for depth " + str(depth) + "! boards created = " + str(len(currentNode.children)))
+        for child in currentNode.children:
+            if (team == self.teamL):
+                team = self.teamR
+            else:
+                team = self.teamL
+            self.addNodes(child, team, depth-1)
 # Main function
 #if __name__ == "__main__":
 #    simple_square = Board()

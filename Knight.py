@@ -27,6 +27,9 @@ class Knight(Piece):
         if (self.critical):
             super().criticalMan()
 
+    def getValue(self):
+        return 13
+
     #Overwrite default print with special Knight print
     def printPiece(self):
         print("Knight at" , self.row, ",", self.col)
