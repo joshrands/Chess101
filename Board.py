@@ -108,7 +108,6 @@ class Board(SampleBase):
             time.sleep(0.1)
         print("Pawns placed.")
 
-    # detect landing
     def detectPiece(self, canvas, team, piece, row, col):
         # setup teamR
         print("Place " + piece + " here:")
@@ -157,7 +156,6 @@ class Board(SampleBase):
 
     def detectLanding(self, piece):
         self.master.readData()
-        # return false if back to original
         targets = piece.targets
         # piece is piece that is moving
         valid = False
@@ -306,9 +304,16 @@ class Board(SampleBase):
             #targetRow = int(input("Enter a row for target: "))
             #targetCol = int(input("Enter a col for target: "))
             placed = False
+            returned = False
             while (not placed):
                 print("Please choose a target already")
                 placed, targetCell = self.detectLanding(self.grid[row][col])
+                if (targetCell != None and targetCell.row == row and targetCell.col == row):
+                    returned = True
+            if returned:
+                # go back to detecting which piece player wants to move
+                # TODO: implement this 
+                continue                
 
             targetRow = targetCell.row
             targetCol = targetCell.col
