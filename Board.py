@@ -41,8 +41,8 @@ class Board(SampleBase):
    #     time.sleep(1)
 
         # begin interactive setup
-        #self.interactiveSetup(offset_canvas, self.teamR)
-        #self.interactiveSetup(offset_canvas, self.teamL)
+        self.interactiveSetup(offset_canvas, self.teamR)
+        self.interactiveSetup(offset_canvas, self.teamL)
 
         self.initializeGameBoard()
 
@@ -62,6 +62,10 @@ class Board(SampleBase):
             offset_canvas = self.matrix.SwapOnVSync(offset_canvas)
 
     ### Member Functions ###
+    def lightPath(self, canvas, startRow, startCol, endRow, endCol):
+        rowIncrement = (endRow - startRow) / 8.0
+        colIncrement = (endCol - startCol) / 8.0
+    
     def lightCheckerTown(self, canvas):
         r = 255
         g = 255
@@ -455,6 +459,7 @@ class Board(SampleBase):
                                     state = self.master.getCellState(enemy.row, enemy.col)
                                     while state == 0:
                                         self.master.readData()
+                                        time.sleep(0.4)
                                         # fade in red
                                         for r in range(201):
                                             canvas = self.matrix.CreateFrameCanvas()
@@ -464,6 +469,7 @@ class Board(SampleBase):
                                             time.sleep(0.002)
                                         
                                         self.master.readData()
+                                        time.sleep(0.4)
                                         # fade out red
                                         for r in range(201):
                                             canvas = self.matrix.CreateFrameCanvas()
