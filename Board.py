@@ -35,6 +35,11 @@ class Board(SampleBase):
 
         # Josh added this, hopefully it's okay
         offset_canvas = self.matrix.CreateFrameCanvas()
+
+   #     self.lightCheckerTown(offset_canvas)
+   #     offset_canvas = self.matrix.SwapOnVSync(offset_canvas)
+   #     time.sleep(1)
+
         # begin interactive setup
         self.interactiveSetup(offset_canvas, self.teamR)
         self.interactiveSetup(offset_canvas, self.teamL)
@@ -56,6 +61,17 @@ class Board(SampleBase):
             offset_canvas = self.matrix.SwapOnVSync(offset_canvas)
 
     ### Member Functions ###
+    def lightCheckerTown(self, canvas):
+        r = 255
+        g = 255
+        b = 255
+        for x in range(4):
+            for y in range(4): 
+                self.lightCell(canvas, 1 + (2*x), 2*y, r, g, b) 
+        for x in range(4):
+            for y in range(4): 
+                self.lightCell(canvas, (2*x), 1 + 2*y, r, g, b) 
+         
     def interactiveSetup(self, canvas, team):
 #        canvas = self.matrix.SwapOnVSync(canvas)
         if (team == self.teamR):
