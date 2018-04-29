@@ -87,7 +87,17 @@ class Master:
        #print("Send data")
 
     def writeToRow(self, address, value):
-        self.bus.write_byte(address, value)
+        # handle i/o error
+        handled = False
+        while not handled:
+            try:
+                self.bus.write_byte(address, value)
+                handled = True
+            except IOError:
+                handled = False
+                print("I/O error... handling...")
+                time.sleep(0.5)
+                
         return -1
 
     def readFromRow(self, address):
