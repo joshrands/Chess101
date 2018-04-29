@@ -37,7 +37,7 @@ class Board(SampleBase):
         offset_canvas = self.matrix.CreateFrameCanvas()
         # begin interactive setup
         self.interactiveSetup(offset_canvas, self.teamR)
-#        self.interactiveSetup(offset_canvas, self.teamL)
+        self.interactiveSetup(offset_canvas, self.teamL)
 
         self.initializeGameBoard()
 
@@ -57,9 +57,11 @@ class Board(SampleBase):
 
     ### Member Functions ###
     def interactiveSetup(self, canvas, team):
+#        canvas = self.matrix.SwapOnVSync(canvas)
         if (team == self.teamR):
             # setup Rook
             self.detectPiece(canvas, team, "Rook", 0, 0)
+            self.lightCell(canvas, 0, 0, team.r, team.g, team.b) # light team color
             self.detectPiece(canvas, team, "Rook", 0, 7)
             # setup Knight
             self.detectPiece(canvas, team, "Knight", 0, 1)
@@ -100,34 +102,54 @@ class Board(SampleBase):
         # loop through valid pieces and make sure they are there        
         teamRPieces = self.getTeamPieces(self.teamR)
         teamLPieces = self.getTeamPieces(self.teamL)
-        for piece in teamRPieces:
-            state = self.master.getCellState(piece.row, piece.col)
-            while (state == 1):
-                print("Piece should be here")
-                print(piece.row, piece.col)
-                # light cell warning color
-                canvas = self.matrix.CreateFrameCanvas()
-                self.lightPieces(canvas, self.teamR)
-                self.lightPieces(canvas, self.teamL)
-                self.lightCell(canvas, piece.row, piece.col, r, g, b) 
-                canvas = self.matrix.SwapOnVSync(canvas)
-                time.sleep(0.01)        
+        mismatch = True
+        canvas = self.matrix.CreateFrameCanvas()
+        self.lightPieces(canvas, self.teamR)
+        self.lightPieces(canvas, self.teamL)
+        canvas = self.matrix.SwapOnVSync(canvas)
+
+        while mismatch:
+            mismatch = False
+            self.master.readData()
+           
+            canvas = self.matrix.CreateFrameCanvas()
+            self.lightPieces(canvas, self.teamR)
+            self.lightPieces(canvas, self.teamL)
+            for piece in teamRPieces:
                 state = self.master.getCellState(piece.row, piece.col)
-                self.master.readData()
-        for piece in teamLPieces:
-            state = self.master.getCellState(piece.row, piece.col)
-            while (state == 1):
-                print("Piece should be here")
-                # print(piece.row, piece.col)
-                # light cell warning color
-                canvas = self.matrix.CreateFrameCanvas()
-                self.lightPieces(canvas, self.teamR)
-                self.lightPieces(canvas, self.teamL)
-                self.lightCell(canvas, piece.row, piece.col, r, g, b) 
-                canvas = self.matrix.SwapOnVSync(canvas)
-                # light cell warning color
+                if state == 1:
+                    mismatch = True
+                    print("Piece should be here")
+                    print(piece.row, piece.col)
+                    # light cell warning color
+                    self.lightCell(canvas, piece.row, piece.col, r, g, b) 
+                    #time.sleep(0.01)        
+            canvas = self.matrix.SwapOnVSync(canvas)
+          
+        mismatch = True
+        canvas = self.matrix.CreateFrameCanvas()
+        self.lightPieces(canvas, self.teamR)
+        self.lightPieces(canvas, self.teamL)
+        canvas = self.matrix.SwapOnVSync(canvas)
+
+        while mismatch:
+            mismatch = False
+            self.master.readData()
+            canvas = self.matrix.CreateFrameCanvas()
+            self.lightPieces(canvas, self.teamR)
+            self.lightPieces(canvas, self.teamL)
+        
+            for piece in teamLPieces:
                 state = self.master.getCellState(piece.row, piece.col)
-                self.master.readData()
+                if state == 1:
+                    mismatch = True
+                    print("Piece should be here")
+                    print(piece.row, piece.col)
+                    # light cell warning color
+                    self.lightCell(canvas, piece.row, piece.col, r, g, b) 
+                    time.sleep(0.01)        
+            canvas = self.matrix.SwapOnVSync(canvas)
+
         # mismatch complete return true
         return True
 
@@ -143,6 +165,7 @@ class Board(SampleBase):
                 # why read every time? self.master.readData()
                 if (self.master.getCellState(row, col) == 1):
                     placed = False
+                    self.lightCell(canvas, row, col, 255, 255, 255)
                 else:
                     self.lightCell(canvas, row, col, team.r, team.g, team.b)
                     # pawn was placed, light cell team color 
@@ -160,9 +183,11 @@ class Board(SampleBase):
             self.master.readData()
             if (self.master.getCellState(row, col) == 0):
                 placed = True
-            time.sleep(0.1)
+            time.sleep(0.01)
         print(piece + " set.")
         self.lightCell(canvas, row, col, team.r, team.g, team.b) # light team color
+        # just added
+        #canvas = self.matrix.SwapOnVSync(canvas)
 
     # detect lift off
     def detectLiftOff(self, team):
@@ -319,12 +344,19 @@ class Board(SampleBase):
         # check for mismatch
         self.detectMismatch(canvas)
 
+        time.sleep(1)
+        
+        #self.lightPieces(canvas, self.teamR)
+        #self.lightPieces(canvas, self.teamL)
+                
         move = False
         row = 0
         col = 0
         print("Player:", team.name, "'s move.")
         
         while (move == False):
+            
+            
             canvas = self.matrix.CreateFrameCanvas()
           
             # move a piece!
