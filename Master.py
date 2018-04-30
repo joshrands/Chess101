@@ -45,7 +45,7 @@ class Master:
 
     def fillRowData(self, row, rowNum):
         self.writeToRow(row, 42)
-        time.sleep(0.1)
+        time.sleep(0.01)
         val = self.readFromRow(row)
         self.updateRowStates(rowNum, val)
 
@@ -87,11 +87,31 @@ class Master:
        #print("Send data")
 
     def writeToRow(self, address, value):
-        self.bus.write_byte(address, value)
+        # handle i/o error
+        handled = False
+        while not handled:
+            try:
+                self.bus.write_byte(address, value)
+                handled = True
+            except IOError:
+                handled = False
+                print("I/O error... handling...")
+                time.sleep(0.5)
+                
         return -1
 
     def readFromRow(self, address):
-        number = self.bus.read_byte(address)
+        # handle i/o error
+        handled = False
+        while not handled:
+            try:
+                number = self.bus.read_byte(address)
+                handled = True
+            except IOError:
+                handled = False
+                print("I/O error... handling...")
+                time.sleep(0.5)
+
         return number
 
 # Test master class
