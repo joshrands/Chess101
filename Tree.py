@@ -34,8 +34,8 @@ class Tree(object):
                 else:
                     blackCount += piece.getValue(self.boardState)
 
-        print("White piece value is " + str(whiteCount))
-        print("Black piece value is " + str(blackCount))
+        #print("White piece value is " + str(whiteCount))
+        #print("Black piece value is " + str(blackCount))
 
 
         total = whiteCount-blackCount
