@@ -57,6 +57,7 @@ class Piece:
             for savingTarget in king.godSaveTheKing:
                 if (target.row == savingTarget.row and target.col == savingTarget.col):
                     newTargets.append(target)
+                    print(savingTarget.row,savingTarget.col)
         self.targets = newTargets
 
     def printPiece(self, board):

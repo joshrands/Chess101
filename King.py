@@ -257,3 +257,107 @@ class King(Piece):
 #Overwrite default print with special King print
     def printPiece(self):
         print("King at", self.row ,"," , self.col)
+
+
+
+#begin tests of reasons why king falsly assumes checkmate
+#create the board based off the false checkmate Josh discovered
+
+teamR = Team(64, 180, 232)
+teamL = Team(255, 140, 0)
+
+grid = []
+
+for row in range(0, 8):
+    grid.append([None, None, None, None, None, None, None, None])
+
+for col in range(0, 4):
+    grid[1][col] = Pawn(1, col, teamR)
+for col in range(5, 8):
+    grid[1][col] = Pawn(1, col, teamR)
+#add the one pawn
+grid[3][4] = Pawn(3,4,teamR)
+# create bishop for teamR
+grid[0][2] = Bishop(0, 2, teamR)
+grid[0][5] = Bishop(0, 5, teamR)
+# create rook for teamR
+grid[0][0] = Rook(0, 0, teamR)
+grid[0][7] = Rook(0, 7, teamR)
+grid[0][1] = Knight(0, 1, teamR)
+grid[0][6] = Knight(0, 6, teamR)
+grid[4][4] = Queen(4, 4, teamR)
+grid[0][4] = King(0, 4, teamR)
+
+# TEAM L
+# create pawns for teamL
+for col in range(1, 4):
+    grid[6][col] = Pawn(6, col, teamL)
+for col in range(6, 8):
+    grid[6][col] = Pawn(6, col, teamL)
+#add the one pawn
+grid[5][0] = Pawn(5,0, teamL)
+# create bishop for teamL
+grid[7][2] = Bishop(7, 2, teamL)
+grid[7][5] = Bishop(7, 5, teamL)
+# create rook for teamL
+grid[7][0] = Rook(7, 0, teamL)
+grid[7][7] = Rook(7, 7, teamL)
+grid[7][1] = Knight(7, 1, teamL)
+grid[7][6] = Knight(7, 6, teamL)
+grid[7][3] = Queen(7, 3, teamL)
+grid[7][4] = King(7, 4, teamL)
+
+check = False
+checkMate = False
+draw = False
+kingRow = -1;
+kingCol = -1;
+
+team = teamL
+
+#count total targets for this team for stalemate purposes
+count = 0;
+for row in grid:
+    for piece in row:
+        if (piece != None):
+            #increment number of moves
+            count += len(piece.getTargets());
+            if (isinstance(piece, King) and piece.team == team):
+                check = piece.calcTargets(grid)
+                kingRow = piece.row
+                kingCol = piece.col
+#check if there are no legal moves
+if (count == 0 and not check):
+    draw = True; #stalemate
+    print("draw")
+
+piecesWithMoves = 0
+
+for row in grid:
+    for piece in row:
+        print("Checking piece")
+        if (isinstance(piece, Pawn) and piece.team == team):
+            piece.enPassantable = False
+        if (isinstance(piece, King)):
+            if (len(piece.getTargets()) > 0 and piece.team == team):
+                piece.printPiece()
+        elif (piece != None):
+            print("calculating piece targets")
+            piece.calcTargets(grid)
+            if (check):
+                print("in check, running skyfall")
+                piece.skyFall(grid[kingRow][kingCol])
+            #print pieces that can be moved
+            if (len(piece.getTargets()) > 0 and piece.team == team):
+                piecesWithMoves = piecesWithMoves + 1
+                piece.printPiece()
+
+if (piecesWithMoves == 0 and len(grid[kingRow][kingCol].targets) == 0):
+    checkMate = True
+
+if (checkMate):
+    print("Check mate!")
+
+
+print(grid[7][4].calcTargets(grid))
+print(grid[7][4].targets)
