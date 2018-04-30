@@ -17,7 +17,7 @@ class Piece:
     def calcTargets(self, checkerTown):
         raise NotImplementedError()
 
-    def getValue(self):
+    def getValue(self, board):
         raise NotImplementedError()
 
     # abstract method move

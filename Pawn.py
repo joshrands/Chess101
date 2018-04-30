@@ -58,8 +58,15 @@ class Pawn(Piece):
         if (self.critical):
             super().criticalMan()
 
-    def getValue(self):
-        return 5
+    def getValue(self, board):
+        self.calcTargets(board)
+        total = 5
+        total = total + len(self.targets)
+        for cell in self.targets:
+            total = total + 1
+            if ((cell.row == 3 or cell.row == 4) and (cell.col == 3 or cell.col == 4)):
+                total = total + 1
+        return total
 
     def skyFall(self, king):
         #refactor the targets because the king is in check and only godSaveTheKing spaces should appear as targets

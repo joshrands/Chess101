@@ -27,8 +27,15 @@ class Knight(Piece):
         if (self.critical):
             super().criticalMan()
 
-    def getValue(self):
-        return 13
+    def getValue(self, board):
+        total = 13
+        self.calcTargets(board)
+        for cell in self.targets:
+            total = total + 1
+            if ((cell.row == 3 or cell.row == 4) and (cell.col == 3 or cell.col == 4)):
+                total = total + 1
+
+        return total
 
     #Overwrite default print with special Knight print
     def printPiece(self):

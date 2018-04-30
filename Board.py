@@ -23,6 +23,8 @@ class Board(SampleBase):
         self.teamL = Team(255, 140, 0)
         self.grid = []
         self.master = Master()
+        self.computerPlayer = False
+        self.computerIsWhite = False
 
         for row in range(0, 8):
             self.grid.append([None, None, None, None, None, None, None, None])
@@ -41,10 +43,20 @@ class Board(SampleBase):
    #     time.sleep(1)
 
         # begin interactive setup
-        self.interactiveSetup(offset_canvas, self.teamR)
-        self.interactiveSetup(offset_canvas, self.teamL)
+   #     self.interactiveSetup(offset_canvas, self.teamR)
+   #     self.interactiveSetup(offset_canvas, self.teamL)
 
         self.initializeGameBoard()
+
+        self.computerPlayer = False
+        self.computerIsWhite = False
+
+        computer = input("Would you like to play against a computer? (y/n)")
+        if (computer == "y" or computer == "Y"):
+            self.computerPlayer = True
+            computerColor = input("Would you like the computer to be white or black? (w/b)")
+            if (computerColor == "w" or computerColor == "W"):
+                self.computerIsWhite = True
 
         while True:
             offset_canvas = self.matrix.CreateFrameCanvas()
@@ -54,8 +66,16 @@ class Board(SampleBase):
 
             # Do player 1's turn
             offset_canvas = self.matrix.CreateFrameCanvas()
+
+            if (self.computerPlayer and self.computerIsWhite):
+                self.computerMove(self.teamR)
+
             self.doTurn(offset_canvas, self.teamR)
             offset_canvas = self.matrix.CreateFrameCanvas()
+
+            if (self.computerPlayer and not self.computerIsWhite):
+                self.computerMove(self.teamL)
+
             self.doTurn(offset_canvas, self.teamL)
             offset_canvas = self.matrix.CreateFrameCanvas()
 
@@ -142,8 +162,8 @@ class Board(SampleBase):
                 state = self.master.getCellState(piece.row, piece.col)
                 if state == 1:
                     mismatch = True
-                    print("Piece should be here")
-                    print(piece.row, piece.col)
+                    #print("Piece should be here")
+                    #print(piece.row, piece.col)
                     # light cell warning color
                     self.lightCell(canvas, piece.row, piece.col, r, g, b) 
                     #time.sleep(0.01)        
@@ -239,9 +259,10 @@ class Board(SampleBase):
         if (grid == None):
             grid = self.grid
         validPieces = []
+
         for row in grid:
             for piece in row:
-                if (piece != None and piece.team == team):
+                if (piece != None and piece.team.r == team.r):
                     validPieces.append(piece)
 
         return validPieces
@@ -335,7 +356,7 @@ class Board(SampleBase):
         kingRow = -1;
         kingCol = -1;
 
-        self.computerMove(team)
+        #self.computerMove(team)
 
         #count total targets for this team for stalemate purposes
         count = 0;
@@ -570,14 +591,20 @@ class Board(SampleBase):
         self.grid[7][4] = King(7, 4, self.teamL)
 
     def createPlayers(self):
-        nameR = input("Enter player 1 name: ")
-        print("Enter player 1 colors (rgb): ")
-        self.teamR.setName(nameR)
+        if (self.computerPlayer and not self.computerIsWhite):
+            nameR = input("Enter player 1 name White): ")
+            print("Enter player 1 colors (rgb): ")
+            self.teamR.setName(nameR)
+        else:
+            self.teamR.setName("Computer")
         #self.teamR.setColor()
 
-        nameL = input("Enter player 2 name: ")
-        print("Enter player 2 colors (rgb): ")
-        self.teamL.setName(nameL)
+        if (self.computerPlayer and self.computerIsWhite):
+            nameL = input("Enter player 2 name (Black): ")
+            print("Enter player 2 colors (rgb): ")
+            self.teamL.setName(nameL)
+        else:
+            self.teamL.setName("Computer")
         #self.teamL.setColor()
 
     def lightCell(self, canvas, x, y, r, g, b):
@@ -594,14 +621,13 @@ class Board(SampleBase):
         for r in range(8):
             print(grid[r])
 
-    def computerMove(self, team, depth=4):
+    def computerMove(self, team, depth=2):
 
         #Create the whole tree recursively
         root = Tree(self.grid, None, None)
         self.addNodes(root, team, depth)
 
         #Create a new AI object with tree
-        #figure out how to incorporate the team
         computerPlayer = AI(root, team)
 
         #Tell the AI to return the best state (node)
@@ -609,6 +635,9 @@ class Board(SampleBase):
 
         #For now, print out the old/new cell of the
         print ("the best move involves moving the piece at square " + str(bestMove.oldCell.row) + str(bestMove.oldCell.col) + " to " + str(bestMove.newCell.row) + str(bestMove.newCell.col))
+
+
+        input("press enter when ready to continue")
 
     def addNodes(self, currentNode, team, depth):
         print ("depth remaining: " + str(depth))
@@ -620,6 +649,7 @@ class Board(SampleBase):
         #change how the pieces are grabbed
         for piece in self.getTeamPieces(team, currentNode.boardState):
             #TODO Parameter for this guy?
+            print("found a piece")
             piece.calcTargets(currentNode.boardState)
             for target in piece.targets:
                 newBoard = copy.deepcopy(currentNode.boardState)
@@ -634,11 +664,16 @@ class Board(SampleBase):
 
         #Once all children for this node are found, go another level deep
         print ("done adding children for depth " + str(depth) + "! boards created = " + str(len(currentNode.children)))
+     
+        if (depth == 0):
+            return
+
+        if (team == self.teamL):
+            team = self.teamR
+        else:
+            team = self.teamL
+
         for child in currentNode.children:
-            if (team == self.teamL):
-                team = self.teamR
-            else:
-                team = self.teamL
             self.addNodes(child, team, depth-1)
 # Main function
 #if __name__ == "__main__":

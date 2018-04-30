@@ -27,8 +27,15 @@ class Queen(Piece):
         if (self.critical):
             super().criticalMan()
 
-    def getValue(self):
-        return 49
+    def getValue(self, board):
+        total = 49
+        self.calcTargets(board)
+        for cell in self.targets:
+            total = total + 1
+            if ((cell.row == 3 or cell.row == 4) and (cell.col == 3 or cell.col == 4)):
+                total = total + 1
+
+        return total
 
 #Overwrite default print with special Queen print
     def printPiece(self):

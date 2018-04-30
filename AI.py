@@ -29,7 +29,7 @@ class AI:
     def max_value(self, node, alpha, beta):
         #print ("AlphaBeta-->MAX: Visited Node :: " + str(node.oldCell.row) + str(node.oldCell.col) + " to " + str(node.newCell.row) + str(node.newCell.col))
         if self.isTerminal(node):
-            return node.getUtility()
+            return node.getUtility(self.team)
         infinity = float('inf')
         value = -infinity
 
@@ -44,7 +44,7 @@ class AI:
     def min_value(self, node, alpha, beta):
         #print ("AlphaBeta-->MIN: Visited Node :: " + str(node.oldCell.row) + str(node.oldCell.col) + " to " + str(node.newCell.row) + str(node.newCell.col))
         if self.isTerminal(node):
-            return node.getUtility()
+            return node.getUtility(self.team)
         infinity = float('inf')
         value = infinity
 

@@ -22,16 +22,27 @@ class Tree(object):
     	return self.boardState
 
     #Heuristic function, for now this will work until the tree is fully made
-    def getUtility(self):
+    def getUtility(self, team):
         whiteCount = 0
         blackCount = 0
         for r in range(0,8):
             for piece in self.boardState[r]:
                 if (piece == None):
                     continue
-                elif (piece.team == self.teamR):
-                    whiteCount += piece.getValue()
+                elif (piece.team.r ==  self.teamR.r):
+                    whiteCount += piece.getValue(self.boardState)
                 else:
-                    blackCount += piece.getValue()
+                    blackCount += piece.getValue(self.boardState)
+
+        print("White piece value is " + str(whiteCount))
+        print("Black piece value is " + str(blackCount))
+
+
         total = whiteCount-blackCount
+        if (team.r == 255):
+            total = -total
+       #    will be used for testing once we integrate AI into actual game
+       #    print("Blacks move")
+#        input("press enter to continue.. the value of this board is " + str(total))
+
         return total
