@@ -66,7 +66,6 @@ class King(Piece):
         castleLeftCell = Cell(-1, -1)
         castleRightCell = Cell(-1, -1)
 
-        print(self.targets)
         for cell in self.targets:
             if (cell.row == oldRow and cell.col == (oldCol - 2)):
                 castleLeft = True
@@ -91,7 +90,6 @@ class King(Piece):
                 if (cell.row == oldRow and cell.col == (oldCol + 1)):
                     castleRightStep = False
                 targetsToRemove.append(cell)
-                print("added cell to be removed as a king target")
 
             #reset the board to its original config
             checkerTown[oldRow][oldCol] = self
@@ -105,7 +103,6 @@ class King(Piece):
             self.targets.remove(castleRightCell)
         #now iterate through targetsToRemove and remove them from targets
         for toRemove in targetsToRemove:
-            print("removed king target")
             self.targets.remove(toRemove)
 
         #re-run amIGonnaDie with the King's original values
@@ -234,10 +231,9 @@ class King(Piece):
         return -1, -1
 
     def pleaseGodSaveTheKing(self, enemyRow, enemyCol):
-
         dir1, dir2 = self.determineDirectionFromEnemyTowardsKing(enemyRow, enemyCol)
         saveTheKing = []
-        while (enemyRow != self.row and enemyCol != self.col):
+        while (not (enemyRow == self.row and enemyCol == self.col)):
             saveTheKing.append(Cell(enemyRow, enemyCol))
             enemyRow = enemyRow + dir1
             enemyCol = enemyCol + dir2
