@@ -68,16 +68,16 @@ class Board(SampleBase):
             offset_canvas = self.matrix.CreateFrameCanvas()
 
             if (self.computerPlayer and self.computerIsWhite):
-                self.computerMove(self.teamR)
-
-            self.doTurn(offset_canvas, self.teamR)
-            offset_canvas = self.matrix.CreateFrameCanvas()
+                self.computerMove(self.teamR, offset_canvas)
+            else: 
+                self.doTurn(offset_canvas, self.teamR)
+                offset_canvas = self.matrix.CreateFrameCanvas()
 
             if (self.computerPlayer and not self.computerIsWhite):
-                self.computerMove(self.teamL)
-
-            self.doTurn(offset_canvas, self.teamL)
-            offset_canvas = self.matrix.CreateFrameCanvas()
+                self.computerMove(self.teamL, offset_canvas)
+            else: 
+                self.doTurn(offset_canvas, self.teamL)
+                offset_canvas = self.matrix.CreateFrameCanvas()
 
             offset_canvas = self.matrix.SwapOnVSync(offset_canvas)
 
@@ -621,7 +621,7 @@ class Board(SampleBase):
         for r in range(8):
             print(grid[r])
 
-    def computerMove(self, team, depth=2):
+    def computerMove(self, team, canvas, depth=2):
 
         #Create the whole tree recursively
         root = Tree(self.grid, None, None)
@@ -636,11 +636,65 @@ class Board(SampleBase):
         #For now, print out the old/new cell of the
         print ("the best move involves moving the piece at square " + str(bestMove.oldCell.row) + str(bestMove.oldCell.col) + " to " + str(bestMove.newCell.row) + str(bestMove.newCell.col))
 
+        # move piece from bestMove.oldCell to bestMove.newCell
+        state = 1
+        
+        if (self.grid[bestMove.newCell.row][bestMove.newCell.col] == None):
+            while state == 1:
+                self.master.readData()
+           
+                canvas = self.matrix.CreateFrameCanvas()
+            #self.lightPieces(canvas, self.teamL)
+                self.lightCheckerTown(canvas)
+                self.lightCell(canvas, bestMove.oldCell.row, bestMove.oldCell.col, team.r, team.g, team.b)
+                self.lightCell(canvas, bestMove.newCell.row, bestMove.newCell.col, team.r, team.g, team.b)
+                
+                canvas = self.matrix.SwapOnVSync(canvas)
 
-        input("press enter when ready to continue")
+                state = self.master.getCellState(bestMove.newCell.row, bestMove.newCell.col)
+        else:
+            # detect removal of other piece and then move of this guy
+            state = 0
+            while state == 0:
+                self.master.readData()
+           
+                canvas = self.matrix.CreateFrameCanvas()
+            #self.lightPieces(canvas, self.teamL)
+                self.lightCheckerTown(canvas)
+                self.lightCell(canvas, bestMove.oldCell.row, bestMove.oldCell.col, team.r, team.g, team.b)
+                self.lightCell(canvas, bestMove.newCell.row, bestMove.newCell.col, team.r, team.g, team.b)
+                
+                canvas = self.matrix.SwapOnVSync(canvas)
+
+                state = self.master.getCellState(bestMove.newCell.row, bestMove.newCell.col)
+            
+            while state == 1:
+                self.master.readData()
+           
+                canvas = self.matrix.CreateFrameCanvas()
+            #self.lightPieces(canvas, self.teamL)
+                self.lightCheckerTown(canvas)
+                self.lightCell(canvas, bestMove.oldCell.row, bestMove.oldCell.col, team.r, team.g, team.b)
+                self.lightCell(canvas, bestMove.newCell.row, bestMove.newCell.col, team.r, team.g, team.b)
+                
+                canvas = self.matrix.SwapOnVSync(canvas)
+
+                state = self.master.getCellState(bestMove.newCell.row, bestMove.newCell.col)
+       
+
+        self.grid[bestMove.oldCell.row][bestMove.oldCell.col].move(bestMove.newCell.row, bestMove.newCell.col)
+        self.grid[bestMove.newCell.row][bestMove.newCell.col] = self.grid[bestMove.oldCell.row][bestMove.oldCell.col] 
+        self.grid[bestMove.oldCell.row][bestMove.oldCell.col] = None
+
+        canvas = self.matrix.CreateFrameCanvas()
+        self.lightCheckerTown(canvas)
+        canvas = self.matrix.SwapOnVSync(canvas)
+
+
+#                input("press enter when ready to continue")
 
     def addNodes(self, currentNode, team, depth):
-        print ("depth remaining: " + str(depth))
+        #print ("depth remaining: " + str(depth))
 
         #if the depth is 0, we've reached the "bottom" of the tree (as far as we initially told it to go)
         if (depth == 0):
@@ -649,7 +703,7 @@ class Board(SampleBase):
         #change how the pieces are grabbed
         for piece in self.getTeamPieces(team, currentNode.boardState):
             #TODO Parameter for this guy?
-            print("found a piece")
+            #print("found a piece")
             piece.calcTargets(currentNode.boardState)
             for target in piece.targets:
                 newBoard = copy.deepcopy(currentNode.boardState)
@@ -659,7 +713,7 @@ class Board(SampleBase):
                 newBoard[piece.row][piece.col] = None
                 newBoard[target.row][target.col] = newPiece
                 #TODO comment this out once boardstates was complete
-                self.printBoardStates(newBoard)
+                #self.printBoardStates(newBoard)
                 currentNode.addChild(Tree(newBoard, Cell(piece.row, piece.col), Cell(target.row, target.col)))
 
         #Once all children for this node are found, go another level deep
