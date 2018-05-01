@@ -30,6 +30,7 @@ class Bishop(Piece):
             total = total + 1
             if ((cell.row == 3 or cell.row == 4) and (cell.col == 3 or cell.col == 4)):
                 total = total + 1
+                total = total + super.isThisTheKing(board, cell.row, cell.col)
 
         return total
 

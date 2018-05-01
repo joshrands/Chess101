@@ -14,6 +14,12 @@ class Piece:
         self.criticalTargets = []
 
     # abstract method calcTargets
+    def isThisTheKing(self, board, row, col):
+        if (isinstance(King, board[row][col])):
+            return 10 
+        else:
+            return 0
+
     def calcTargets(self, checkerTown):
         raise NotImplementedError()
 
