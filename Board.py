@@ -917,6 +917,7 @@ class Board(SampleBase):
             #print("found a piece")
             piece.calcTargets(currentNode.boardState)
             if len(piece.targets) > 0:
+                print("setting checkmate false")
                 checkMate = False
 
             for target in piece.targets:
