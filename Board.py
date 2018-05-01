@@ -800,6 +800,7 @@ class Board(SampleBase):
 
                 state = self.master.getCellState(bestMove.newCell.row, bestMove.newCell.col)
             print("State Change to:", state)
+            time.sleep(.1)
             while state == 1:
                 self.master.readData()
 
