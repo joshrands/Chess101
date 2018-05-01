@@ -905,7 +905,7 @@ class Board(SampleBase):
         self.teamR.r = self.teamR.r + 1
 
 
-    def addNodes(self, currentNode, team, depth):
+    def addNodes(self, currentNode, team, depth=2):
         #print ("depth remaining: " + str(depth))
 
         #if the depth is 0, we've reached the "bottom" of the tree (as far as we initially told it to go)
@@ -925,7 +925,7 @@ class Board(SampleBase):
                 newBoard[piece.row][piece.col] = None
                 newBoard[target.row][target.col] = newPiece
                 #TODO comment this out once boardstates was complete
-                #self.drawBoard(newBoard)
+                self.drawBoard(newBoard)
                 #self.printBoardStates(newBoard)
                 currentNode.addChild(Tree(newBoard, Cell(piece.row, piece.col), Cell(target.row, target.col)))
 
