@@ -912,6 +912,7 @@ class Board(SampleBase):
         #change how the pieces are grabbed
         # checkmate?
         checkMate = True
+        check = False
 
         piecesWithMoves = 0
 
