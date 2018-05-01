@@ -879,16 +879,23 @@ class Board(SampleBase):
                         self.lightCell(canvas, 2, i, self.teamArray[i].r, self.teamArray[i].g, self.teamArray[i].b)
                     if (self.master.getCellState(5, i) == 0):
                         self.lightCell(canvas, 5, i, self.teamArray[i].r, self.teamArray[i].g, self.teamArray[i].b)
+                canvas = self.matrix.SwapOnVSync(canvas)
                 time.sleep(2)
             elif (team1Found):
                 for i in range(0, 8):
                     if (self.master.getCellState(2, i) == 0):
                         self.lightCell(canvas, 2, i, self.teamArray[i].r, self.teamArray[i].g, self.teamArray[i].b)
+                for i in range (0, 8):
+                    self.lightCell(canvas, 5, i, self.teamArray[i].r, self.teamArray[i].g, self.teamArray[i].b) # colorpicker
+                canvas = self.matrix.SwapOnVSync(canvas)
             elif (team2Found):
                 for i in range(0, 8):
                     if (self.master.getCellState(5, i) == 0):
                         self.lightCell(canvas, 5, i, self.teamArray[i].r, self.teamArray[i].g, self.teamArray[i].b)
-            canvas = self.matrix.SwapOnVSync(canvas)
+                for i in range (0, 8):
+                    self.lightCell(canvas, 2, i, self.teamArray[i].r, self.teamArray[i].g, self.teamArray[i].b) # colorpicker
+                canvas = self.matrix.SwapOnVSync(canvas)
+
 
     def addNodes(self, currentNode, team, depth):
         #print ("depth remaining: " + str(depth))
