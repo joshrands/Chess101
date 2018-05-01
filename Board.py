@@ -842,7 +842,7 @@ class Board(SampleBase):
             for piece in row:
                 if (piece != None):
                     self.lightCell(canvas, piece.row, piece.col, piece.team.r, piece.team.g, piece.team.b)
-        if (self.checkerBrightness == 255):
+        if (self.checkerBrightness > 180):
             self.chooseLightCheckerTown(canvas)
         canvas = self.matrix.SwapOnVSync(canvas)
 
