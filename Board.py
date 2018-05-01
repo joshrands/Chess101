@@ -21,8 +21,10 @@ class Board(SampleBase):
         super(Board, self).__init__(*args, **kwargs)
         #self.teamR = Team(64, 180, 232)
         #self.teamL = Team(255, 140, 0)
-        self.teamR = Team(0, 153, 76)
-        self.teamL = Team(81, 0, 153)
+        #self.teamR = Team(0, 153, 76)
+        #self.teamL = Team(81, 0, 153)
+        self.teamR = Team(255, 255, 0)
+        self.teamL = Team(255, 0, 255)
         self.grid = []
         self.master = Master()
         self.computerPlayer = False
@@ -47,8 +49,8 @@ class Board(SampleBase):
    #     time.sleep(1)
 
         # begin interactive setup
-   #     self.interactiveSetup(offset_canvas, self.teamR)
-   #     self.interactiveSetup(offset_canvas, self.teamL)
+        self.interactiveSetup(offset_canvas, self.teamR)
+        self.interactiveSetup(offset_canvas, self.teamL)
 
         self.initializeGameBoard()
 
