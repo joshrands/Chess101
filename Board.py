@@ -725,6 +725,11 @@ class Board(SampleBase):
         state = 0
 
         if (self.grid[bestMove.newCell.row][bestMove.newCell.col] == None):
+            canvas = self.matrix.CreateFrameCanvas()
+            self.lightCheckerTown(canvas)
+            canvas = self.matrix.SwapOnVSync(canvas)
+            self.detectMismatch(canvas)
+
             while state == 0:
                 self.master.readData()
 
@@ -747,8 +752,6 @@ class Board(SampleBase):
                 canvas = self.matrix.CreateFrameCanvas()
                 self.lightCheckerTown(canvas)
                 canvas = self.matrix.SwapOnVSync(canvas)
-
-                self.detectMismatch(canvas)
 
                 state = self.master.getCellState(bestMove.newCell.row, bestMove.newCell.col)
         else:
@@ -765,8 +768,6 @@ class Board(SampleBase):
 
                 canvas = self.matrix.SwapOnVSync(canvas)
 
-                self.detectMismatch(canvas)
-
                 state = self.master.getCellState(bestMove.oldCell.row, bestMove.oldCell.col)
 
             print("State Change to:", state)
@@ -782,8 +783,6 @@ class Board(SampleBase):
 
                 canvas = self.matrix.SwapOnVSync(canvas)
 
-                self.detectMismatch(canvas)
-
                 state = self.master.getCellState(bestMove.newCell.row, bestMove.newCell.col)
             print("State Change to:", state)
             while state == 1:
@@ -797,8 +796,6 @@ class Board(SampleBase):
                 canvas = self.matrix.CreateFrameCanvas()
                 self.lightCheckerTown(canvas)
                 canvas = self.matrix.SwapOnVSync(canvas)
-
-                self.detectMismatch(canvas)
 
                 state = self.master.getCellState(bestMove.newCell.row, bestMove.newCell.col)
             print("State Change to:", state)
