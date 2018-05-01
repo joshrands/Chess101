@@ -813,6 +813,13 @@ class Board(SampleBase):
 
 #                input("press enter when ready to continue")
 
+    def drawBoard(self, boardState):
+        canvas = self.matrix.CreateFrameCanvas()
+        for row in boardState:
+            for piece in row:
+                if (piece != None):
+                    self.lightCell(canvas, piece.row, piece.col, piece.team.r, piece.team.g, piece.team.b)
+        canvas = self.matrix.SwapOnVSync(canvas)
     def addNodes(self, currentNode, team, depth):
         #print ("depth remaining: " + str(depth))
 

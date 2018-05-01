@@ -17,6 +17,7 @@ class AI:
         successors = self.getSuccessors(self.game_tree)
         best_state = None
         for state in successors: # for every node..
+        Board.drawBoard(state.getBoardState())
             value = self.min_value(state, best_val, beta)
             if value > best_val:
                 best_val = value
