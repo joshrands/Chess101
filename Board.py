@@ -848,28 +848,45 @@ class Board(SampleBase):
         canvas = self.matrix.SwapOnVSync(canvas)
 
     def colorPicker(self):
-        while True:
-            cont = input("Next Color? (y/n)")
-            if (cont == "n"):
-                return
-            else:
-                R = int (input("Enter an r value: "))
-                G = int (input("Enter an g value: "))
-                B = int (input("Enter an b value: "))
+        canvas = self.matrix.CreateFrameCanvas()
 
-                canvas = self.matrix.CreateFrameCanvas()
+        for i in range (0, 8):
+            self.lightCell(canvas, 2, i, self.teamArray[i].r, self.teamArray[i].g, self.teamArray[i].b) # colorpicker
+            self.lightCell(canvas, 5, i, self.teamArray[i].r, self.teamArray[i].g, self.teamArray[i].b) # colorpicker
 
-                for i in range(3, 5):
-                    for j in range(0, 8):
-                        self.lightCell(canvas, i, j, R, G, B)
+        team1Found = False
+        teame2Found = False
 
-                for i in range (0, 8):
-                    self.lightCell(canvas, 2, i, 255, 0, 0) #red
-                    self.lightCell(canvas, 5, i, 255, 255, 255) #white
-                    self.lightCell(canvas, 4, i, R, G, B) # colorpicker
-                    self.lightCell(canvas, 3, i, self.teamArray[i].r, self.teamArray[i].g, self.teamArray[i].b) # colorpicker
-
-                canvas = self.matrix.SwapOnVSync(canvas)
+        while not (team1Found and team2Found):
+            self.master.readData()
+            for i in range(0, 8):
+                if (self.master.getCellState(2, i) == 0):
+                    team1Found = True
+                    self.teamR.r = self.teamArray[i].r
+                    self.teamR.g = self.teamArray[i].g
+                    self.teamR.b = self.teamArray[i].b
+                if (self.master.getCellState(5, i) == 0):
+                    team2Found = True
+                    self.teamL.r = self.teamArray[i].r
+                    self.teamL.g = self.teamArray[i].g
+                    self.teamL.b = self.teamArray[i].b
+            canvas = self.matrix.CreateFrameCanvas()
+            if (team1Found and team2Found):
+                for i in range(0, 8):
+                    if (self.master.getCellState(2, i) == 0):
+                        self.lightCell(canvas, 2, i, self.teamArray[i].r, self.teamArray[i].g, self.teamArray[i].b)
+                    if (self.master.getCellState(5, i) == 0):
+                        self.lightCell(canvas, 5, i, self.teamArray[i].r, self.teamArray[i].g, self.teamArray[i].b)
+                time.sleep(2)
+            elif (team1Found):
+                for i in range(0, 8):
+                    if (self.master.getCellState(2, i) == 0):
+                        self.lightCell(canvas, 2, i, self.teamArray[i].r, self.teamArray[i].g, self.teamArray[i].b)
+            elif (team2Found):
+                for i in range(0, 8):
+                    if (self.master.getCellState(5, i) == 0):
+                        self.lightCell(canvas, 5, i, self.teamArray[i].r, self.teamArray[i].g, self.teamArray[i].b)
+        canvas = self.matrix.SwapOnVSync(canvas)
 
     def addNodes(self, currentNode, team, depth):
         #print ("depth remaining: " + str(depth))
