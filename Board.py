@@ -831,7 +831,7 @@ class Board(SampleBase):
         checkerBrightness = checkerBrightness + checkerBrightnessDir
         if (checkerBrightness == 0 or checkerBrightness == 255):
             checkerBrightnessDir = checkerBrightnessDir * -1
-        elif (checkerBrightness)
+        
         for row in boardState:
             for piece in row:
                 if (piece != None):
