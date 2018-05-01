@@ -668,6 +668,7 @@ class Board(SampleBase):
         kingRow = -1
         kingCol = -1
         piecesWithMoves = 0
+        self.checkerBrightness = 255;
 
         #self.computerMove(team)
 
