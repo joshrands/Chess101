@@ -56,7 +56,9 @@ class Board(SampleBase):
         computer = input("Would you like to play against a computer? (y/n)")
         if (computer == "y" or computer == "Y"):
             self.computerPlayer = True
-            self.computerIsWhite = False
+            computerColor = input("Would you like the computer to be white or black? (w/b)")
+            if (computerColor == "w" or computerColor == "W"):
+                self.computerIsWhite = True
 
         while True:
             offset_canvas = self.matrix.CreateFrameCanvas()
