@@ -2,7 +2,7 @@ import pygame
 pygame.init()
 
 def playSound(filename):
-    pygame.mixer.Sound(filename)
-    pygame.mixer.play()
+    sound = pygame.mixer.Sound(filename)
+    sound.play()
 
 playSound("test.wav")
