@@ -829,7 +829,7 @@ class Board(SampleBase):
     def drawBoard(self, boardState):
         canvas = self.matrix.CreateFrameCanvas()
         self.checkerBrightness = self.checkerBrightness + (2 * self.checkerBrightnessDir)
-        if (self.checkerBrightness =< 0):
+        if (self.checkerBrightness <= 0):
             self.checkerBrightnessDir = self.checkerBrightnessDir * -1
             self.checkerBrightness = 0
         elif (self.checkerBrightness >= 255):
