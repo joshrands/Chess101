@@ -89,7 +89,7 @@ class Pawn(Piece):
         self.row = newRow
         self.col = newCol
         #check for at end of rowTargets
-        if ((self.row + 6) % 12 == self.startRow):
+        if ((self.startingRow + 6) % 12 == self.row):
             checkerTown[self.row][self.col] = Queen(self.row, self.col, self.team)
         if (oldRow == self.startingRow and oldCol == self.startingCol and (newRow - oldRow) == 2 * self.direction):
             self.enPassantable = True
