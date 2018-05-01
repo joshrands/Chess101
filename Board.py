@@ -853,6 +853,10 @@ class Board(SampleBase):
                     for j in range(0, 8):
                         self.lightCell(canvas, i, j, R, G, B)
 
+                for i in range (0, 8):
+                    self.lightCell(canvas, 2, i, 255, 0, 0)
+                    self.lightCell(canvas, 5, i, 255, 255, 255)
+
                 canvas = self.matrix.SwapOnVSync(canvas)
 
     def addNodes(self, currentNode, team, depth):
