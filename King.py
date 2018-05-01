@@ -115,7 +115,7 @@ class King(Piece):
     def getValue(self, board):
         return 1000
 
-    def move(self, newRow, newCol):
+    def move(self, newRow, newCol, checkerTown):
     # calculate new targets
         oldRow = self.row
         oldCol = self.col

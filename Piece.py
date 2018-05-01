@@ -21,7 +21,7 @@ class Piece:
         raise NotImplementedError()
 
     # abstract method move
-    def move(self, newRow, newCol):
+    def move(self, newRow, newCol, checkerTown):
         # calculate new targets
         self.row = newRow
         self.col = newCol

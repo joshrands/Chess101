@@ -21,10 +21,26 @@ class Board(SampleBase):
         super(Board, self).__init__(*args, **kwargs)
         self.teamR = Team(64, 180, 232)
         self.teamL = Team(255, 140, 0)
+        #self.teamR = Team(0, 153, 76)
+        #self.teamL = Team(81, 0, 153)
+        #self.teamR = Team(255, 255, 0)
+        #self.teamL = Team(254, 0, 255)
         self.grid = []
         self.master = Master()
         self.computerPlayer = False
         self.computerIsWhite = False
+        self.checkerBrightness = 0
+        self.checkerBrightnessDir = 2
+
+        self.teamArray = []
+        self.teamArray.append(Team(64, 180, 232)) #Blue
+        self.teamArray.append(Team(190, 25, 255)) #Purple
+        self.teamArray.append(Team(254, 220, 0)) #Yellow
+        self.teamArray.append(Team(250, 125, 125)) #Pink
+        self.teamArray.append(Team(25, 255, 35)) #Green
+        self.teamArray.append(Team(245, 125, 0)) #Orange
+        self.teamArray.append(Team(0, 25, 230)) #Dark Blue
+        self.teamArray.append(Team(28, 225, 180)) #Cyan
 
         for row in range(0, 8):
             self.grid.append([None, None, None, None, None, None, None, None])
@@ -32,6 +48,15 @@ class Board(SampleBase):
     # RUN GAME
     def run(self):
         print("Running game...")
+        #self.colorPicker()
+
+        self.computerPlayer = False
+        self.computerIsWhite = False
+
+        computer = input("Would you like to play against a computer? (y/n)")
+        if (computer == "y" or computer == "Y"):
+            self.computerPlayer = True
+            self.computerIsWhite = False
 
         self.createPlayers()
 
@@ -41,22 +66,11 @@ class Board(SampleBase):
    #     self.lightCheckerTown(offset_canvas)
    #     offset_canvas = self.matrix.SwapOnVSync(offset_canvas)
    #     time.sleep(1)
-
         # begin interactive setup
-   #     self.interactiveSetup(offset_canvas, self.teamR)
-   #     self.interactiveSetup(offset_canvas, self.teamL)
+        self.interactiveSetup(offset_canvas, self.teamR)
+        self.interactiveSetup(offset_canvas, self.teamL)
 
         self.initializeGameBoard()
-
-        self.computerPlayer = False
-        self.computerIsWhite = False
-
-        computer = input("Would you like to play against a computer? (y/n)")
-        if (computer == "y" or computer == "Y"):
-            self.computerPlayer = True
-            computerColor = input("Would you like the computer to be white or black? (w/b)")
-            if (computerColor == "w" or computerColor == "W"):
-                self.computerIsWhite = True
 
         while True:
             offset_canvas = self.matrix.CreateFrameCanvas()
@@ -90,6 +104,17 @@ class Board(SampleBase):
         r = 255
         g = 255
         b = 255
+        for x in range(4):
+            for y in range(4):
+                self.lightCell(canvas, 1 + (2*x), 2*y, r, g, b)
+        for x in range(4):
+            for y in range(4):
+                self.lightCell(canvas, (2*x), 1 + 2*y, r, g, b)
+
+    def chooseLightCheckerTown(self, canvas):
+        r = self.checkerBrightness
+        g = self.checkerBrightness
+        b = self.checkerBrightness
         for x in range(4):
             for y in range(4):
                 self.lightCell(canvas, 1 + (2*x), 2*y, r, g, b)
@@ -188,8 +213,8 @@ class Board(SampleBase):
                 state = self.master.getCellState(piece.row, piece.col)
                 if state == 1:
                     mismatch = True
-                    print("Piece should be here")
-                    print(piece.row, piece.col)
+                    #print("Piece should be here")
+                    #print(piece.row, piece.col)
                     # light cell warning color
                     self.lightCell(canvas, piece.row, piece.col, r, g, b)
                     time.sleep(0.01)
@@ -199,7 +224,7 @@ class Board(SampleBase):
         return True
 
     def detectPawns(self, canvas, team, row):
-        print("Please place pawns")
+        #print("Please place pawns")
         for col in range(8):
             self.lightCell(canvas, row, col, 255, 255, 255)
         placed = False
@@ -215,11 +240,11 @@ class Board(SampleBase):
                     self.lightCell(canvas, row, col, team.r, team.g, team.b)
                     # pawn was placed, light cell team color
             time.sleep(0.1)
-        print("Pawns placed.")
+        #print("Pawns placed.")
 
     def detectPiece(self, canvas, team, piece, row, col):
         # setup teamR
-        print("Place " + piece + " here:")
+        #print("Place " + piece + " here:")
         # light up cell white
         self.lightCell(canvas, row, col, 255, 255, 255)
         canvas = self.matrix.SwapOnVSync(canvas)
@@ -229,7 +254,7 @@ class Board(SampleBase):
             if (self.master.getCellState(row, col) == 0):
                 placed = True
             time.sleep(0.01)
-        print(piece + " set.")
+        #print(piece + " set.")
         self.lightCell(canvas, row, col, team.r, team.g, team.b) # light team color
         # just added
         #canvas = self.matrix.SwapOnVSync(canvas)
@@ -237,7 +262,7 @@ class Board(SampleBase):
     # detect lift off
     def detectLiftOff(self, team):
         # team is current team
-#        print("Detecting lift off...")
+        #print("Detecting lift off...")
         # get all valid pieces that can move
         validPieces = self.getTeamPieces(team)
         # update board data
@@ -248,7 +273,7 @@ class Board(SampleBase):
         for piece in validPieces:
             state = self.master.getCellState(piece.row, piece.col)
             if (state == 1 and valid == False):
-                print("Yay you can move that good job")
+                #print("Yay you can move that good job")
                 valid = True
                 lifted = piece
 
@@ -293,7 +318,7 @@ class Board(SampleBase):
                         canvas = self.matrix.SwapOnVSync(canvas)
 
                         self.master.readData()
-                        print("You are taking an enemy, please place your piece")
+                        #print("You are taking an enemy, please place your piece")
                         state = self.master.getCellState(cell.row, cell.col)
 
                         canvas = self.matrix.CreateFrameCanvas()
@@ -304,7 +329,7 @@ class Board(SampleBase):
                     valid = True
 
             elif (state == 0):
-                print("Are you sure? Too bad")
+                #print("Are you sure? Too bad")
                 valid = True
                 activatedTarget = cell
 
@@ -370,8 +395,9 @@ class Board(SampleBase):
 
         check = False
         checkMate = False
-        kingRow = -1;
-        kingCol = -1;
+        kingRow = -1
+        kingCol = -1
+        piecesWithMoves = 0
 
         #self.computerMove(team)
 
@@ -384,46 +410,41 @@ class Board(SampleBase):
                     #count += len(piece.getTargets());
                     if (isinstance(piece, King) and piece.team == team):
                         check = piece.calcTargets(self.grid)
+                        if (len(piece.getTargets()) > 0):
+                            piecesWithMoves = piecesWithMoves + 1
                         kingRow = piece.row
                         kingCol = piece.col
-
-        piecesWithMoves = 0
 
         for row in self.grid:
             for piece in row:
                 if (isinstance(piece, Pawn) and piece.team == team):
                     piece.enPassantable = False
-                if (isinstance(piece, King)):
-                    if (len(piece.getTargets()) > 0 and piece.team == team):
-                        piece.printPiece()
-                elif (piece != None):
+                if (piece != None and not (isinstance(piece, King))):
                     piece.calcTargets(self.grid)
                     if (check):
                         piece.skyFall(self.grid[kingRow][kingCol])
                     #print pieces that can be moved
                     if (len(piece.getTargets()) > 0 and piece.team == team):
                         piecesWithMoves = piecesWithMoves + 1
-                        piece.printPiece()
 
         #check if there are no legal moves
-        if (piecesWithMoves == 0 and not check):
+        if (piecesWithMoves == 0):
             #stalemate
-            while True:
-                canvas = self.matrix.CreateFrameCanvas()
-                for i in range(0, 4):
-                    for j in range(0, 8):
-                        self.lightCell(canvas, i, j, teamR.r, teamG.g, teamB.b)
-                for i in range(4, 8):
-                    for j in range(0, 8):
-                        self.lightCell(canvas, i, j, teamL.r, teamL.g, teamL.b)
-                canvas = self.matrix.SwapOnVSync(canvas)
-
-
-        if (piecesWithMoves == 0 and len(self.grid[kingRow][kingCol].targets) == 0):
-            checkMate = True
+            if (not check):
+                while True:
+                    canvas = self.matrix.CreateFrameCanvas()
+                    for i in range(0, 4):
+                        for j in range(0, 8):
+                            self.lightCell(canvas, i, j, self.teamR.r, self.teamR.g, self.teamR.b)
+                    for i in range(4, 8):
+                        for j in range(0, 8):
+                            self.lightCell(canvas, i, j, self.teamL.r, self.teamL.g, self.teamL.b)
+                    canvas = self.matrix.SwapOnVSync(canvas)
+            elif (check):
+                checkMate = True
 
         if (checkMate):
-            print("Check mate!")
+            #print("Check mate!")
             self.sethVictory(canvas, team)
 
         # check for mismatch
@@ -450,11 +471,11 @@ class Board(SampleBase):
             liftedPiece = None
             while (pieceLifted == False):
                 pieceLifted, liftedPiece = self.detectLiftOff(team)
-                print("Waiting for player move...")
+                #print("Waiting for player move...")
 
             row = liftedPiece.row
             col = liftedPiece.col
-            print("Calculating targets...")
+            #print("Calculating targets...")
             #self.lightPieces(canvas, self.teamR)
             self.lightCheckerTown(canvas)
             self.lightTargets(canvas, self.grid[row][col])
@@ -476,7 +497,7 @@ class Board(SampleBase):
                     if placed:
                         #print(targetCell.row, targetCell.col, row, col)
                         if (targetCell.row == row and targetCell.col == col):
-                            print("Piece returned.")
+                            #print("Piece returned.")
                             returned = True
                 if returned:
                     # go back to detecting which piece player wants to move
@@ -487,7 +508,7 @@ class Board(SampleBase):
                     self.lightCheckerTown(canvas)
                     #self.lightPieces(canvas, self.teamR)
                     canvas = self.matrix.SwapOnVSync(canvas)
-                    print("Regret.")
+                    #print("Regret.")
                     #continue
 
                 if move:
@@ -497,13 +518,13 @@ class Board(SampleBase):
                     for cell in self.grid[row][col].getTargets():
                         if (cell.row == targetRow and cell.col == targetCol):
                             validMove = True
-                            print("Moving piece...")
+                            #print("Moving piece...")
                             self.grid[targetRow][targetCol] = self.grid[row][col]
                             if (isinstance(self.grid[targetRow][targetCol], Pawn)):
-                                enemy = self.grid[targetRow][targetCol].move(targetRow, targetCol)
+                                enemy = self.grid[targetRow][targetCol].move(targetRow, targetCol, self.grid)
                                 if (enemy != None):
                                     self.grid[enemy.row][enemy.col] = None
-                                    print("enPassant!")
+                                    #print("enPassant!")
                                     # make player remove piece
                                     state = self.master.getCellState(enemy.row, enemy.col)
                                     while state == 0:
@@ -530,14 +551,14 @@ class Board(SampleBase):
                                         state = self.master.getCellState(enemy.row, enemy.col)
 
                             elif (isinstance(self.grid[targetRow][targetCol], King)):
-                                rookLocation, rookTarget = self.grid[targetRow][targetCol].move(targetRow, targetCol)
+                                rookLocation, rookTarget = self.grid[targetRow][targetCol].move(targetRow, targetCol, self.grid)
                                 if (rookLocation != None):
                                     # do castling
                                     self.grid[rookTarget.row][rookTarget.col] = self.grid[rookLocation.row][rookLocation.col]
                                     self.grid[rookLocation.row][rookLocation.col] = None
-                                    self.grid[rookTarget.row][rookTarget.col].move(rookTarget.row, rookTarget.col)
+                                    self.grid[rookTarget.row][rookTarget.col].move(rookTarget.row, rookTarget.col, self.grid)
                             else:
-                                self.grid[targetRow][targetCol].move(targetRow, targetCol)
+                                self.grid[targetRow][targetCol].move(targetRow, targetCol,self.grid)
 
                             self.grid[row][col] = None
 
@@ -565,7 +586,7 @@ class Board(SampleBase):
 
         targets = piece.getTargets()
         for cell in targets:
-            print("Target: ", cell.row, cell.col)
+            #print("Target: ", cell.row, cell.col)
             self.lightCell(canvas, cell.row, cell.col, r, g, b)
 
     def lightPieces(self, offset_canvas, team):
@@ -619,20 +640,16 @@ class Board(SampleBase):
         self.grid[7][4] = King(7, 4, self.teamL)
 
     def createPlayers(self):
-        if (self.computerPlayer and not self.computerIsWhite):
-            nameR = input("Enter player 1 name White): ")
-            print("Enter player 1 colors (rgb): ")
-            self.teamR.setName(nameR)
+        if (self.computerPlayer):
+            if (self.computerIsWhite):
+                self.teamR.setName("Computer")
+                self.teamL.setName("Human")
+            else:
+                self.teamL.setName("Computer")
+                self.teamR.setName("Human")
         else:
-            self.teamR.setName("Computer")
-        #self.teamR.setColor()
-
-        if (self.computerPlayer and self.computerIsWhite):
-            nameL = input("Enter player 2 name (Black): ")
-            print("Enter player 2 colors (rgb): ")
-            self.teamL.setName(nameL)
-        else:
-            self.teamL.setName("Computer")
+            self.teamL.setName("Player 1")
+            self.teamR.setName("Player 2")
         #self.teamL.setColor()
 
     def lightCell(self, canvas, x, y, r, g, b):
@@ -650,6 +667,60 @@ class Board(SampleBase):
             print(grid[r])
 
     def computerMove(self, team, canvas, depth=2):
+        check = False
+        checkMate = False
+        kingRow = -1
+        kingCol = -1
+        piecesWithMoves = 0
+        self.checkerBrightness = 255;
+
+        #self.computerMove(team)
+
+        #count total targets for this team for stalemate purposes
+        #count = 0;
+        for row in self.grid:
+            for piece in row:
+                if (piece != None):
+                    #increment number of moves
+                    #count += len(piece.getTargets());
+                    if (isinstance(piece, King) and piece.team == team):
+                        check = piece.calcTargets(self.grid)
+                        if (len(piece.getTargets()) > 0):
+                            piecesWithMoves = piecesWithMoves + 1
+                        kingRow = piece.row
+                        kingCol = piece.col
+
+        for row in self.grid:
+            for piece in row:
+                if (isinstance(piece, Pawn) and piece.team == team):
+                    piece.enPassantable = False
+                if (piece != None and not isinstance(piece, King)):
+                    piece.calcTargets(self.grid)
+                    if (check):
+                        piece.skyFall(self.grid[kingRow][kingCol])
+                    #print pieces that can be moved
+                    if (len(piece.getTargets()) > 0 and piece.team == team):
+                        piecesWithMoves = piecesWithMoves + 1
+
+        #check if there are no legal moves
+        if (piecesWithMoves == 0):
+            #stalemate
+            if (not check):
+                while True:
+                    canvas = self.matrix.CreateFrameCanvas()
+                    for i in range(0, 4):
+                        for j in range(0, 8):
+                            self.lightCell(canvas, i, j, self.teamR.r, self.teamR.g, self.teamR.b)
+                    for i in range(4, 8):
+                        for j in range(0, 8):
+                            self.lightCell(canvas, i, j, self.teamL.r, self.teamL.g, self.teamL.b)
+                    canvas = self.matrix.SwapOnVSync(canvas)
+            elif (check):
+                checkMate = True
+
+        if (checkMate):
+            print("Check mate!")
+            self.sethVictory(canvas, team)
 
         #Create the whole tree recursively
         root = Tree(self.grid, None, None, self.teamR, self.teamL)
@@ -665,18 +736,36 @@ class Board(SampleBase):
         print ("the best move involves moving the piece at square " + str(bestMove.oldCell.row) + str(bestMove.oldCell.col) + " to " + str(bestMove.newCell.row) + str(bestMove.newCell.col))
 
         # move piece from bestMove.oldCell to bestMove.newCell
-        state = 1
+        state = 0
+
+        canvas = self.matrix.CreateFrameCanvas()
+        self.lightCheckerTown(canvas)
+        canvas = self.matrix.SwapOnVSync(canvas)
+        self.detectMismatch(canvas)
+        self.detectMismatch(canvas)
 
         if (self.grid[bestMove.newCell.row][bestMove.newCell.col] == None):
-            while state == 1:
+            while state == 0:
                 self.master.readData()
 
                 canvas = self.matrix.CreateFrameCanvas()
             #self.lightPieces(canvas, self.teamL)
                 self.lightCheckerTown(canvas)
                 self.lightCell(canvas, bestMove.oldCell.row, bestMove.oldCell.col, team.r, team.g, team.b)
-                self.lightCell(canvas, bestMove.newCell.row, bestMove.newCell.col, team.r, team.g, team.b)
 
+                canvas = self.matrix.SwapOnVSync(canvas)
+
+                state = self.master.getCellState(bestMove.oldCell.row, bestMove.oldCell.col)
+            while state == 1:
+                self.master.readData()
+
+                canvas = self.matrix.CreateFrameCanvas()
+                self.lightCheckerTown(canvas)
+                self.lightCell(canvas, bestMove.newCell.row, bestMove.newCell.col, team.r, team.g, team.b)
+                canvas = self.matrix.SwapOnVSync(canvas)
+                time.sleep(.1)
+                canvas = self.matrix.CreateFrameCanvas()
+                self.lightCheckerTown(canvas)
                 canvas = self.matrix.SwapOnVSync(canvas)
 
                 state = self.master.getCellState(bestMove.newCell.row, bestMove.newCell.col)
@@ -690,27 +779,40 @@ class Board(SampleBase):
             #self.lightPieces(canvas, self.teamL)
                 self.lightCheckerTown(canvas)
                 self.lightCell(canvas, bestMove.oldCell.row, bestMove.oldCell.col, team.r, team.g, team.b)
+                #self.lightCell(canvas, bestMove.newCell.row, bestMove.newCell.col, team.r, team.g, team.b)
+
+                canvas = self.matrix.SwapOnVSync(canvas)
+
+                state = self.master.getCellState(bestMove.oldCell.row, bestMove.oldCell.col)
+            state = 0
+            while state == 0:
+                self.master.readData()
+                canvas = self.matrix.CreateFrameCanvas()
+            #self.lightPieces(canvas, self.teamL)
+                self.lightCheckerTown(canvas)
+                #self.lightCell(canvas, bestMove.oldCell.row, bestMove.oldCell.col, team.r, team.g, team.b)
                 self.lightCell(canvas, bestMove.newCell.row, bestMove.newCell.col, team.r, team.g, team.b)
 
                 canvas = self.matrix.SwapOnVSync(canvas)
 
                 state = self.master.getCellState(bestMove.newCell.row, bestMove.newCell.col)
-
+            time.sleep(.1)
             while state == 1:
                 self.master.readData()
 
                 canvas = self.matrix.CreateFrameCanvas()
-            #self.lightPieces(canvas, self.teamL)
                 self.lightCheckerTown(canvas)
-                self.lightCell(canvas, bestMove.oldCell.row, bestMove.oldCell.col, team.r, team.g, team.b)
                 self.lightCell(canvas, bestMove.newCell.row, bestMove.newCell.col, team.r, team.g, team.b)
-
+                canvas = self.matrix.SwapOnVSync(canvas)
+                time.sleep(.1)
+                canvas = self.matrix.CreateFrameCanvas()
+                self.lightCheckerTown(canvas)
                 canvas = self.matrix.SwapOnVSync(canvas)
 
                 state = self.master.getCellState(bestMove.newCell.row, bestMove.newCell.col)
 
 
-        self.grid[bestMove.oldCell.row][bestMove.oldCell.col].move(bestMove.newCell.row, bestMove.newCell.col)
+        self.grid[bestMove.oldCell.row][bestMove.oldCell.col].move(bestMove.newCell.row, bestMove.newCell.col, self.grid)
         self.grid[bestMove.newCell.row][bestMove.newCell.col] = self.grid[bestMove.oldCell.row][bestMove.oldCell.col]
         self.grid[bestMove.oldCell.row][bestMove.oldCell.col] = None
 
@@ -721,7 +823,85 @@ class Board(SampleBase):
 
 #                input("press enter when ready to continue")
 
-    def addNodes(self, currentNode, team, depth):
+    def drawBoard(self, boardState):
+        canvas = self.matrix.CreateFrameCanvas()
+        self.checkerBrightness = self.checkerBrightness + self.checkerBrightnessDir
+        if (self.checkerBrightness <= 0):
+            self.checkerBrightnessDir = self.checkerBrightnessDir * -1
+            self.checkerBrightness = 0
+        elif (self.checkerBrightness >= 255):
+            self.checkerBrightnessDir = self.checkerBrightnessDir * -1
+            self.checkerBrightness = 255
+
+        #self.chooseLightCheckerTown(canvas)
+        for row in boardState:
+            for piece in row:
+                if (piece != None):
+                    self.lightCell(canvas, piece.row, piece.col, piece.team.r, piece.team.g, piece.team.b)
+
+        self.chooseLightCheckerTown(canvas)
+
+        canvas = self.matrix.SwapOnVSync(canvas)
+
+    def colorPicker(self):
+        canvas = self.matrix.CreateFrameCanvas()
+
+        for i in range (0, 8):
+            self.lightCell(canvas, 2, i, self.teamArray[i].r, self.teamArray[i].g, self.teamArray[i].b) # colorpicker
+            self.lightCell(canvas, 5, i, self.teamArray[i].r, self.teamArray[i].g, self.teamArray[i].b) # colorpicker
+
+        team1Found = False
+        team2Found = False
+
+        canvas = self.matrix.SwapOnVSync(canvas)
+
+        while not (team1Found and team2Found):
+            team1Found = False
+            team2Found = False
+            self.master.readData()
+            for i in range(0, 8):
+                if (self.master.getCellState(2, i) == 0):
+                    team1Found = True
+                    self.teamR.r = self.teamArray[i].r
+                    self.teamR.g = self.teamArray[i].g
+                    self.teamR.b = self.teamArray[i].b
+                if (self.master.getCellState(5, i) == 0):
+                    team2Found = True
+                    self.teamL.r = self.teamArray[i].r
+                    self.teamL.g = self.teamArray[i].g
+                    self.teamL.b = self.teamArray[i].b
+            canvas = self.matrix.CreateFrameCanvas()
+            if (team1Found and team2Found):
+                for i in range(0, 8):
+                    if (self.master.getCellState(2, i) == 0):
+                        self.lightCell(canvas, 2, i, self.teamArray[i].r, self.teamArray[i].g, self.teamArray[i].b)
+                    if (self.master.getCellState(5, i) == 0):
+                        self.lightCell(canvas, 5, i, self.teamArray[i].r, self.teamArray[i].g, self.teamArray[i].b)
+                canvas = self.matrix.SwapOnVSync(canvas)
+                time.sleep(2)
+            elif (team1Found):
+                for i in range(0, 8):
+                    if (self.master.getCellState(2, i) == 0):
+                        self.lightCell(canvas, 2, i, self.teamArray[i].r, self.teamArray[i].g, self.teamArray[i].b)
+                for i in range (0, 8):
+                    self.lightCell(canvas, 5, i, self.teamArray[i].r, self.teamArray[i].g, self.teamArray[i].b) # colorpicker
+                canvas = self.matrix.SwapOnVSync(canvas)
+            elif (team2Found):
+                for i in range(0, 8):
+                    if (self.master.getCellState(5, i) == 0):
+                        self.lightCell(canvas, 5, i, self.teamArray[i].r, self.teamArray[i].g, self.teamArray[i].b)
+                for i in range (0, 8):
+                    self.lightCell(canvas, 2, i, self.teamArray[i].r, self.teamArray[i].g, self.teamArray[i].b) # colorpicker
+                canvas = self.matrix.SwapOnVSync(canvas)
+            else:
+                for i in range (0, 8):
+                    self.lightCell(canvas, 2, i, self.teamArray[i].r, self.teamArray[i].g, self.teamArray[i].b) # colorpicker
+                    self.lightCell(canvas, 5, i, self.teamArray[i].r, self.teamArray[i].g, self.teamArray[i].b) # colorpicker
+                canvas = self.matrix.SwapOnVSync(canvas)
+        self.teamR.r = self.teamR.r + 1
+
+
+    def addNodes(self, currentNode, team, depth=2):
         #print ("depth remaining: " + str(depth))
 
         #if the depth is 0, we've reached the "bottom" of the tree (as far as we initially told it to go)
@@ -737,10 +917,11 @@ class Board(SampleBase):
                 newBoard = copy.deepcopy(currentNode.boardState)
                 newPiece = newBoard[piece.row][piece.col]
                 #If it is, make the move and add the child to the current node
-                newPiece.move(target.row, target.col)
+                newPiece.move(target.row, target.col, self.grid)
                 newBoard[piece.row][piece.col] = None
                 newBoard[target.row][target.col] = newPiece
                 #TODO comment this out once boardstates was complete
+                self.drawBoard(newBoard)
                 #self.printBoardStates(newBoard)
                 currentNode.addChild(Tree(newBoard, Cell(piece.row, piece.col), Cell(target.row, target.col), self.teamR, self.teamL))
 
@@ -757,6 +938,7 @@ class Board(SampleBase):
 
         for child in currentNode.children:
             self.addNodes(child, team, depth-1)
+
 # Main function
 #if __name__ == "__main__":
 #    simple_square = Board()
