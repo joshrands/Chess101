@@ -248,7 +248,7 @@ class Board(SampleBase):
     # detect lift off
     def detectLiftOff(self, team):
         # team is current team
-#        print("Detecting lift off...")
+        #print("Detecting lift off...")
         # get all valid pieces that can move
         validPieces = self.getTeamPieces(team)
         # update board data
