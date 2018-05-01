@@ -443,6 +443,7 @@ class Board(SampleBase):
             elif (check):
                 checkMate = True
 
+        checkMate = False
         if (checkMate):
             #print("Check mate!")
             self.sethVictory(canvas, team)
