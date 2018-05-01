@@ -4,7 +4,7 @@ from Piece import Piece
 #Basic tree structure for holding the score/children of each node
 
 class Tree(object):
-    def __init__(self, boardState, oldCell = None, newCell = None):
+    def __init__(self, boardState, oldCell, newCell, teamR, teamL):
         self.children = []
         self.boardState = boardState
 
@@ -12,8 +12,8 @@ class Tree(object):
         self.oldCell = oldCell
         self.newCell = newCell
         #white is right
-        self.teamR = Team(64, 180, 232)
-        self.teamL = Team(255, 140, 0)
+        self.teamR = Team(teamR.r, teamR.g, teamR.b)
+        self.teamL = Team(teamL.r, teamL.g, teamL.b)
 
     def addChild(self, child):
     	self.children.append(child)

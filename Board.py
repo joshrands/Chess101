@@ -723,7 +723,7 @@ class Board(SampleBase):
             self.sethVictory(canvas, team)
 
         #Create the whole tree recursively
-        root = Tree(self.grid, None, None)
+        root = Tree(self.grid, None, None, self.teamR, self.teamL)
         self.addNodes(root, team, depth)
 
         #Create a new AI object with tree
@@ -923,7 +923,7 @@ class Board(SampleBase):
                 #TODO comment this out once boardstates was complete
                 self.drawBoard(newBoard)
                 #self.printBoardStates(newBoard)
-                currentNode.addChild(Tree(newBoard, Cell(piece.row, piece.col), Cell(target.row, target.col)))
+                currentNode.addChild(Tree(newBoard, Cell(piece.row, piece.col), Cell(target.row, target.col), self.teamR, self.teamL))
 
         #Once all children for this node are found, go another level deep
         print ("done adding children for depth " + str(depth) + "! boards created = " + str(len(currentNode.children)))
