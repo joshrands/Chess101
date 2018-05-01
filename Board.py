@@ -856,16 +856,12 @@ class Board(SampleBase):
 
         team1Found = False
         team2Found = False
-        team1Color = -1
-        team2Color = -1
 
         canvas = self.matrix.SwapOnVSync(canvas)
 
         while not (team1Found and team2Found):
             team1Found = False
             team2Found = False
-            team1Color = -1
-            team2Color = -1
             self.master.readData()
             for i in range(0, 8):
                 if (self.master.getCellState(2, i) == 0):
