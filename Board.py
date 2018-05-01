@@ -47,7 +47,7 @@ class Board(SampleBase):
    #     self.lightCheckerTown(offset_canvas)
    #     offset_canvas = self.matrix.SwapOnVSync(offset_canvas)
    #     time.sleep(1)
-
+        self.colorPicker()
         # begin interactive setup
         self.interactiveSetup(offset_canvas, self.teamR)
         self.interactiveSetup(offset_canvas, self.teamL)
@@ -836,6 +836,24 @@ class Board(SampleBase):
         self.chooseLightCheckerTown(canvas)
 
         canvas = self.matrix.SwapOnVSync(canvas)
+
+    def colorPicker(self):
+        while True:
+            cont = input("Next Color? (y/n)")
+            if (cont == "n"):
+                return
+            else:
+                R = input("Enter an r value: ")
+                G = input("Enter an g value: ")
+                B = input("Enter an b value: ")
+
+                canvas = self.matrix.CreateFrameCanvas()
+
+                for i in range(3, 5):
+                    for j in range(0, 8):
+                        self.lightCell(canvas, i, j, R, G, B)
+
+                canvas = self.matrix.SwapOnVSync(canvas)
 
     def addNodes(self, currentNode, team, depth):
         #print ("depth remaining: " + str(depth))
