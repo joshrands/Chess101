@@ -370,8 +370,8 @@ class Board(SampleBase):
 
         check = False
         checkMate = False
-        kingRow = -1;
-        kingCol = -1;
+        kingRow = -1
+        kingCol = -1
         piecesWithMoves = 0
 
         #self.computerMove(team)
@@ -500,7 +500,7 @@ class Board(SampleBase):
                             print("Moving piece...")
                             self.grid[targetRow][targetCol] = self.grid[row][col]
                             if (isinstance(self.grid[targetRow][targetCol], Pawn)):
-                                enemy = self.grid[targetRow][targetCol].move(targetRow, targetCol)
+                                enemy = self.grid[targetRow][targetCol].move(targetRow, targetCol, self.grid)
                                 if (enemy != None):
                                     self.grid[enemy.row][enemy.col] = None
                                     print("enPassant!")
@@ -530,14 +530,14 @@ class Board(SampleBase):
                                         state = self.master.getCellState(enemy.row, enemy.col)
 
                             elif (isinstance(self.grid[targetRow][targetCol], King)):
-                                rookLocation, rookTarget = self.grid[targetRow][targetCol].move(targetRow, targetCol)
+                                rookLocation, rookTarget = self.grid[targetRow][targetCol].move(targetRow, targetCol, self.grid)
                                 if (rookLocation != None):
                                     # do castling
                                     self.grid[rookTarget.row][rookTarget.col] = self.grid[rookLocation.row][rookLocation.col]
                                     self.grid[rookLocation.row][rookLocation.col] = None
-                                    self.grid[rookTarget.row][rookTarget.col].move(rookTarget.row, rookTarget.col)
+                                    self.grid[rookTarget.row][rookTarget.col].move(rookTarget.row, rookTarget.col, self.grid)
                             else:
-                                self.grid[targetRow][targetCol].move(targetRow, targetCol)
+                                self.grid[targetRow][targetCol].move(targetRow, targetCol,self.grid, self.grid)
 
                             self.grid[row][col] = None
 
@@ -652,8 +652,9 @@ class Board(SampleBase):
     def computerMove(self, team, canvas, depth=3):
         check = False
         checkMate = False
-        kingRow = -1;
-        kingCol = -1;
+        kingRow = -1
+        kingCol = -1
+        piecesWithMoves = 0
 
         #self.computerMove(team)
 
@@ -670,8 +671,6 @@ class Board(SampleBase):
                             piecesWithMoves = piecesWithMoves + 1
                         kingRow = piece.row
                         kingCol = piece.col
-
-        piecesWithMoves = 0
 
         for row in self.grid:
             for piece in row:
@@ -768,7 +767,7 @@ class Board(SampleBase):
                 state = self.master.getCellState(bestMove.newCell.row, bestMove.newCell.col)
 
 
-        self.grid[bestMove.oldCell.row][bestMove.oldCell.col].move(bestMove.newCell.row, bestMove.newCell.col)
+        self.grid[bestMove.oldCell.row][bestMove.oldCell.col].move(bestMove.newCell.row, bestMove.newCell.col, self.grid)
         self.grid[bestMove.newCell.row][bestMove.newCell.col] = self.grid[bestMove.oldCell.row][bestMove.oldCell.col]
         self.grid[bestMove.oldCell.row][bestMove.oldCell.col] = None
 
@@ -795,7 +794,7 @@ class Board(SampleBase):
                 newBoard = copy.deepcopy(currentNode.boardState)
                 newPiece = newBoard[piece.row][piece.col]
                 #If it is, make the move and add the child to the current node
-                newPiece.move(target.row, target.col)
+                newPiece.move(target.row, target.col, self.grid)
                 newBoard[piece.row][piece.col] = None
                 newBoard[target.row][target.col] = newPiece
                 #TODO comment this out once boardstates was complete
