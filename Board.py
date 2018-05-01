@@ -939,6 +939,7 @@ class Board(SampleBase):
             #    checkMate = False
 
             if (isinstance(piece, Pawn) and piece.team == team):
+                print("team check works at least")
                 piece.enPassantable = False
             if (piece != None and not isinstance(piece, King)):
                 piece.calcTargets(currentNode.boardState)
