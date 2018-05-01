@@ -728,6 +728,7 @@ class Board(SampleBase):
         self.lightCheckerTown(canvas)
         canvas = self.matrix.SwapOnVSync(canvas)
         self.detectMismatch(canvas)
+        self.detectMismatch(canvas)
 
         if (self.grid[bestMove.newCell.row][bestMove.newCell.col] == None):
             while state == 0:
