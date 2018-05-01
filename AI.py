@@ -1,7 +1,7 @@
 from Tree import Tree
 from samplebase import SampleBase
 
-class AI:
+class AI(SampleBase):
     # print utility value of root node (assuming it is max)
     # print names of all nodes visited during search
     def __init__(self, game_tree, team, *args, **kwargs):
