@@ -937,6 +937,8 @@ class Board(SampleBase):
         if checkMate:
             print("Checkmate, go down this path.")
             return True
+        else:
+            print("not checkmate, good.")
 
         if (depth == 0):
             return None
