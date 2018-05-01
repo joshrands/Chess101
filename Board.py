@@ -765,6 +765,7 @@ class Board(SampleBase):
 
                 state = self.master.getCellState(bestMove.oldCell.row, bestMove.oldCell.col)
 
+            print("State Change to:", state)
             state = 0
             while state == 0:
                 self.master.readData()
@@ -778,6 +779,7 @@ class Board(SampleBase):
                 canvas = self.matrix.SwapOnVSync(canvas)
 
                 state = self.master.getCellState(bestMove.newCell.row, bestMove.newCell.col)
+            print("State Change to:", state)
             while state == 1:
                 self.master.readData()
 
@@ -791,6 +793,7 @@ class Board(SampleBase):
                 canvas = self.matrix.SwapOnVSync(canvas)
 
                 state = self.master.getCellState(bestMove.newCell.row, bestMove.newCell.col)
+            print("State Change to:", state)
 
 
         self.grid[bestMove.oldCell.row][bestMove.oldCell.col].move(bestMove.newCell.row, bestMove.newCell.col, self.grid)
