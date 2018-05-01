@@ -855,7 +855,7 @@ class Board(SampleBase):
             self.lightCell(canvas, 5, i, self.teamArray[i].r, self.teamArray[i].g, self.teamArray[i].b) # colorpicker
 
         team1Found = False
-        teame2Found = False
+        team2Found = False
 
         while not (team1Found and team2Found):
             self.master.readData()
