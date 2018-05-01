@@ -1,4 +1,5 @@
 from Tree import Tree
+from Board import Board
 
 class AI:
     # print utility value of root node (assuming it is max)
