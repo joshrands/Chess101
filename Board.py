@@ -921,6 +921,7 @@ class Board(SampleBase):
                 #increment number of moves
                 #count += len(piece.getTargets());
                 if (isinstance(piece, King) and piece.team == team):
+                    print ("Doing that check setting")
                     check = piece.calcTargets(currentNode.boardState)
                     if (len(piece.getTargets()) > 0):
                         piecesWithMoves = piecesWithMoves + 1
