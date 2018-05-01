@@ -1,5 +1,5 @@
 from Tree import Tree
-from Board import Board
+from samplebase import SampleBase
 
 class AI:
     # print utility value of root node (assuming it is max)
@@ -18,7 +18,14 @@ class AI:
         successors = self.getSuccessors(self.game_tree)
         best_state = None
         for state in successors: # for every node..
-            Board.drawBoard(state.getBoardState())
+            canvas = self.matrix.CreateFrameCanvas()
+            for row in state:
+                for piece in row:
+                    if (piece != None):
+                        self.lightCell(canvas, piece.row, piece.col, piece.team.r, piece.team.g, piece.team.b)
+            canvas = self.matrix.SwapOnVSync(canvas)
+
+
             value = self.min_value(state, best_val, beta)
             if value > best_val:
                 best_val = value
