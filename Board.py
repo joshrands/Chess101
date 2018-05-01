@@ -866,8 +866,8 @@ class Board(SampleBase):
                 for i in range (0, 8):
                     self.lightCell(canvas, 2, i, 255, 0, 0) #red
                     self.lightCell(canvas, 5, i, 255, 255, 255) #white
-                    self.lightCell(canvas, 4, j, R, G, B) # colorpicker
-                    self.lightCell(canvas, 3, j, self.teamArray[i].r, self.teamArray[i].g, self.teamArray[i].b) # colorpicker
+                    self.lightCell(canvas, 4, i, R, G, B) # colorpicker
+                    self.lightCell(canvas, 3, i, self.teamArray[i].r, self.teamArray[i].g, self.teamArray[i].b) # colorpicker
 
                 canvas = self.matrix.SwapOnVSync(canvas)
 
