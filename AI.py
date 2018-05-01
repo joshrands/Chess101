@@ -4,7 +4,8 @@ from samplebase import SampleBase
 class AI:
     # print utility value of root node (assuming it is max)
     # print names of all nodes visited during search
-    def __init__(self, game_tree, team):
+    def __init__(self, game_tree, team, *args, **kwargs):
+        super(AI, self).__init__(*args, **kwargs)
         self.game_tree = game_tree  # Whole tree (only the root node, but this node will contain the children)
         self.team = team
         return
