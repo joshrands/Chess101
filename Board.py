@@ -48,7 +48,7 @@ class Board(SampleBase):
     # RUN GAME
     def run(self):
         print("Running game...")
-        self.colorPicker()
+        #self.colorPicker()
 
         self.computerPlayer = False
         self.computerIsWhite = False
