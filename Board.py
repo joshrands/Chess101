@@ -100,9 +100,9 @@ class Board(SampleBase):
                 self.lightCell(canvas, (2*x), 1 + 2*y, r, g, b)
 
     def chooseLightCheckerTown(self, canvas):
-        r = checkerBrightness
-        g = checkerBrightness
-        b = checkerBrightness
+        r = self.checkerBrightness
+        g = self.checkerBrightness
+        b = self.checkerBrightness
         for x in range(4):
             for y in range(4):
                 self.lightCell(canvas, 1 + (2*x), 2*y, r, g, b)
