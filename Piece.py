@@ -12,10 +12,11 @@ class Piece:
         self.touched = False
         self.critical = False
         self.criticalTargets = []
+        self.isKing = False
 
     # abstract method calcTargets
     def isThisTheKing(self, board, row, col):
-        if (isinstance(King, board[row][col])):
+        if (board[row][col].isKing = True):
             return 10 
         else:
             return 0

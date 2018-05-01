@@ -19,6 +19,7 @@ class Pawn(Piece):
         self.enPassantLoc = None
         self.critical = False
         self.criticalTargets = []
+        self.isKing = False
 
     #calcTargets, which is abstract in the parent
     def calcTargets(self, checkerTown):

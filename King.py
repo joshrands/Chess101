@@ -22,6 +22,7 @@ class King(Piece):
         self.touched = False
         self.critical = False
         self.godSaveTheKing = []
+        self.isKing = True
 
     def bladeWalker(self, checkerTown, dir1, dir2, row, col):
         if (row + dir1 >= 0 and row + dir1 <= 7 and col + dir2 >= 0 and col + dir2 <= 7):
