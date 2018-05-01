@@ -26,7 +26,7 @@ class Board(SampleBase):
         self.computerPlayer = False
         self.computerIsWhite = False
         self.checkerBrightness = 0
-        self.checkerBrightnessDir = 1
+        self.checkerBrightnessDir = 2
 
         for row in range(0, 8):
             self.grid.append([None, None, None, None, None, None, None, None])
@@ -830,7 +830,7 @@ class Board(SampleBase):
 
     def drawBoard(self, boardState):
         canvas = self.matrix.CreateFrameCanvas()
-        self.checkerBrightness = self.checkerBrightness + (2 * self.checkerBrightnessDir)
+        self.checkerBrightness = self.checkerBrightness + self.checkerBrightnessDir
         if (self.checkerBrightness <= 0):
             self.checkerBrightnessDir = self.checkerBrightnessDir * -1
             self.checkerBrightness = 0
@@ -838,13 +838,14 @@ class Board(SampleBase):
             self.checkerBrightnessDir = self.checkerBrightnessDir * -1
             self.checkerBrightness = 255
 
-        self.chooseLightCheckerTown(canvas)
+        #self.chooseLightCheckerTown(canvas)
         for row in boardState:
             for piece in row:
                 if (piece != None):
                     self.lightCell(canvas, piece.row, piece.col, piece.team.r, piece.team.g, piece.team.b)
-        if (self.checkerBrightness > 180):
-            self.chooseLightCheckerTown(canvas)
+
+        self.chooseLightCheckerTown(canvas)
+        
         canvas = self.matrix.SwapOnVSync(canvas)
 
     def addNodes(self, currentNode, team, depth):
