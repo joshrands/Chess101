@@ -48,6 +48,12 @@ class Board(SampleBase):
     # RUN GAME
     def run(self):
         print("Running game...")
+        self.colorPicker()
+
+        computer = input("Would you like to play against a computer? (y/n)")
+        if (computer == "y" or computer == "Y"):
+            self.computerPlayer = True
+            self.computerIsWhite = False
 
         self.createPlayers()
 
@@ -57,7 +63,6 @@ class Board(SampleBase):
    #     self.lightCheckerTown(offset_canvas)
    #     offset_canvas = self.matrix.SwapOnVSync(offset_canvas)
    #     time.sleep(1)
-        self.colorPicker()
         # begin interactive setup
         self.interactiveSetup(offset_canvas, self.teamR)
         self.interactiveSetup(offset_canvas, self.teamL)
@@ -66,11 +71,6 @@ class Board(SampleBase):
 
         self.computerPlayer = False
         self.computerIsWhite = False
-
-        computer = input("Would you like to play against a computer? (y/n)")
-        if (computer == "y" or computer == "Y"):
-            self.computerPlayer = True
-            self.computerIsWhite = False
 
         while True:
             offset_canvas = self.matrix.CreateFrameCanvas()
