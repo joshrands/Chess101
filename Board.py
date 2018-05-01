@@ -907,13 +907,18 @@ class Board(SampleBase):
 
         #if the depth is 0, we've reached the "bottom" of the tree (as far as we initially told it to go)
         if (depth == 0):
-            return
+            return None
 
         #change how the pieces are grabbed
+        # checkmate?
+        checkMate = True
         for piece in self.getTeamPieces(team, currentNode.boardState):
             #TODO Parameter for this guy?
             #print("found a piece")
             piece.calcTargets(currentNode.boardState)
+            if len(piece.targets) > 0:
+                checkMate = False
+
             for target in piece.targets:
                 newBoard = copy.deepcopy(currentNode.boardState)
                 newPiece = newBoard[piece.row][piece.col]
@@ -929,8 +934,12 @@ class Board(SampleBase):
         #Once all children for this node are found, go another level deep
         print ("done adding children for depth " + str(depth) + "! boards created = " + str(len(currentNode.children)))
 
+        if checkMate:
+            print("Checkmate, go down this path.")
+            return True
+
         if (depth == 0):
-            return
+            return None
 
         if (team == self.teamL):
             team = self.teamR
