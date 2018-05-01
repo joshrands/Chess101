@@ -349,26 +349,22 @@ class Board(SampleBase):
 
         check = False
         checkMate = False
-        draw = False
         kingRow = -1;
         kingCol = -1;
 
         #self.computerMove(team)
 
         #count total targets for this team for stalemate purposes
-        count = 0;
+        #count = 0;
         for row in self.grid:
             for piece in row:
                 if (piece != None):
                     #increment number of moves
-                    count += len(piece.getTargets());
+                    #count += len(piece.getTargets());
                     if (isinstance(piece, King) and piece.team == team):
                         check = piece.calcTargets(self.grid)
                         kingRow = piece.row
                         kingCol = piece.col
-        #check if there are no legal moves
-        if (count == 0 and not check):
-            draw = True; #stalemate
 
         piecesWithMoves = 0
 
@@ -387,6 +383,19 @@ class Board(SampleBase):
                     if (len(piece.getTargets()) > 0 and piece.team == team):
                         piecesWithMoves = piecesWithMoves + 1
                         piece.printPiece()
+
+        #check if there are no legal moves
+        if (piecesWithMoves == 0 and not check):
+            #stalemate
+            canvas = self.matrix.CreateFrameCanvas()
+            for i in range(0, 4):
+                for j in range(0, 8):
+                    self.lightCell(canvas, i, j, teamR.r, teamG.g, teamB.b)
+            for i in range(4, 8):
+                for j in range(0, 8):
+                    self.lightCell(canvas, i, j, teamL.r, teamL.g, teamL.b)
+            canvas = self.matrix.SwapOnVSync(canvas)
+
 
         if (piecesWithMoves == 0 and len(self.grid[kingRow][kingCol].targets) == 0):
             checkMate = True
