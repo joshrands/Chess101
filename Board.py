@@ -743,7 +743,7 @@ class Board(SampleBase):
                 self.lightCheckerTown(canvas)
                 self.lightCell(canvas, bestMove.newCell.row, bestMove.newCell.col, team.r, team.g, team.b)
                 canvas = self.matrix.SwapOnVSync(canvas)
-
+                time.sleep(.1)
                 canvas = self.matrix.CreateFrameCanvas()
                 self.lightCheckerTown(canvas)
                 canvas = self.matrix.SwapOnVSync(canvas)
@@ -785,7 +785,7 @@ class Board(SampleBase):
                 self.lightCheckerTown(canvas)
                 self.lightCell(canvas, bestMove.newCell.row, bestMove.newCell.col, team.r, team.g, team.b)
                 canvas = self.matrix.SwapOnVSync(canvas)
-
+                time.sleep(.1)
                 canvas = self.matrix.CreateFrameCanvas()
                 self.lightCheckerTown(canvas)
                 canvas = self.matrix.SwapOnVSync(canvas)
