@@ -19,8 +19,10 @@ class Board(SampleBase):
 
     def __init__(self, *args, **kwargs):
         super(Board, self).__init__(*args, **kwargs)
-        self.teamR = Team(64, 180, 232)
-        self.teamL = Team(255, 140, 0)
+        #self.teamR = Team(64, 180, 232)
+        #self.teamL = Team(255, 140, 0)
+        self.teamR = Team(0, 153, 76)
+        self.teamL = Team(81, 0, 153)
         self.grid = []
         self.master = Master()
         self.computerPlayer = False
