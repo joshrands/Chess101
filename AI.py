@@ -1,6 +1,6 @@
 from Tree import Tree
 
-class AI():
+class AI:
     # print utility value of root node (assuming it is max)
     # print names of all nodes visited during search
     def __init__(self, game_tree, team):

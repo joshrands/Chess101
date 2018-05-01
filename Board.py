@@ -25,6 +25,8 @@ class Board(SampleBase):
         self.master = Master()
         self.computerPlayer = False
         self.computerIsWhite = False
+        self.checkerBrightness = 0
+        self.checkerBrightnessDir = 1
 
         for row in range(0, 8):
             self.grid.append([None, None, None, None, None, None, None, None])
@@ -90,6 +92,17 @@ class Board(SampleBase):
         r = 255
         g = 255
         b = 255
+        for x in range(4):
+            for y in range(4):
+                self.lightCell(canvas, 1 + (2*x), 2*y, r, g, b)
+        for x in range(4):
+            for y in range(4):
+                self.lightCell(canvas, (2*x), 1 + 2*y, r, g, b)
+
+    def chooseLightCheckerTown(self, canvas):
+        r = checkerBrightness
+        g = checkerBrightness
+        b = checkerBrightness
         for x in range(4):
             for y in range(4):
                 self.lightCell(canvas, 1 + (2*x), 2*y, r, g, b)
@@ -649,7 +662,7 @@ class Board(SampleBase):
         for r in range(8):
             print(grid[r])
 
-    def computerMove(self, team, canvas, depth=3):
+    def computerMove(self, team, canvas, depth=2):
         check = False
         checkMate = False
         kingRow = -1
@@ -815,10 +828,15 @@ class Board(SampleBase):
 
     def drawBoard(self, boardState):
         canvas = self.matrix.CreateFrameCanvas()
+        checkerBrightness = checkerBrightness + checkerBrightnessDir
+        if (checkerBrightness == 0 or checkerBrightness == 255):
+            checkerBrightnessDir = checkerBrightnessDir * -1
+        elif (checkerBrightness)
         for row in boardState:
             for piece in row:
                 if (piece != None):
                     self.lightCell(canvas, piece.row, piece.col, piece.team.r, piece.team.g, piece.team.b)
+        self.chooseLightCheckerTown(canvas)
         canvas = self.matrix.SwapOnVSync(canvas)
 
     def addNodes(self, currentNode, team, depth):
