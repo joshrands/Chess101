@@ -1,5 +1,8 @@
 from Tree import Tree
 from samplebase import SampleBase
+import time
+import random
+import copy
 
 class AI(SampleBase):
     # print utility value of root node (assuming it is max)
