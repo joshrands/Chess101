@@ -24,7 +24,7 @@ class Board(SampleBase):
         #self.teamR = Team(0, 153, 76)
         #self.teamL = Team(81, 0, 153)
         self.teamR = Team(255, 255, 0)
-        self.teamL = Team(255, 0, 255)
+        self.teamL = Team(254, 0, 255)
         self.grid = []
         self.master = Master()
         self.computerPlayer = False
