@@ -678,7 +678,53 @@ class Board(SampleBase):
         piecesWithMoves = 0
         self.checkerBrightness = 255;
 
+        #self.computerMove(team)
 
+        #count total targets for this team for stalemate purposes
+        #count = 0;
+        for row in self.grid:
+            for piece in row:
+                if (piece != None):
+                    #increment number of moves
+                    #count += len(piece.getTargets());
+                    if (isinstance(piece, King) and piece.team == team):
+                        check = piece.calcTargets(self.grid)
+                        if (len(piece.getTargets()) > 0):
+                            piecesWithMoves = piecesWithMoves + 1
+                        kingRow = piece.row
+                        kingCol = piece.col
+
+        for row in self.grid:
+            for piece in row:
+                if (isinstance(piece, Pawn) and piece.team == team):
+                    piece.enPassantable = False
+                if (piece != None and not isinstance(piece, King)):
+                    piece.calcTargets(self.grid)
+                    if (check):
+                        piece.skyFall(self.grid[kingRow][kingCol])
+                    #print pieces that can be moved
+                    if (len(piece.getTargets()) > 0 and piece.team == team):
+                        piecesWithMoves = piecesWithMoves + 1
+
+        #check if there are no legal moves
+        if (piecesWithMoves == 0):
+            #stalemate
+            if (not check):
+                while True:
+                    canvas = self.matrix.CreateFrameCanvas()
+                    for i in range(0, 4):
+                        for j in range(0, 8):
+                            self.lightCell(canvas, i, j, self.teamR.r, self.teamR.g, self.teamR.b)
+                    for i in range(4, 8):
+                        for j in range(0, 8):
+                            self.lightCell(canvas, i, j, self.teamL.r, self.teamL.g, self.teamL.b)
+                    canvas = self.matrix.SwapOnVSync(canvas)
+            elif (check):
+                checkMate = True
+
+        if (checkMate):
+            print("Check mate!")
+            self.sethVictory(canvas, team)
 
         #Create the whole tree recursively
         root = Tree(self.grid, None, None)
@@ -879,7 +925,7 @@ class Board(SampleBase):
                 newBoard[piece.row][piece.col] = None
                 newBoard[target.row][target.col] = newPiece
                 #TODO comment this out once boardstates was complete
-                self.drawBoard(newBoard)
+                #self.drawBoard(newBoard)
                 #self.printBoardStates(newBoard)
                 currentNode.addChild(Tree(newBoard, Cell(piece.row, piece.col), Cell(target.row, target.col)))
 
@@ -897,54 +943,6 @@ class Board(SampleBase):
         for child in currentNode.children:
             self.addNodes(child, team, depth-1)
 
-    def doStuff(self, team, canvas):
-        #self.computerMove(team)
-
-        #count total targets for this team for stalemate purposes
-        #count = 0;
-        for row in self.grid:
-            for piece in row:
-                if (piece != None):
-                    #increment number of moves
-                    #count += len(piece.getTargets());
-                    if (isinstance(piece, King) and piece.team == team):
-                        check = piece.calcTargets(self.grid)
-                        if (len(piece.getTargets()) > 0):
-                            piecesWithMoves = piecesWithMoves + 1
-                        kingRow = piece.row
-                        kingCol = piece.col
-
-        for row in self.grid:
-            for piece in row:
-                if (isinstance(piece, Pawn) and piece.team == team):
-                    piece.enPassantable = False
-                if (piece != None and not isinstance(piece, King)):
-                    piece.calcTargets(self.grid)
-                    if (check):
-                        piece.skyFall(self.grid[kingRow][kingCol])
-                    #print pieces that can be moved
-                    if (len(piece.getTargets()) > 0 and piece.team == team):
-                        piecesWithMoves = piecesWithMoves + 1
-
-        #check if there are no legal moves
-        if (piecesWithMoves == 0):
-            #stalemate
-            if (not check):
-                while True:
-                    canvas = self.matrix.CreateFrameCanvas()
-                    for i in range(0, 4):
-                        for j in range(0, 8):
-                            self.lightCell(canvas, i, j, self.teamR.r, self.teamR.g, self.teamR.b)
-                    for i in range(4, 8):
-                        for j in range(0, 8):
-                            self.lightCell(canvas, i, j, self.teamL.r, self.teamL.g, self.teamL.b)
-                    canvas = self.matrix.SwapOnVSync(canvas)
-            elif (check):
-                checkMate = True
-
-        if (checkMate):
-            print("Check mate!")
-            self.sethVictory(canvas, team)
 # Main function
 #if __name__ == "__main__":
 #    simple_square = Board()
