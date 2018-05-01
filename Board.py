@@ -372,6 +372,7 @@ class Board(SampleBase):
         checkMate = False
         kingRow = -1;
         kingCol = -1;
+        piecesWithMoves = 0
 
         #self.computerMove(team)
 
@@ -384,10 +385,10 @@ class Board(SampleBase):
                     #count += len(piece.getTargets());
                     if (isinstance(piece, King) and piece.team == team):
                         check = piece.calcTargets(self.grid)
+                        if (len(piece.getTargets()) > 0):
+                            piecesWithMoves = piecesWithMoves + 1
                         kingRow = piece.row
                         kingCol = piece.col
-
-        piecesWithMoves = 0
 
         for row in self.grid:
             for piece in row:
@@ -406,21 +407,20 @@ class Board(SampleBase):
                         piece.printPiece()
 
         #check if there are no legal moves
-        if (piecesWithMoves == 0 and not check):
+        if (piecesWithMoves == 0):
             #stalemate
-            while True:
-                canvas = self.matrix.CreateFrameCanvas()
-                for i in range(0, 4):
-                    for j in range(0, 8):
-                        self.lightCell(canvas, i, j, teamR.r, teamG.g, teamB.b)
-                for i in range(4, 8):
-                    for j in range(0, 8):
-                        self.lightCell(canvas, i, j, teamL.r, teamL.g, teamL.b)
-                canvas = self.matrix.SwapOnVSync(canvas)
-
-
-        if (piecesWithMoves == 0 and len(self.grid[kingRow][kingCol].targets) == 0):
-            checkMate = True
+            if (not check):
+                while True:
+                    canvas = self.matrix.CreateFrameCanvas()
+                    for i in range(0, 4):
+                        for j in range(0, 8):
+                            self.lightCell(canvas, i, j, self.teamR.r, self.teamR.g, self.teamR.b)
+                    for i in range(4, 8):
+                        for j in range(0, 8):
+                            self.lightCell(canvas, i, j, self.teamL.r, self.teamL.g, self.teamL.b)
+                    canvas = self.matrix.SwapOnVSync(canvas)
+            elif (check):
+                checkMate = True
 
         if (checkMate):
             print("Check mate!")
@@ -649,7 +649,65 @@ class Board(SampleBase):
         for r in range(8):
             print(grid[r])
 
-    def computerMove(self, team, canvas, depth=2):
+    def computerMove(self, team, canvas, depth=3):
+        check = False
+        checkMate = False
+        kingRow = -1;
+        kingCol = -1;
+
+        #self.computerMove(team)
+
+        #count total targets for this team for stalemate purposes
+        #count = 0;
+        for row in self.grid:
+            for piece in row:
+                if (piece != None):
+                    #increment number of moves
+                    #count += len(piece.getTargets());
+                    if (isinstance(piece, King) and piece.team == team):
+                        check = piece.calcTargets(self.grid)
+                        if (len(piece.getTargets()) > 0):
+                            piecesWithMoves = piecesWithMoves + 1
+                        kingRow = piece.row
+                        kingCol = piece.col
+
+        piecesWithMoves = 0
+
+        for row in self.grid:
+            for piece in row:
+                if (isinstance(piece, Pawn) and piece.team == team):
+                    piece.enPassantable = False
+                elif (piece != None and not isinstance(piece, King)):
+                    piece.calcTargets(self.grid)
+                    if (check):
+                        piece.skyFall(self.grid[kingRow][kingCol])
+                    #print pieces that can be moved
+                    if (len(piece.getTargets()) > 0 and piece.team == team):
+                        piecesWithMoves = piecesWithMoves + 1
+
+        #check if there are no legal moves
+        if (piecesWithMoves == 0):
+            #stalemate
+            if (not check):
+                while True:
+                    canvas = self.matrix.CreateFrameCanvas()
+                    for i in range(0, 4):
+                        for j in range(0, 8):
+                            self.lightCell(canvas, i, j, self.teamR.r, self.teamR.g, self.teamR.b)
+                    for i in range(4, 8):
+                        for j in range(0, 8):
+                            self.lightCell(canvas, i, j, self.teamL.r, self.teamL.g, self.teamL.b)
+                    canvas = self.matrix.SwapOnVSync(canvas)
+            elif (check):
+                checkMate = True
+
+        if (checkMate):
+            print("Check mate!")
+            self.sethVictory(canvas, team)
+
+        if (checkMate):
+            print("Check mate!")
+            self.sethVictory(canvas, team)
 
         #Create the whole tree recursively
         root = Tree(self.grid, None, None)
