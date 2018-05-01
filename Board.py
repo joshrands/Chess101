@@ -901,6 +901,7 @@ class Board(SampleBase):
                 for i in range (0, 8):
                     self.lightCell(canvas, 2, i, self.teamArray[i].r, self.teamArray[i].g, self.teamArray[i].b) # colorpicker
                     self.lightCell(canvas, 5, i, self.teamArray[i].r, self.teamArray[i].g, self.teamArray[i].b) # colorpicker
+                canvas = self.matrix.SwapOnVSync(canvas)
 
 
     def addNodes(self, currentNode, team, depth):
