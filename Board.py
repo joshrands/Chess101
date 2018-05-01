@@ -843,9 +843,9 @@ class Board(SampleBase):
             if (cont == "n"):
                 return
             else:
-                R = int (raw_input("Enter an r value: "))
-                G = int (raw_input("Enter an g value: "))
-                B = int (raw_input("Enter an b value: "))
+                R = int (input("Enter an r value: "))
+                G = int (input("Enter an g value: "))
+                B = int (input("Enter an b value: "))
 
                 canvas = self.matrix.CreateFrameCanvas()
 
