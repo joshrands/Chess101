@@ -857,6 +857,8 @@ class Board(SampleBase):
         team1Found = False
         team2Found = False
 
+        canvas = self.matrix.SwapOnVSync(canvas)
+
         while not (team1Found and team2Found):
             self.master.readData()
             for i in range(0, 8):
@@ -886,7 +888,7 @@ class Board(SampleBase):
                 for i in range(0, 8):
                     if (self.master.getCellState(5, i) == 0):
                         self.lightCell(canvas, 5, i, self.teamArray[i].r, self.teamArray[i].g, self.teamArray[i].b)
-        canvas = self.matrix.SwapOnVSync(canvas)
+            canvas = self.matrix.SwapOnVSync(canvas)
 
     def addNodes(self, currentNode, team, depth):
         #print ("depth remaining: " + str(depth))
