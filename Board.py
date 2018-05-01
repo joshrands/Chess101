@@ -820,9 +820,10 @@ class Board(SampleBase):
                 if (piece != None):
                     self.lightCell(canvas, piece.row, piece.col, piece.team.r, piece.team.g, piece.team.b)
         canvas = self.matrix.SwapOnVSync(canvas)
+        
     def addNodes(self, currentNode, team, depth):
         #print ("depth remaining: " + str(depth))
-
+        self.drawBoard(currentNode.boardState)
         #if the depth is 0, we've reached the "bottom" of the tree (as far as we initially told it to go)
         if (depth == 0):
             return

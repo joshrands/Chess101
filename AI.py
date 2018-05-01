@@ -1,14 +1,9 @@
 from Tree import Tree
-from samplebase import SampleBase
-import time
-import random
-import copy
 
-class AI(SampleBase):
+class AI():
     # print utility value of root node (assuming it is max)
     # print names of all nodes visited during search
-    def __init__(self, game_tree, team, *args, **kwargs):
-        super(AI, self).__init__(*args, **kwargs)
+    def __init__(self, game_tree, team):
         self.game_tree = game_tree  # Whole tree (only the root node, but this node will contain the children)
         self.team = team
         return
@@ -22,14 +17,6 @@ class AI(SampleBase):
         successors = self.getSuccessors(self.game_tree)
         best_state = None
         for state in successors: # for every node..
-            canvas = self.matrix.CreateFrameCanvas()
-            for row in state:
-                for piece in row:
-                    if (piece != None):
-                        self.lightCell(canvas, piece.row, piece.col, piece.team.r, piece.team.g, piece.team.b)
-            canvas = self.matrix.SwapOnVSync(canvas)
-
-
             value = self.min_value(state, best_val, beta)
             if value > best_val:
                 best_val = value
