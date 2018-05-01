@@ -724,6 +724,11 @@ class Board(SampleBase):
         # move piece from bestMove.oldCell to bestMove.newCell
         state = 0
 
+        canvas = self.matrix.CreateFrameCanvas()
+        self.lightCheckerTown(canvas)
+        canvas = self.matrix.SwapOnVSync(canvas)
+        self.detectMismatch(canvas)
+
         if (self.grid[bestMove.newCell.row][bestMove.newCell.col] == None):
             while state == 0:
                 self.master.readData()
@@ -748,8 +753,6 @@ class Board(SampleBase):
                 self.lightCheckerTown(canvas)
                 canvas = self.matrix.SwapOnVSync(canvas)
 
-                self.detectMismatch(canvas)
-
                 state = self.master.getCellState(bestMove.newCell.row, bestMove.newCell.col)
         else:
             # detect removal of other piece and then move of this guy
@@ -764,8 +767,6 @@ class Board(SampleBase):
                 #self.lightCell(canvas, bestMove.newCell.row, bestMove.newCell.col, team.r, team.g, team.b)
 
                 canvas = self.matrix.SwapOnVSync(canvas)
-
-                self.detectMismatch(canvas)
 
                 state = self.master.getCellState(bestMove.oldCell.row, bestMove.oldCell.col)
 
@@ -782,8 +783,6 @@ class Board(SampleBase):
 
                 canvas = self.matrix.SwapOnVSync(canvas)
 
-                self.detectMismatch(canvas)
-
                 state = self.master.getCellState(bestMove.newCell.row, bestMove.newCell.col)
             print("State Change to:", state)
             while state == 1:
@@ -797,8 +796,6 @@ class Board(SampleBase):
                 canvas = self.matrix.CreateFrameCanvas()
                 self.lightCheckerTown(canvas)
                 canvas = self.matrix.SwapOnVSync(canvas)
-
-                self.detectMismatch(canvas)
 
                 state = self.master.getCellState(bestMove.newCell.row, bestMove.newCell.col)
             print("State Change to:", state)
