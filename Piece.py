@@ -16,7 +16,7 @@ class Piece:
 
     # abstract method calcTargets
     def isThisTheKing(self, board, row, col):
-        if (board[row][col].isKing = True):
+        if (board[row][col].isKing == True):
             return 10 
         else:
             return 0
