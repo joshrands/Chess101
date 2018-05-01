@@ -722,18 +722,30 @@ class Board(SampleBase):
         print ("the best move involves moving the piece at square " + str(bestMove.oldCell.row) + str(bestMove.oldCell.col) + " to " + str(bestMove.newCell.row) + str(bestMove.newCell.col))
 
         # move piece from bestMove.oldCell to bestMove.newCell
-        state = 1
+        state = 0
 
         if (self.grid[bestMove.newCell.row][bestMove.newCell.col] == None):
-            while state == 1:
+            while state == 0:
                 self.master.readData()
 
                 canvas = self.matrix.CreateFrameCanvas()
             #self.lightPieces(canvas, self.teamL)
                 self.lightCheckerTown(canvas)
                 self.lightCell(canvas, bestMove.oldCell.row, bestMove.oldCell.col, team.r, team.g, team.b)
-                self.lightCell(canvas, bestMove.newCell.row, bestMove.newCell.col, team.r, team.g, team.b)
 
+                canvas = self.matrix.SwapOnVSync(canvas)
+
+                state = self.master.getCellState(bestMove.oldCell.row, bestMove.oldCell.col)
+            while state == 1:
+                self.master.readData()
+
+                canvas = self.matrix.CreateFrameCanvas()
+                self.lightCheckerTown(canvas)
+                self.lightCell(canvas, bestMove.newCell.row, bestMove.newCell.col, team.r, team.g, team.b)
+                canvas = self.matrix.SwapOnVSync(canvas)
+
+                canvas = self.matrix.CreateFrameCanvas()
+                self.lightCheckerTown(canvas)
                 canvas = self.matrix.SwapOnVSync(canvas)
 
                 state = self.master.getCellState(bestMove.newCell.row, bestMove.newCell.col)
@@ -747,21 +759,35 @@ class Board(SampleBase):
             #self.lightPieces(canvas, self.teamL)
                 self.lightCheckerTown(canvas)
                 self.lightCell(canvas, bestMove.oldCell.row, bestMove.oldCell.col, team.r, team.g, team.b)
-                self.lightCell(canvas, bestMove.newCell.row, bestMove.newCell.col, team.r, team.g, team.b)
+                #self.lightCell(canvas, bestMove.newCell.row, bestMove.newCell.col, team.r, team.g, team.b)
 
                 canvas = self.matrix.SwapOnVSync(canvas)
 
-                state = self.master.getCellState(bestMove.newCell.row, bestMove.newCell.col)
+                state = self.master.getCellState(bestMove.oldCell.row, bestMove.oldCell.col)
 
-            while state == 1:
+            state = 0
+            while state == 0:
                 self.master.readData()
 
                 canvas = self.matrix.CreateFrameCanvas()
             #self.lightPieces(canvas, self.teamL)
                 self.lightCheckerTown(canvas)
-                self.lightCell(canvas, bestMove.oldCell.row, bestMove.oldCell.col, team.r, team.g, team.b)
+                #self.lightCell(canvas, bestMove.oldCell.row, bestMove.oldCell.col, team.r, team.g, team.b)
                 self.lightCell(canvas, bestMove.newCell.row, bestMove.newCell.col, team.r, team.g, team.b)
 
+                canvas = self.matrix.SwapOnVSync(canvas)
+
+                state = self.master.getCellState(bestMove.newCell.row, bestMove.newCell.col)
+            while state == 1:
+                self.master.readData()
+
+                canvas = self.matrix.CreateFrameCanvas()
+                self.lightCheckerTown(canvas)
+                self.lightCell(canvas, bestMove.newCell.row, bestMove.newCell.col, team.r, team.g, team.b)
+                canvas = self.matrix.SwapOnVSync(canvas)
+
+                canvas = self.matrix.CreateFrameCanvas()
+                self.lightCheckerTown(canvas)
                 canvas = self.matrix.SwapOnVSync(canvas)
 
                 state = self.master.getCellState(bestMove.newCell.row, bestMove.newCell.col)
