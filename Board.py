@@ -320,13 +320,13 @@ class Board(SampleBase):
             self.lightCell(canvas, x, y, team.r, team.g, team.b)
             canvas = self.matrix.SwapOnVSync(canvas)
 
-    def sethVictory(self, canvas, team):
+    def sethVictoryOld(self, canvas, team):
         if (team == self.teamL):
             team = self.teamR
         else:
             team = self.teamL
         for i in range(0, 10000):
-            time.sleep(.01)
+            time.sleep(.001)
             canvas = self.matrix.CreateFrameCanvas()
             for m in range(0, 32):
                 for z in range(0, 4):
@@ -339,8 +339,29 @@ class Board(SampleBase):
                 for k in range(4, 28):
                     #x = random.randint(0, 29) + 1
                     canvas.SetPixel(j, k, random.randint(0, 255), random.randint(0, 255), random.randint(0, 255))
-                    time.sleep(.0001)
+                    #time.sleep(.0001)
             canvas = self.matrix.SwapOnVSync(canvas)
+
+    def sethVictory(self, canvas, team):
+        if (team == self.teamL):
+            team = self.teamR
+        else:
+            team = self.teamL
+        for i in range(0, 10000):
+            time.sleep(.001)
+            canvas = self.matrix.CreateFrameCanvas()
+            for m in range(0, 8):
+                self.lightCell(canvas, m, 0, team.r, team.g, team.b)
+                self.lightCell(canvas, 0, m, team.r, team.g, team.b)
+                self.lightCell(canvas, m, 7, team.r, team.g, team.b)
+                self.lightCell(canvas, 7, m, team.r, team.g, team.b)
+            for j in range(1, 7):
+                for k in range(1, 7):
+                    #x = random.randint(0, 29) + 1
+                    self.lightCell(canvas, j, k, random.randint(0, 255), random.randint(0, 255), random.randint(0, 255))
+                    #time.sleep(.0001)
+            canvas = self.matrix.SwapOnVSync(canvas)
+
 
 
     def doTurn(self, canvas, team):
