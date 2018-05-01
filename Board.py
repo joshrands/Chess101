@@ -649,7 +649,7 @@ class Board(SampleBase):
         for r in range(8):
             print(grid[r])
 
-    def computerMove(self, team, canvas, depth=3):
+    def computerMove(self, team, canvas, depth=2):
         check = False
         checkMate = False
         kingRow = -1
