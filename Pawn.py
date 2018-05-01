@@ -1,6 +1,7 @@
 #child class of Piece that represents a Pawn
 from Piece import Piece
 from Cell import Cell
+from Queen import Queen
 
 class Pawn(Piece):
     def __init__(self, row, col, team):
