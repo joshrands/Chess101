@@ -39,7 +39,7 @@ class Tree(object):
 
 
         total = whiteCount-blackCount
-        if (team.r == 255):
+        if (team.r == self.teamL.r):
             total = -total
        #    will be used for testing once we integrate AI into actual game
        #    print("Blacks move")
