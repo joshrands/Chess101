@@ -50,6 +50,9 @@ class Board(SampleBase):
         print("Running game...")
         self.colorPicker()
 
+        self.computerPlayer = False
+        self.computerIsWhite = False
+
         computer = input("Would you like to play against a computer? (y/n)")
         if (computer == "y" or computer == "Y"):
             self.computerPlayer = True
@@ -68,9 +71,6 @@ class Board(SampleBase):
         self.interactiveSetup(offset_canvas, self.teamL)
 
         self.initializeGameBoard()
-
-        self.computerPlayer = False
-        self.computerIsWhite = False
 
         while True:
             offset_canvas = self.matrix.CreateFrameCanvas()
@@ -640,20 +640,16 @@ class Board(SampleBase):
         self.grid[7][4] = King(7, 4, self.teamL)
 
     def createPlayers(self):
-        if (self.computerPlayer and not self.computerIsWhite):
-            nameR = input("Enter player 1 name White): ")
-            print("Enter player 1 colors (rgb): ")
-            self.teamR.setName(nameR)
+        if (self.computerPlayer):
+            if (self.computerIsWhite):
+                self.teamR.setName("Computer")
+                self.teamL.setName("Human")
+            else:
+                self.teamL.setName("Computer")
+                self.teamR.setName("Human")
         else:
-            self.teamR.setName("Computer")
-        #self.teamR.setColor()
-
-        if (self.computerPlayer and self.computerIsWhite):
-            nameL = input("Enter player 2 name (Black): ")
-            print("Enter player 2 colors (rgb): ")
-            self.teamL.setName(nameL)
-        else:
-            self.teamL.setName("Computer")
+            self.teamL.setName("Player 1")
+            self.teamR.setName("Player 2")
         #self.teamL.setColor()
 
     def lightCell(self, canvas, x, y, r, g, b):
