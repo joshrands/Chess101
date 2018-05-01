@@ -6,4 +6,4 @@ def playSound(filename):
     sound = pygame.mixer.Sound(filename)
     sound.play()
 
-playSound("./test.wav")
+playSound('./test.wav')
