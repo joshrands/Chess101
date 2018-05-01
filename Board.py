@@ -549,7 +549,7 @@ class Board(SampleBase):
                             self.grid[row][col] = None
 
                     if (validMove == False):
-                        #print("Invalid target.")
+                        print("Invalid target.")
                     else:
                         canvas = self.matrix.CreateFrameCanvas()
                         self.lightCheckerTown(canvas)
