@@ -837,12 +837,11 @@ class Board(SampleBase):
             self.checkerBrightnessDir = self.checkerBrightnessDir * -1
             self.checkerBrightness = 255
 
-
+        self.chooseLightCheckerTown(canvas)
         for row in boardState:
             for piece in row:
                 if (piece != None):
                     self.lightCell(canvas, piece.row, piece.col, piece.team.r, piece.team.g, piece.team.b)
-        self.chooseLightCheckerTown(canvas)
         canvas = self.matrix.SwapOnVSync(canvas)
 
     def addNodes(self, currentNode, team, depth):
