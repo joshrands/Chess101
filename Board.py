@@ -443,7 +443,7 @@ class Board(SampleBase):
             elif (check):
                 checkMate = True
 
-        checkMate = False
+        #checkMate = False
         if (checkMate):
             #print("Check mate!")
             self.sethVictory(canvas, team)
@@ -941,7 +941,7 @@ class Board(SampleBase):
         if (depth == 0):
             return None
 
-        if (team == self.teamL):
+        if (team.r == self.teamL.r):
             team = self.teamR
         else:
             team = self.teamL
