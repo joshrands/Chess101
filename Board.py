@@ -537,7 +537,7 @@ class Board(SampleBase):
                                     self.grid[rookLocation.row][rookLocation.col] = None
                                     self.grid[rookTarget.row][rookTarget.col].move(rookTarget.row, rookTarget.col, self.grid)
                             else:
-                                self.grid[targetRow][targetCol].move(targetRow, targetCol,self.grid, self.grid)
+                                self.grid[targetRow][targetCol].move(targetRow, targetCol,self.grid)
 
                             self.grid[row][col] = None
 
