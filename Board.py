@@ -912,12 +912,41 @@ class Board(SampleBase):
         #change how the pieces are grabbed
         # checkmate?
         checkMate = True
+
+        piecesWithMoves = 0
+
+        for piece in self.getTeamPieces(team, currentNode.boardState):
+
+            if (piece != None):
+                #increment number of moves
+                #count += len(piece.getTargets());
+                if (isinstance(piece, King) and piece.team == team):
+                    check = piece.calcTargets(currentNode.boardState)
+                    if (len(piece.getTargets()) > 0):
+                        piecesWithMoves = piecesWithMoves + 1
+                    kingRow = piece.row
+                    kingCol = piece.col
+
         for piece in self.getTeamPieces(team, currentNode.boardState):
             #TODO Parameter for this guy?
             #print("found a piece")
-            piece.calcTargets(currentNode.boardState)
-            if len(piece.targets) > 0:
-                print("setting checkmate false")
+            #adding all of the code that makes checkmate checking accurate
+
+            #piece.calcTargets(currentNode.boardState)
+            #if len(piece.targets) > 0:
+            #    checkMate = False
+
+            if (isinstance(piece, Pawn) and piece.team == team):
+                piece.enPassantable = False
+            if (piece != None and not isinstance(piece, King)):
+                piece.calcTargets(currentNode.boardState)
+                if (check):
+                    piece.skyFall(currentNode.boardState[kingRow][kingCol])
+                #print pieces that can be moved
+                if (len(piece.getTargets()) > 0 and piece.team == team):
+                    piecesWithMoves = piecesWithMoves + 1
+
+            if (piecesWithMoves > 0):
                 checkMate = False
 
             for target in piece.targets:
