@@ -724,12 +724,12 @@ class Board(SampleBase):
         # move piece from bestMove.oldCell to bestMove.newCell
         state = 0
 
-        if (self.grid[bestMove.newCell.row][bestMove.newCell.col] == None):
-            canvas = self.matrix.CreateFrameCanvas()
-            self.lightCheckerTown(canvas)
-            canvas = self.matrix.SwapOnVSync(canvas)
-            self.detectMismatch(canvas)
+        canvas = self.matrix.CreateFrameCanvas()
+        self.lightCheckerTown(canvas)
+        canvas = self.matrix.SwapOnVSync(canvas)
+        self.detectMismatch(canvas)
 
+        if (self.grid[bestMove.newCell.row][bestMove.newCell.col] == None):
             while state == 0:
                 self.master.readData()
 
