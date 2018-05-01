@@ -35,12 +35,12 @@ class Board(SampleBase):
         self.teamArray = []
         self.teamArray.append(Team(64, 180, 232)) #Blue
         self.teamArray.append(Team(190, 25, 255)) #Purple
-        self.teamArray.append(Team(255, 220, 0)) #Yellow
+        self.teamArray.append(Team(254, 220, 0)) #Yellow
         self.teamArray.append(Team(250, 125, 125)) #Pink
         self.teamArray.append(Team(25, 255, 35)) #Green
         self.teamArray.append(Team(245, 125, 0)) #Orange
         self.teamArray.append(Team(0, 25, 230)) #Dark Blue
-        self.teamArray.append(Team(26, 225, 180)) #Cyan
+        self.teamArray.append(Team(28, 225, 180)) #Cyan
 
         for row in range(0, 8):
             self.grid.append([None, None, None, None, None, None, None, None])
@@ -902,6 +902,7 @@ class Board(SampleBase):
                     self.lightCell(canvas, 2, i, self.teamArray[i].r, self.teamArray[i].g, self.teamArray[i].b) # colorpicker
                     self.lightCell(canvas, 5, i, self.teamArray[i].r, self.teamArray[i].g, self.teamArray[i].b) # colorpicker
                 canvas = self.matrix.SwapOnVSync(canvas)
+        self.teamR.r = self.teamR.r + 1
 
 
     def addNodes(self, currentNode, team, depth):
