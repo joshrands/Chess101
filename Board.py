@@ -769,7 +769,7 @@ class Board(SampleBase):
             state = 0
             while state == 0:
                 self.master.readData()
-
+                print("Hello")
                 canvas = self.matrix.CreateFrameCanvas()
             #self.lightPieces(canvas, self.teamL)
                 self.lightCheckerTown(canvas)
