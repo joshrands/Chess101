@@ -56,9 +56,7 @@ class Board(SampleBase):
         computer = input("Would you like to play against a computer? (y/n)")
         if (computer == "y" or computer == "Y"):
             self.computerPlayer = True
-            computerColor = input("Would you like the computer to be white or black? (w/b)")
-            if (computerColor == "w" or computerColor == "W"):
-                self.computerIsWhite = True
+            self.computerIsWhite = False
 
         while True:
             offset_canvas = self.matrix.CreateFrameCanvas()
@@ -407,7 +405,7 @@ class Board(SampleBase):
             for piece in row:
                 if (isinstance(piece, Pawn) and piece.team == team):
                     piece.enPassantable = False
-                elif (piece != None and not (isinstance(piece, King))):
+                if (piece != None and not (isinstance(piece, King))):
                     piece.calcTargets(self.grid)
                     if (check):
                         piece.skyFall(self.grid[kingRow][kingCol])
@@ -686,7 +684,7 @@ class Board(SampleBase):
             for piece in row:
                 if (isinstance(piece, Pawn) and piece.team == team):
                     piece.enPassantable = False
-                elif (piece != None and not isinstance(piece, King)):
+                if (piece != None and not isinstance(piece, King)):
                     piece.calcTargets(self.grid)
                     if (check):
                         piece.skyFall(self.grid[kingRow][kingCol])
