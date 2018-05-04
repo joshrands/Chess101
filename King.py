@@ -59,12 +59,13 @@ class King(Piece):
         #check amIGonnaDie() with a board and position changed
         targetsToRemove = []
 
-        castleLeft = False;
-        castleLeftStep = True;
-        castleRight = False;
-        castleRightStep = True;
+        castleLeft = False
+        castleLeftStep = True
+        castleRight = False
+        castleRightStep = True
         castleLeftCell = Cell(-1, -1)
         castleRightCell = Cell(-1, -1)
+
 
         for cell in self.targets:
             if (cell.row == oldRow and cell.col == (oldCol - 2)):
@@ -97,20 +98,21 @@ class King(Piece):
             self.row = oldRow
             self.col = oldCol
 
-        if (castleLeft == True and castleLeftStep == False):
+        #re-run amIGonnaDie with the King's original values
+        useless1, useless2 = self.amIGonnaDie(checkerTown)
+        inCheck = False
+        if (useless1 != -1 and useless2 != -1):
+            inCheck = True
+
+        if ((castleLeft == True and castleLeftStep == False) or inCheck):
             self.targets.remove(castleLeftCell)
-        if (castleRight == True and castleRightStep == False):
+        if ((castleRight == True and castleRightStep == False) or inCheck)):
             self.targets.remove(castleRightCell)
         #now iterate through targetsToRemove and remove them from targets
         for toRemove in targetsToRemove:
             self.targets.remove(toRemove)
 
-        #re-run amIGonnaDie with the King's original values
-        useless1, useless2 = self.amIGonnaDie(checkerTown)
-        if (useless1 != -1 and useless2 != -1):
-            return True
-        else:
-            return False
+        return inCheck
 
     def getValue(self, board):
         return 1000
