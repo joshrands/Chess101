@@ -106,7 +106,7 @@ class King(Piece):
 
         if ((castleLeft == True and castleLeftStep == False) or inCheck):
             self.targets.remove(castleLeftCell)
-        if ((castleRight == True and castleRightStep == False) or inCheck)):
+        if ((castleRight == True and castleRightStep == False) or inCheck):
             self.targets.remove(castleRightCell)
         #now iterate through targetsToRemove and remove them from targets
         for toRemove in targetsToRemove:

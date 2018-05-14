@@ -373,7 +373,7 @@ class Board(SampleBase):
         else:
             team = self.teamL
         for i in range(0, 10000):
-            time.sleep(.1)
+            time.sleep(.001)
             canvas = self.matrix.CreateFrameCanvas()
             for m in range(0, 8):
                 self.lightCell(canvas, m, 0, team.r, team.g, team.b)
