@@ -104,9 +104,9 @@ class King(Piece):
         if (useless1 != -1 and useless2 != -1):
             inCheck = True
 
-        if ((castleLeft == True and castleLeftStep == False) or inCheck):
+        if (castleLeft == True and (castleLeftStep == False or inCheck)):
             self.targets.remove(castleLeftCell)
-        if ((castleRight == True and castleRightStep == False) or inCheck):
+        if (castleRight == True and (castleRightStep == False or inCheck)):
             self.targets.remove(castleRightCell)
         #now iterate through targetsToRemove and remove them from targets
         for toRemove in targetsToRemove:
