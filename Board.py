@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-from rgbmatrix import RGBMatrix, RGBMatrixOptions
+from samplebase import SampleBase
 from Team import Team
 from Pawn import Pawn
 from Bishop import Bishop
