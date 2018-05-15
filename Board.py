@@ -98,6 +98,8 @@ class Board(SampleBase):
             offset_canvas = self.matrix.SwapOnVSync(offset_canvas)
             del self.matrix
             self.matrix = loopMatrix
+        del self.matrix
+        self.matrix = tempMatrix
 
     ### Member Functions ###
     def lightPath(self, canvas, startRow, startCol, endRow, endCol):
@@ -163,6 +165,7 @@ class Board(SampleBase):
             self.detectPawns(canvas, team, 6)
 
     def detectMismatch(self, canvas):
+        tempMatrix = self.matrix
         # read data into master
         self.master.readData()
         # set color of piece that needs correction
@@ -224,6 +227,8 @@ class Board(SampleBase):
                     time.sleep(0.01)
             canvas = self.matrix.SwapOnVSync(canvas)
 
+        del self.matrix
+        self.matrix = tempMatrix
         # mismatch complete return true
         return True
 
@@ -247,6 +252,7 @@ class Board(SampleBase):
         #print("Pawns placed.")
 
     def detectPiece(self, canvas, team, piece, row, col):
+        tempMatrix = self.matrix
         # setup teamR
         #print("Place " + piece + " here:")
         # light up cell white
@@ -262,6 +268,8 @@ class Board(SampleBase):
         self.lightCell(canvas, row, col, team.r, team.g, team.b) # light team color
         # just added
         #canvas = self.matrix.SwapOnVSync(canvas)
+        del self.matrix
+        self.matrix = tempMatrix
 
     # detect lift off
     def detectLiftOff(self, team):
@@ -297,6 +305,7 @@ class Board(SampleBase):
         return validPieces
 
     def detectLanding(self, canvas, piece):
+        tempMatrix = self.matrix
         self.master.readData()
         targets = piece.targets
         # piece is piece that is moving
@@ -337,6 +346,8 @@ class Board(SampleBase):
                 valid = True
                 activatedTarget = cell
 
+        del self.matrix
+        self.matrix = tempMatrix
         # return true if valid target
         return valid, activatedTarget
 
@@ -372,11 +383,13 @@ class Board(SampleBase):
             canvas = self.matrix.SwapOnVSync(canvas)
 
     def sethVictory(self, canvas, team):
+        tempMatrix = self.matrix
         if (team == self.teamL):
             team = self.teamR
         else:
             team = self.teamL
-        for i in range(0, 10000):
+        for i in range(0, 100000):
+            print(i)
             time.sleep(.001)
             canvas = self.matrix.CreateFrameCanvas()
             for m in range(0, 8):
@@ -390,8 +403,8 @@ class Board(SampleBase):
                     self.lightCell(canvas, j, k, random.randint(0, 255), random.randint(0, 255), random.randint(0, 255))
                     #time.sleep(.0001)
             canvas = self.matrix.SwapOnVSync(canvas)
-
-
+            del self.matrix
+            self.matrix = tempMatrix
 
     def doTurn(self, canvas, team):
         # disable enPassantable
