@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-from samplebase import SampleBase
+from rgbmatrix import RGBMatrix, RGBMatrixOptions
 from Team import Team
 from Pawn import Pawn
 from Bishop import Bishop
@@ -15,10 +15,35 @@ from Tree import Tree
 from AI import AI
 import copy
 
-class Board(SampleBase):
+class Board():
 
     def __init__(self, *args, **kwargs):
         super(Board, self).__init__(*args, **kwargs)
+
+        #options for matrix
+        options = RGBMatrixOptions()
+
+        options.hardware_mapping = 'regular'
+        options.rows = 32
+        options.cols = 32
+        options.hardware_mapping = self.args.led_gpio_mapping
+        options.rows = self.args.led_rows
+        options.cols = self.args.led_cols
+        options.chain_length = self.args.led_chain
+        options.parallel = self.args.led_parallel
+        options.row_address_type = self.args.led_row_addr_type
+        options.multiplexing = self.args.led_multiplexing
+        options.pwm_bits = self.args.led_pwm_bits
+        options.brightness = self.args.led_brightness
+        options.pwm_lsb_nanoseconds = self.args.led_pwm_lsb_nanoseconds
+        options.led_rgb_sequence = self.args.led_rgb_sequence
+        options.show_refresh_rate = 1
+        options.gpio_slowdown = self.args.led_slowdown_gpio
+        options.disable_hardware_pulsing = True
+
+        self.matrix = RGBMatrix(options = options)
+
+
         self.teamR = Team(64, 180, 232)
         self.teamL = Team(255, 140, 0)
         #self.teamR = Team(0, 153, 76)
@@ -383,7 +408,7 @@ class Board(SampleBase):
             canvas = self.matrix.SwapOnVSync(canvas)
 
     def sethVictory(self, canvas, team):
-        tempMatrix = self.matrix
+        tempMatrix = copy.deepcopy(self.matrix)
         if (team == self.teamL):
             team = self.teamR
         else:
@@ -403,8 +428,9 @@ class Board(SampleBase):
                     self.lightCell(canvas, j, k, random.randint(0, 255), random.randint(0, 255), random.randint(0, 255))
                     #time.sleep(.0001)
             canvas = self.matrix.SwapOnVSync(canvas)
-            del self.matrix
+            delMatrix = self.matrix
             self.matrix = tempMatrix
+            del delMatrix
 
     def doTurn(self, canvas, team):
         # disable enPassantable
