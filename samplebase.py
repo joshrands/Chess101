@@ -42,7 +42,7 @@ class SampleBase(object):
         self.options.rows = 32
         self.options.cols = 32
 
-        self.options.drop_priveleges = False
+        self.options.drop_privileges = False
 
         if self.args.led_gpio_mapping != None:
             self.options.hardware_mapping = self.args.led_gpio_mapping
