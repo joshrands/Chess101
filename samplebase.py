@@ -63,7 +63,8 @@ class SampleBase(object):
           options.disable_hardware_pulsing = True
 
         self.matrix = RGBMatrix(options = options)
-
+        self.tempMatrix = RGBMatrix(options = options)
+        
         try:
             # Start loop
             print("Press CTRL-C to stop sample")

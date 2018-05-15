@@ -386,8 +386,7 @@ class Board(SampleBase):
             canvas = self.matrix.SwapOnVSync(canvas)
 
     def sethVictory(self, canvas, team):
-        tempMatrix = RGBMatrix()
-        tempMatrix = self.matrix
+        self.tempMatrix = self.matrix
         if (team == self.teamL):
             team = self.teamR
         else:
@@ -408,7 +407,7 @@ class Board(SampleBase):
                     #time.sleep(.0001)
             canvas = self.matrix.SwapOnVSync(canvas)
             delMatrix = self.matrix
-            self.matrix = tempMatrix
+            self.matrix = self.tempMatrix
             del delMatrix
 
     def doTurn(self, canvas, team):
