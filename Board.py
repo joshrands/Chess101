@@ -385,7 +385,7 @@ class Board(SampleBase):
             canvas = self.matrix.SwapOnVSync(canvas)
 
     def sethVictory(self, canvas, team):
-        tempMatrix = copy.deepcopy(self.matrix)
+        tempMatrix = RGBMatrix()
         if (team == self.teamL):
             team = self.teamR
         else:
