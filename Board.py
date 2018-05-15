@@ -386,6 +386,8 @@ class Board(SampleBase):
             canvas = self.matrix.SwapOnVSync(canvas)
 
     def sethVictory(self, canvas, team):
+        tempMatrix = RGBMatrix(options = self.options)
+        tempMatrix = self.matrix
         if (team == self.teamL):
             team = self.teamR
         else:
@@ -406,7 +408,8 @@ class Board(SampleBase):
                     #time.sleep(.0001)
             canvas = self.matrix.SwapOnVSync(canvas)
             del self.matrix
-            self.matrix = RGBMatrix(options = self.options)
+            self.matrix = tempMatrix
+
 
     def doTurn(self, canvas, team):
         # disable enPassantable
