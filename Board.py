@@ -51,6 +51,8 @@ class Board(SampleBase):
     # RUN GAME
     def run(self):
         print("Running game...")
+        self.canvas = self.matrix.CreateFrameCanvas()
+
         self.colorPicker()
 
         self.computerPlayer = False
@@ -867,7 +869,7 @@ class Board(SampleBase):
         canvas = self.matrix.SwapOnVSync(canvas)
 
     def colorPicker(self):
-        canvas = self.matrix.CreateFrameCanvas()
+        self.canvas.Clear()
 
         for i in range (0, 8):
             self.lightCell(canvas, 2, i, self.teamArray[i].r, self.teamArray[i].g, self.teamArray[i].b) # colorpicker
@@ -876,7 +878,7 @@ class Board(SampleBase):
         team1Found = False
         team2Found = False
 
-        canvas = self.matrix.SwapOnVSync(canvas)
+        self.canvas = self.matrix.SwapOnVSync(self.canvas)
 
         while not (team1Found and team2Found):
             team1Found = False
@@ -894,34 +896,34 @@ class Board(SampleBase):
                     self.teamL.g = self.teamArray[i].g
                     self.teamL.b = self.teamArray[i].b
             #canvas = self.matrix.CreateFrameCanvas()
-            canvas.Clear()
+            self.canvas.Clear()
             if (team1Found and team2Found):
                 for i in range(0, 8):
                     if (self.master.getCellState(2, i) == 0):
-                        self.lightCell(canvas, 2, i, self.teamArray[i].r, self.teamArray[i].g, self.teamArray[i].b)
+                        self.lightCell(self.canvas, 2, i, self.teamArray[i].r, self.teamArray[i].g, self.teamArray[i].b)
                     if (self.master.getCellState(5, i) == 0):
-                        self.lightCell(canvas, 5, i, self.teamArray[i].r, self.teamArray[i].g, self.teamArray[i].b)
-                canvas = self.matrix.SwapOnVSync(canvas)
+                        self.lightCell(self.canvas, 5, i, self.teamArray[i].r, self.teamArray[i].g, self.teamArray[i].b)
+                self.canvas = self.matrix.SwapOnVSync(self.canvas)
                 time.sleep(2)
             elif (team1Found):
                 for i in range(0, 8):
                     if (self.master.getCellState(2, i) == 0):
-                        self.lightCell(canvas, 2, i, self.teamArray[i].r, self.teamArray[i].g, self.teamArray[i].b)
+                        self.lightCell(self.canvas, 2, i, self.teamArray[i].r, self.teamArray[i].g, self.teamArray[i].b)
                 for i in range (0, 8):
-                    self.lightCell(canvas, 5, i, self.teamArray[i].r, self.teamArray[i].g, self.teamArray[i].b) # colorpicker
-                canvas = self.matrix.SwapOnVSync(canvas)
+                    self.lightCell(self.canvas, 5, i, self.teamArray[i].r, self.teamArray[i].g, self.teamArray[i].b) # colorpicker
+                self.canvas = self.matrix.SwapOnVSync(self.canvas)
             elif (team2Found):
                 for i in range(0, 8):
                     if (self.master.getCellState(5, i) == 0):
-                        self.lightCell(canvas, 5, i, self.teamArray[i].r, self.teamArray[i].g, self.teamArray[i].b)
+                        self.lightCell(self.canvas, 5, i, self.teamArray[i].r, self.teamArray[i].g, self.teamArray[i].b)
                 for i in range (0, 8):
-                    self.lightCell(canvas, 2, i, self.teamArray[i].r, self.teamArray[i].g, self.teamArray[i].b) # colorpicker
-                canvas = self.matrix.SwapOnVSync(canvas)
+                    self.lightCell(self.canvas, 2, i, self.teamArray[i].r, self.teamArray[i].g, self.teamArray[i].b) # colorpicker
+                self.canvas = self.matrix.SwapOnVSync(self.canvas)
             else:
                 for i in range (0, 8):
-                    self.lightCell(canvas, 2, i, self.teamArray[i].r, self.teamArray[i].g, self.teamArray[i].b) # colorpicker
-                    self.lightCell(canvas, 5, i, self.teamArray[i].r, self.teamArray[i].g, self.teamArray[i].b) # colorpicker
-                canvas = self.matrix.SwapOnVSync(canvas)
+                    self.lightCell(self.canvas, 2, i, self.teamArray[i].r, self.teamArray[i].g, self.teamArray[i].b) # colorpicker
+                    self.lightCell(self.canvas, 5, i, self.teamArray[i].r, self.teamArray[i].g, self.teamArray[i].b) # colorpicker
+                self.canvas = self.matrix.SwapOnVSync(self.canvas)
         self.teamR.r = self.teamR.r + 1
 
 
