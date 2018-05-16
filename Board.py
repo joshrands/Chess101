@@ -50,7 +50,6 @@ class Board(SampleBase):
 
     # RUN GAME
     def run(self):
-        tempMatrix = self.matrix
         print("Running game...")
         self.colorPicker()
 
@@ -77,7 +76,6 @@ class Board(SampleBase):
         self.initializeGameBoard()
 
         while True:
-            loopMatrix = self.matrix
             offset_canvas = self.matrix.CreateFrameCanvas()
             #self.lightPieces(offset_canvas, self.teamR)
             self.lightCheckerTown(offset_canvas)
@@ -100,9 +98,9 @@ class Board(SampleBase):
 
             offset_canvas = self.matrix.SwapOnVSync(offset_canvas)
             del self.matrix
-            self.matrix = loopMatrix
+            self.matrix = RGBMatrix(options = self.options)
         del self.matrix
-        self.matrix = tempMatrix
+        self.matrix = RGBMatrix(options = self.options)
 
     ### Member Functions ###
     def lightPath(self, canvas, startRow, startCol, endRow, endCol):
