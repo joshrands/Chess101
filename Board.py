@@ -457,7 +457,8 @@ class Board(SampleBase):
             #stalemate
             if (not check):
                 while True:
-                    canvas = self.matrix.CreateFrameCanvas()
+                    #canvas = self.matrix.CreateFrameCanvas()
+                    canvas.Clear()
                     for i in range(0, 4):
                         for j in range(0, 8):
                             self.lightCell(canvas, i, j, self.teamR.r, self.teamR.g, self.teamR.b)
@@ -487,7 +488,8 @@ class Board(SampleBase):
 
         while (move == False):
 
-            canvas = self.matrix.CreateFrameCanvas()
+            #canvas = self.matrix.CreateFrameCanvas()
+            canvas.Clear()
 
             # move a piece!
 #            row = int(input("Enter row for desired piece: "))
@@ -529,7 +531,8 @@ class Board(SampleBase):
                     move = False
                     validMove = True # jank but whatever it'll work
                     #self.clearBoard(canvas)
-                    canvas = self.matrix.CreateFrameCanvas()
+                    #canvas = self.matrix.CreateFrameCanvas()
+                    canvas.Clear()
                     self.lightCheckerTown(canvas)
                     #self.lightPieces(canvas, self.teamR)
                     canvas = self.matrix.SwapOnVSync(canvas)
@@ -557,7 +560,8 @@ class Board(SampleBase):
                                         time.sleep(0.4)
                                         # fade in red
                                         for r in range(201):
-                                            canvas = self.matrix.CreateFrameCanvas()
+                                            #canvas = self.matrix.CreateFrameCanvas()
+                                            canvas.Clear()
                                             self.lightCheckerTown(canvas)
                                             self.lightCell(canvas, enemy.row, enemy.col, 50+r, 0, 0)
                                             canvas = self.matrix.SwapOnVSync(canvas)
@@ -567,7 +571,8 @@ class Board(SampleBase):
                                         time.sleep(0.4)
                                         # fade out red
                                         for r in range(201):
-                                            canvas = self.matrix.CreateFrameCanvas()
+                                            #canvas = self.matrix.CreateFrameCanvas()
+                                            canvas.Clear()
                                             self.lightCheckerTown(canvas)
                                             self.lightCell(canvas, enemy.row, enemy.col, 255-r, 0, 0)
                                             canvas = self.matrix.SwapOnVSync(canvas)
@@ -590,7 +595,8 @@ class Board(SampleBase):
                     if (validMove == False):
                         print("Invalid target.")
                     else:
-                        canvas = self.matrix.CreateFrameCanvas()
+                        #canvas = self.matrix.CreateFrameCanvas()
+                        canvas.Clear()
                         self.lightCheckerTown(canvas)
                         #self.lightPieces(canvas, self.teamR)
                         canvas = self.matrix.SwapOnVSync(canvas)
@@ -732,7 +738,8 @@ class Board(SampleBase):
             #stalemate
             if (not check):
                 while True:
-                    canvas = self.matrix.CreateFrameCanvas()
+                    #canvas = self.matrix.CreateFrameCanvas()
+                    canvas.Clear()
                     for i in range(0, 4):
                         for j in range(0, 8):
                             self.lightCell(canvas, i, j, self.teamR.r, self.teamR.g, self.teamR.b)
@@ -763,7 +770,8 @@ class Board(SampleBase):
         # move piece from bestMove.oldCell to bestMove.newCell
         state = 0
 
-        canvas = self.matrix.CreateFrameCanvas()
+        #canvas = self.matrix.CreateFrameCanvas()
+        canvas.Clear()
         self.lightCheckerTown(canvas)
         canvas = self.matrix.SwapOnVSync(canvas)
         self.detectMismatch(canvas)
@@ -773,7 +781,8 @@ class Board(SampleBase):
             while state == 0:
                 self.master.readData()
 
-                canvas = self.matrix.CreateFrameCanvas()
+                #canvas = self.matrix.CreateFrameCanvas()
+                canvas.Clear()
             #self.lightPieces(canvas, self.teamL)
                 self.lightCheckerTown(canvas)
                 self.lightCell(canvas, bestMove.oldCell.row, bestMove.oldCell.col, team.r, team.g, team.b)
@@ -784,12 +793,14 @@ class Board(SampleBase):
             while state == 1:
                 self.master.readData()
 
-                canvas = self.matrix.CreateFrameCanvas()
+                #canvas = self.matrix.CreateFrameCanvas()
+                canvas.Clear()
                 self.lightCheckerTown(canvas)
                 self.lightCell(canvas, bestMove.newCell.row, bestMove.newCell.col, team.r, team.g, team.b)
                 canvas = self.matrix.SwapOnVSync(canvas)
                 time.sleep(.1)
-                canvas = self.matrix.CreateFrameCanvas()
+                #canvas = self.matrix.CreateFrameCanvas()
+                canvas.Clear()
                 self.lightCheckerTown(canvas)
                 canvas = self.matrix.SwapOnVSync(canvas)
 
@@ -800,7 +811,8 @@ class Board(SampleBase):
             while state == 0:
                 self.master.readData()
 
-                canvas = self.matrix.CreateFrameCanvas()
+                #canvas = self.matrix.CreateFrameCanvas()
+                canvas.Clear()
             #self.lightPieces(canvas, self.teamL)
                 self.lightCheckerTown(canvas)
                 self.lightCell(canvas, bestMove.oldCell.row, bestMove.oldCell.col, team.r, team.g, team.b)
@@ -812,7 +824,8 @@ class Board(SampleBase):
             state = 0
             while state == 0:
                 self.master.readData()
-                canvas = self.matrix.CreateFrameCanvas()
+                #canvas = self.matrix.CreateFrameCanvas()
+                canvas.Clear()
             #self.lightPieces(canvas, self.teamL)
                 self.lightCheckerTown(canvas)
                 #self.lightCell(canvas, bestMove.oldCell.row, bestMove.oldCell.col, team.r, team.g, team.b)
@@ -825,12 +838,14 @@ class Board(SampleBase):
             while state == 1:
                 self.master.readData()
 
-                canvas = self.matrix.CreateFrameCanvas()
+                #canvas = self.matrix.CreateFrameCanvas()
+                canvas.Clear()
                 self.lightCheckerTown(canvas)
                 self.lightCell(canvas, bestMove.newCell.row, bestMove.newCell.col, team.r, team.g, team.b)
                 canvas = self.matrix.SwapOnVSync(canvas)
                 time.sleep(.1)
-                canvas = self.matrix.CreateFrameCanvas()
+                #canvas = self.matrix.CreateFrameCanvas()
+                canvas.Clear()
                 self.lightCheckerTown(canvas)
                 canvas = self.matrix.SwapOnVSync(canvas)
 
@@ -841,7 +856,8 @@ class Board(SampleBase):
         self.grid[bestMove.newCell.row][bestMove.newCell.col] = self.grid[bestMove.oldCell.row][bestMove.oldCell.col]
         self.grid[bestMove.oldCell.row][bestMove.oldCell.col] = None
 
-        canvas = self.matrix.CreateFrameCanvas()
+        #canvas = self.matrix.CreateFrameCanvas()
+        canvas.Clear()
         self.lightCheckerTown(canvas)
         canvas = self.matrix.SwapOnVSync(canvas)
 
@@ -849,7 +865,8 @@ class Board(SampleBase):
 #                input("press enter when ready to continue")
 
     def drawBoard(self, boardState):
-        canvas = self.matrix.CreateFrameCanvas()
+        #canvas = self.matrix.CreateFrameCanvas()
+        canvas.Clear()
         self.checkerBrightness = self.checkerBrightness + self.checkerBrightnessDir
         if (self.checkerBrightness <= 0):
             self.checkerBrightnessDir = self.checkerBrightnessDir * -1
