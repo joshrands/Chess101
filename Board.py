@@ -893,7 +893,8 @@ class Board(SampleBase):
                     self.teamL.r = self.teamArray[i].r
                     self.teamL.g = self.teamArray[i].g
                     self.teamL.b = self.teamArray[i].b
-            canvas = self.matrix.CreateFrameCanvas()
+            #canvas = self.matrix.CreateFrameCanvas()
+            canvas.Clear()
             if (team1Found and team2Found):
                 for i in range(0, 8):
                     if (self.master.getCellState(2, i) == 0):
