@@ -866,6 +866,7 @@ class Board(SampleBase):
 
     def drawBoard(self, boardState):
         #canvas = self.matrix.CreateFrameCanvas()
+        canvas = self.canvas
         canvas.Clear()
         self.checkerBrightness = self.checkerBrightness + self.checkerBrightnessDir
         if (self.checkerBrightness <= 0):
