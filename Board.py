@@ -404,7 +404,7 @@ class Board(SampleBase):
                     #x = random.randint(0, 29) + 1
                     self.lightCell(canvas, j, k, random.randint(0, 255), random.randint(0, 255), random.randint(0, 255))
                     #time.sleep(.0001)
-            canvasList[i] = canvas
+            canvasList.add(canvas)
 
         for i in range(0, 10000):
             index = random.randint(0,100)
