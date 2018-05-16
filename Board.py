@@ -872,8 +872,8 @@ class Board(SampleBase):
         self.canvas.Clear()
 
         for i in range (0, 8):
-            self.lightCell(canvas, 2, i, self.teamArray[i].r, self.teamArray[i].g, self.teamArray[i].b) # colorpicker
-            self.lightCell(canvas, 5, i, self.teamArray[i].r, self.teamArray[i].g, self.teamArray[i].b) # colorpicker
+            self.lightCell(self.canvas, 2, i, self.teamArray[i].r, self.teamArray[i].g, self.teamArray[i].b) # colorpicker
+            self.lightCell(self.canvas, 5, i, self.teamArray[i].r, self.teamArray[i].g, self.teamArray[i].b) # colorpicker
 
         team1Found = False
         team2Found = False
