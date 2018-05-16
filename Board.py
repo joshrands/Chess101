@@ -386,15 +386,13 @@ class Board(SampleBase):
             canvas = self.matrix.SwapOnVSync(canvas)
 
     def sethVictory(self, canvas, team):
-        tempMatrix = RGBMatrix(options = self.options)
-        tempMatrix = self.matrix
         if (team == self.teamL):
             team = self.teamR
         else:
             team = self.teamL
-        for i in range(0, 100000):
-            print(i)
-            time.sleep(.001)
+        canvasList = []
+        for i in range(0, 100):
+            print(i, " canvases created")
             canvas = self.matrix.CreateFrameCanvas()
             for m in range(0, 8):
                 self.lightCell(canvas, m, 0, team.r, team.g, team.b)
@@ -406,9 +404,14 @@ class Board(SampleBase):
                     #x = random.randint(0, 29) + 1
                     self.lightCell(canvas, j, k, random.randint(0, 255), random.randint(0, 255), random.randint(0, 255))
                     #time.sleep(.0001)
-            canvas = self.matrix.SwapOnVSync(canvas)
-            del self.matrix
-            self.matrix = tempMatrix
+            canvasList[i] = canvas
+
+        for i in range(0, 10000):
+            index = random.randint(0,100)
+            self.matrix.SwapOnVSync(canvasList[index])
+            time.sleep(0.1)
+        del self.matrix
+        self.matrix = RGBMatrix(options = self.options)
 
 
     def doTurn(self, canvas, team):
