@@ -407,7 +407,7 @@ class Board(SampleBase):
             canvasList.append(canvas)
 
         for i in range(0, 10000):
-            index = random.randint(0,100)
+            index = random.randint(0,99)
             self.matrix.SwapOnVSync(canvasList[index])
             time.sleep(0.1)
         del self.matrix
