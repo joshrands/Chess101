@@ -919,9 +919,9 @@ class Board(SampleBase):
                             self.canvas.SetPixel(j, k, 255, 0, 0)
                     self.canvas = self.matrix.SwapOnVSync(self.canvas)
                     #sleep here
-                    time.sleep(0.05 * np.exp(1/16*i))
+                    time.sleep(0.01 * np.exp(1/16*(i - 16)))
 
-                for i in range (0, 16):
+                for i in range (0, 12):
                     self.canvas.Clear()
                     for j in range (i, 31 - i):
                         #color these rows
@@ -929,7 +929,7 @@ class Board(SampleBase):
                             self.canvas.SetPixel(k, j, 255, 0, 0)
                     self.canvas = self.matrix.SwapOnVSync(self.canvas)
                     #sleep here
-                    time.sleep(0.05 * np.exp(1/16*i))
+                    time.sleep(0.01 * np.exp(1/16*(i - 12)))
 
 
                 time.sleep(2)
