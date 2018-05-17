@@ -963,7 +963,7 @@ class Board(SampleBase):
 
             #light teamR's squares
             if (team1Decided):
-                if (computerPlayerR):
+                if (self.computerPlayerR):
                     for i in range (0, 8):
                         if (i == thinkR):
                             self.lightCell(self.canvas, 3, i, self.teamL.r, self.teamL.g, self.teamL.b)
@@ -984,7 +984,7 @@ class Board(SampleBase):
 
             #light teamL's squares
             if (team2Decided):
-                if (computerPlayerL):
+                if (self.computerPlayerL):
                     for i in range (0, 8):
                         if (i == thinkL):
                             self.lightCell(self.canvas, 4, i, self.teamR.r, self.teamR.g, self.teamR.b)
