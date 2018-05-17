@@ -74,5 +74,5 @@ class SampleBase(object):
             print("Exiting\n")
             sys.exit(0)
 
-        print("End of process")
+        print("End of Game")
         return True

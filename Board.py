@@ -35,6 +35,8 @@ class Board(SampleBase):
         self.checkerBrightness = 0
         self.checkerBrightnessDir = 2
 
+        self.gameOver = False
+
         self.teamArray = []
         self.teamArray.append(Team(64, 180, 232)) #Blue
         self.teamArray.append(Team(190, 25, 255)) #Purple
@@ -77,7 +79,7 @@ class Board(SampleBase):
 
         self.initializeGameBoard()
 
-        while True:
+        while (not self.gameOver):
             offset_canvas = self.matrix.CreateFrameCanvas()
             #self.lightPieces(offset_canvas, self.teamR)
             self.lightCheckerTown(offset_canvas)
@@ -91,6 +93,9 @@ class Board(SampleBase):
             else:
                 self.doTurn(offset_canvas, self.teamR)
                 offset_canvas = self.matrix.CreateFrameCanvas()
+
+            if (self.gameOver):
+                break
 
             if (self.computerPlayer and not self.computerIsWhite):
                 self.computerMove(self.teamL, offset_canvas)
@@ -407,12 +412,28 @@ class Board(SampleBase):
             self.matrix.SwapOnVSync(canvas)
             canvasList.append(canvas)
 
-        for i in range(0, 1000):
-            index = random.randint(0,99)
+        index = 0
+        while (True):
+            if (self.checkNewGame()):
+                return
+            index = (index + random.randint(0,98)) % 100
             self.matrix.SwapOnVSync(canvasList[index])
             time.sleep(0.1)
         del self.matrix
         self.matrix = RGBMatrix(options = self.options)
+
+    def staleMate(self, canvas):
+        canvas = self.matrix.CreateFrameCanvas()
+        for i in range(0, 4):
+            for j in range(0, 8):
+                self.lightCell(canvas, i, j, self.teamR.r, self.teamR.g, self.teamR.b)
+        for i in range(4, 8):
+            for j in range(0, 8):
+                self.lightCell(canvas, i, j, self.teamL.r, self.teamL.g, self.teamL.b)
+        canvas = self.matrix.SwapOnVSync(canvas)
+        while True:
+            if self.checkNewGame():
+                return
 
 
     def doTurn(self, canvas, team):
@@ -457,22 +478,15 @@ class Board(SampleBase):
         if (piecesWithMoves == 0):
             #stalemate
             if (not check):
-                while True:
-                    canvas = self.matrix.CreateFrameCanvas()
-                    for i in range(0, 4):
-                        for j in range(0, 8):
-                            self.lightCell(canvas, i, j, self.teamR.r, self.teamR.g, self.teamR.b)
-                    for i in range(4, 8):
-                        for j in range(0, 8):
-                            self.lightCell(canvas, i, j, self.teamL.r, self.teamL.g, self.teamL.b)
-                    canvas = self.matrix.SwapOnVSync(canvas)
-            elif (check):
-                checkMate = True
+                self.gameOver = True
+                self.staleMate(canvas)
+                return
 
-        if (checkMate):
-            #print("Check mate!")
-            self.sethVictory(canvas, team)
-            return
+            elif (check):
+                #print("Check mate!")
+                self.gameOver = True
+                self.sethVictory(canvas, team)
+                return
 
         # check for mismatch
         self.detectMismatch(canvas)
@@ -733,22 +747,15 @@ class Board(SampleBase):
         if (piecesWithMoves == 0):
             #stalemate
             if (not check):
-                while True:
-                    canvas = self.matrix.CreateFrameCanvas()
-                    for i in range(0, 4):
-                        for j in range(0, 8):
-                            self.lightCell(canvas, i, j, self.teamR.r, self.teamR.g, self.teamR.b)
-                    for i in range(4, 8):
-                        for j in range(0, 8):
-                            self.lightCell(canvas, i, j, self.teamL.r, self.teamL.g, self.teamL.b)
-                    canvas = self.matrix.SwapOnVSync(canvas)
-            elif (check):
-                checkMate = True
+                self.gameOver = True
+                self.staleMate(canvas)
+                return
 
-        if (checkMate):
-            print("Check mate!")
-            self.sethVictory(canvas, team)
-            return
+            elif (check):
+                #print("Check mate!")
+                self.gameOver = True
+                self.sethVictory(canvas, team)
+                return
 
         #Create the whole tree recursively
         root = Tree(self.grid, None, None, self.teamR, self.teamL)
@@ -968,8 +975,17 @@ class Board(SampleBase):
         for child in currentNode.children:
             self.addNodes(child, team, depth-1)
 
-# Main function
-#if __name__ == "__main__":
-#    simple_square = Board()
-#    if (not simple_square.process()):
-#        simple_square.print_help()
+    def checkNewGame(self):
+        self.master.readData()
+        sum = [0,0,0,0,0,0,0,0]
+        total = 0
+        for i in range (0,8):
+            for j in range (0,8):
+                    sum[i] = sum[i] + (self.master.getCellState(i, j) + 1) % 2
+                    total = total + (self.master.getCellState(i, j) + 1) % 2
+        if (total == 0):
+            return True
+        elif (sum[0] == 8 and sum[1] == 8 and sum[6] == 8 and sum [7] == 8):
+            return True
+        else:
+            return False
