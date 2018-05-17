@@ -909,14 +909,15 @@ class Board(SampleBase):
 
             if (shutDownKey1 and shutDownKey2):
                 self.canvas.Clear()
+
                 for i in range (0, 8):
                     for j in range (0, 8):
                         self.lightCell(self.canvas, i, j, 255, 0, 0)
                 self.canvas = self.matrix.SwapOnVSync(self.canvas)
-                sleep.time(2)
+                time.sleep(2)
                 self.canvas.Clear()
                 self.canvas = self.matrix.SwapOnVSync(self.canvas)
-                os.system("sudo shutdown now")
+                os.system("sudo shutdown")
                 while True:
                     print("shutting down")
 
