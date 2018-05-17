@@ -74,4 +74,5 @@ class SampleBase(object):
             print("Exiting\n")
             sys.exit(0)
 
+        print("End of process")
         return True
