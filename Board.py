@@ -917,7 +917,7 @@ class Board(SampleBase):
                 time.sleep(2)
                 self.canvas.Clear()
                 self.canvas = self.matrix.SwapOnVSync(self.canvas)
-                os.system("sudo shutdown")
+                os.system("sudo shutdown now")
                 while True:
                     print("shutting down")
 
