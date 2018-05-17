@@ -404,9 +404,10 @@ class Board(SampleBase):
                     #x = random.randint(0, 29) + 1
                     self.lightCell(canvas, j, k, random.randint(0, 255), random.randint(0, 255), random.randint(0, 255))
                     #time.sleep(.0001)
+            self.matrix.SwapOnVSync(canvas)
             canvasList.append(canvas)
 
-        for i in range(0, 10000):
+        for i in range(0, 1000):
             index = random.randint(0,99)
             self.matrix.SwapOnVSync(canvasList[index])
             time.sleep(0.1)
@@ -471,7 +472,7 @@ class Board(SampleBase):
         if (checkMate):
             #print("Check mate!")
             self.sethVictory(canvas, team)
-            return;
+            return
 
         # check for mismatch
         self.detectMismatch(canvas)
