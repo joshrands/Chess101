@@ -982,6 +982,10 @@ class Board(SampleBase):
             if (not team2Decided or self.computerPlayerL):
                 self.lightCell(self.canvas, 4, think, self.teamR.r, self.teamR.g, self.teamR.b)
 
+            self.canvas = self.matrix.SwapOnVSync(self.canvas)
+
+            think = (think + 1) % 4
+
             if (team1Decided and team2Decided):
                 break
 
