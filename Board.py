@@ -30,8 +30,9 @@ class Board(SampleBase):
         #self.teamL = Team(254, 0, 255)
         self.grid = []
         self.master = Master()
-        self.computerPlayer = False
-        self.computerIsWhite = False
+        self.computerPlayerR = False
+        self.computerPlayerL = False
+
         self.checkerBrightness = 0
         self.checkerBrightnessDir = 2
 
@@ -57,13 +58,7 @@ class Board(SampleBase):
 
         self.colorPicker()
 
-        self.computerPlayer = False
-        self.computerIsWhite = False
-
-        computer = input("Would you like to play against a computer? (y/n)")
-        if (computer == "y" or computer == "Y"):
-            self.computerPlayer = True
-            self.computerIsWhite = False
+        self.warGames()
 
         self.createPlayers()
 
@@ -88,7 +83,7 @@ class Board(SampleBase):
             # Do player 1's turn
             offset_canvas = self.matrix.CreateFrameCanvas()
 
-            if (self.computerPlayer and self.computerIsWhite):
+            if (self.computerPlayerR):
                 self.computerMove(self.teamR, offset_canvas)
             else:
                 self.doTurn(offset_canvas, self.teamR)
@@ -97,7 +92,7 @@ class Board(SampleBase):
             if (self.gameOver):
                 break
 
-            if (self.computerPlayer and not self.computerIsWhite):
+            if (self.computerPlayerL):
                 self.computerMove(self.teamL, offset_canvas)
             else:
                 self.doTurn(offset_canvas, self.teamL)
@@ -397,6 +392,8 @@ class Board(SampleBase):
             team = self.teamL
         canvasList = []
         for i in range(0, 100):
+            if self.checkNewGame():
+                return
             time.sleep(0.1)
             canvas = self.matrix.CreateFrameCanvas()
             for m in range(0, 8):
@@ -611,11 +608,6 @@ class Board(SampleBase):
                         #self.lightPieces(canvas, self.teamR)
                         canvas = self.matrix.SwapOnVSync(canvas)
 
-    def clearBoard(self, canvas):
-        for x in range(0, 8):
-            for y in range(0, 8):
-                self.lightCell(canvas, x, y, 0, 0, 0)
-
     def lightTargets(self, canvas, piece):
         #piece.calcTargets(self.grid)
         #:canvas = self.matrix.CreateFrameCanvas()
@@ -681,13 +673,12 @@ class Board(SampleBase):
         self.grid[7][4] = King(7, 4, self.teamL)
 
     def createPlayers(self):
-        if (self.computerPlayer):
-            if (self.computerIsWhite):
-                self.teamR.setName("Computer")
-                self.teamL.setName("Human")
-            else:
-                self.teamL.setName("Computer")
-                self.teamR.setName("Human")
+        if (self.computerPlayerR):
+            self.teamR.setName("Computer")
+            self.teamL.setName("Human")
+        elif (self.computerPlayerL):
+            self.teamL.setName("Computer")
+            self.teamR.setName("Human")
         else:
             self.teamL.setName("Player 1")
             self.teamR.setName("Player 2")
@@ -935,6 +926,64 @@ class Board(SampleBase):
                     self.lightCell(self.canvas, 5, i, self.teamArray[i].r, self.teamArray[i].g, self.teamArray[i].b) # colorpicker
                 self.canvas = self.matrix.SwapOnVSync(self.canvas)
         self.teamR.r = self.teamR.r + 1
+
+    def warGames(self):
+        self.canvas.Clear()
+        print("The only winning move is not to play")
+
+        modesPicked = False
+        team1Decided = False
+        team2Decided = False
+
+        think = 0
+
+        while (not modesPicked):
+            team1Decided = False
+            team2Decided = False
+            self.master.readData()
+
+            for i in range (0, 8):
+                if (i < 4):
+                    if (self.master.getCellState(3, i) == 0 and not team1Decided):
+                        team1Decided = True
+                        self.computerPlayerR = False
+                    elif (self.master.getCellState(4, i) == 0 and not team2Decided):
+                        team2Decided = True
+                        self.computerPlayerL = True
+                else:
+                    if (self.master.getCellState(3, i) == 0 and not team1Decided):
+                        team1Decided = True
+                        self.computerPlayerR = True
+                    elif (self.master.getCellState(4, i) == 0 and not team2Decided):
+                        team2Decided = True
+                        self.computerPlayerL = False
+                if (team1Decided and team2Decided):
+                    break
+
+            #light human squares
+            for i in range (0, 8):
+                if (i < 4):
+                    if (not team1Decided or not self.computerPlayerR):
+                        self.lightCell(self.canvas, 3, i, 255, 255, 255)
+                else:
+                    if (not team2Decided or not self.computerPlayerL):
+                        self.lightCell(self.canvas, 4, i, 255, 255, 255)
+
+            #light AI squares
+            for i in range (0, 8):
+                if (i < 4):
+                    if (not team2Decided or self.computerPlayerL):
+                        self.lightCell(self.canvas, 4, i, self.teamL.r, self.teamL.g, self.teamL.b)
+                else:
+                    if (not team1Decided or self.computerPlayerR):
+                        self.lightCell(self.canvas, 3, i, self.teamR.r, self.teamR.g, self.teamR.b)
+            if (not team1Decided or self.computerPlayerR):
+                self.lightCell(self.canvas, 3, 7 - think, self.teamL.r, self.teamL.g, self.teamL.b)
+            if (not team2Decided or self.computerPlayerL):
+                self.lightCell(self.canvas, 4, think, self.teamR.r, self.teamR.g, self.teamR.b)
+
+            if (team1Decided and team2Decided):
+                break
 
 
     def addNodes(self, currentNode, team, depth=2):
