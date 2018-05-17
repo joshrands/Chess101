@@ -910,6 +910,8 @@ class Board(SampleBase):
             if (shutDownKey1 and shutDownKey2):
                 self.canvas.Clear()
 
+                #for i in range (0, 16):
+
 
                 for i in range (0, 8):
                     for j in range (0, 8):
@@ -993,42 +995,42 @@ class Board(SampleBase):
                 if (self.computerPlayerR):
                     for i in range (0, 8):
                         if (i == (7 - thinkR)):
-                            self.lightCell(self.canvas, 3, 7 - thinkR, self.teamL.r, self.teamL.g, self.teamL.b)
+                            self.lightCell(self.canvas, 3, 7 - thinkR, self.teamR.r, self.teamR.g, self.teamR.b)
                         else:
-                            self.lightCell(self.canvas, 3, i, self.teamR.r, self.teamR.g, self.teamR.b)
+                            self.lightCell(self.canvas, 3, i, 255, 255, 255)
                 else:
                     for i in range (0, 8):
-                        self.lightCell(self.canvas, 3, i, 255, 255, 255)
+                        self.lightCell(self.canvas, 3, i, self.teamR.r, self.teamR.g, self.teamR.b)
             else:
                 for i in range (0, 8):
                     if (i < 4):
-                        self.lightCell(self.canvas, 3, i, 255, 255, 255)
+                        self.lightCell(self.canvas, 3, i, self.teamR.r, self.teamR.g, self.teamR.b)
                     else:
                         if (i == (7 - think)):
-                            self.lightCell(self.canvas, 3, 7 - think, self.teamL.r, self.teamL.g, self.teamL.b)
+                            self.lightCell(self.canvas, 3, 7 - think, self.teamR.r, self.teamR.g, self.teamR.b)
                         else:
-                            self.lightCell(self.canvas, 3, i, self.teamR.r, self.teamR.g, self.teamR.b)
+                            self.lightCell(self.canvas, 3, i, 255, 255, 255)
 
             #light teamL's squares
             if (team2Decided):
                 if (self.computerPlayerL):
                     for i in range (0, 8):
                         if (i == thinkL):
-                            self.lightCell(self.canvas, 4, thinkL, self.teamR.r, self.teamR.g, self.teamR.b)
+                            self.lightCell(self.canvas, 4, thinkL, self.teamL.r, self.teamL.g, self.teamL.b)
                         else:
-                            self.lightCell(self.canvas, 4, i, self.teamL.r, self.teamL.g, self.teamL.b)
+                            self.lightCell(self.canvas, 4, i, 255, 255, 255)
                 else:
                     for i in range (0, 8):
-                        self.lightCell(self.canvas, 4, i, 255, 255, 255)
+                        self.lightCell(self.canvas, 4, i, self.teamL.r, self.teamL.g, self.teamL.b)
             else:
                 for i in range (0, 8):
                     if (i < 4):
                         if (i == think):
-                            self.lightCell(self.canvas, 4, think, self.teamR.r, self.teamR.g, self.teamR.b)
+                            self.lightCell(self.canvas, 4, think, self.teamL.r, self.teamL.g, self.teamL.b)
                         else:
-                            self.lightCell(self.canvas, 4, i, self.teamL.r, self.teamL.g, self.teamL.b)
+                            self.lightCell(self.canvas, 4, i, 255, 255, 255)
                     else:
-                        self.lightCell(self.canvas, 4, i, 255, 255, 255)
+                        self.lightCell(self.canvas, 4, i, self.teamL.r, self.teamL.g, self.teamL.b)
 
             self.canvas = self.matrix.SwapOnVSync(self.canvas)
 
