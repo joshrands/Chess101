@@ -911,7 +911,7 @@ class Board(SampleBase):
             if (shutDownKey1 and shutDownKey2):
                 self.canvas.Clear()
 
-                for i in range (0, 16):
+                for i in range (0, 12):
                     self.canvas.Clear()
                     for j in range (i, 31 - i):
                         #color these rows
@@ -919,17 +919,17 @@ class Board(SampleBase):
                             self.canvas.SetPixel(j, k, 255, 0, 0)
                     self.canvas = self.matrix.SwapOnVSync(self.canvas)
                     #sleep here
-                    time.sleep(0.01 * np.exp(1/16*(i - 16)))
+                    time.sleep(0.75 * np.exp(1/16*(i - 16)))
 
                 for i in range (0, 12):
                     self.canvas.Clear()
                     for j in range (i, 31 - i):
                         #color these rows
-                        for k in range (15, 17):
+                        for k in range (11, 21):
                             self.canvas.SetPixel(k, j, 255, 0, 0)
                     self.canvas = self.matrix.SwapOnVSync(self.canvas)
                     #sleep here
-                    time.sleep(0.01 * np.exp(1/16*(i - 12)))
+                    time.sleep(0.75 * np.exp(1/16*(i - 12)))
 
 
                 time.sleep(2)
