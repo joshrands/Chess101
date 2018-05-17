@@ -929,7 +929,7 @@ class Board(SampleBase):
                             self.canvas.SetPixel(k, j, 255, 0, 0)
                     self.canvas = self.matrix.SwapOnVSync(self.canvas)
                     #sleep here
-                    time.sleep(0.015 * np.exp(-1/16*(i - 16)))
+                    time.sleep(0.025 * np.exp(-1/16*(i - 16)))
                 self.canvas.Clear()
                 self.canvas = self.matrix.SwapOnVSync(self.canvas)
                 os.system("sudo shutdown now")
