@@ -913,8 +913,12 @@ class Board(SampleBase):
                     for j in range (0, 8):
                         self.lightCell(self.canvas, i, j, 255, 0, 0)
                 self.canvas = self.matrix.SwapOnVSync(self.canvas)
-                time.sleep(1)
+                sleep.time(2)
+                self.canvas.Clear()
+                self.canvas = self.matrix.SwapOnVSync(self.canvas)
                 os.system("sudo shutdown")
+                while True:
+                    print("shutting down")
 
 
             #canvas = self.matrix.CreateFrameCanvas()
