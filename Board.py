@@ -392,7 +392,7 @@ class Board(SampleBase):
             team = self.teamL
         canvasList = []
         for i in range(0, 100):
-            print(i, " canvases created")
+            time.sleep(0.1)
             canvas = self.matrix.CreateFrameCanvas()
             for m in range(0, 8):
                 self.lightCell(canvas, m, 0, team.r, team.g, team.b)
