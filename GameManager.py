@@ -15,5 +15,7 @@ class GameManager:
 #    def setGameProperties():
 
 game = GameManager()
-game.startGame()
-
+while True:
+    game.startGame()
+    again = raw_input("Do you want to play again? (y/n)")
+    if (again == "y") break;

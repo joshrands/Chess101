@@ -471,6 +471,7 @@ class Board(SampleBase):
         if (checkMate):
             #print("Check mate!")
             self.sethVictory(canvas, team)
+            return;
 
         # check for mismatch
         self.detectMismatch(canvas)
