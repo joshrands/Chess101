@@ -965,8 +965,8 @@ class Board(SampleBase):
             if (team1Decided):
                 if (self.computerPlayerR):
                     for i in range (0, 8):
-                        if (i == thinkR):
-                            self.lightCell(self.canvas, 3, i, self.teamL.r, self.teamL.g, self.teamL.b)
+                        if (i == (7 - thinkR)):
+                            self.lightCell(self.canvas, 3, 7 - thinkR, self.teamL.r, self.teamL.g, self.teamL.b)
                         else:
                             self.lightCell(self.canvas, 3, i, self.teamR.r, self.teamR.g, self.teamR.b)
                 else:
@@ -987,7 +987,7 @@ class Board(SampleBase):
                 if (self.computerPlayerL):
                     for i in range (0, 8):
                         if (i == thinkL):
-                            self.lightCell(self.canvas, 4, i, self.teamR.r, self.teamR.g, self.teamR.b)
+                            self.lightCell(self.canvas, 4, thinkL, self.teamR.r, self.teamR.g, self.teamR.b)
                         else:
                             self.lightCell(self.canvas, 4, i, self.teamL.r, self.teamL.g, self.teamL.b)
                 else:
