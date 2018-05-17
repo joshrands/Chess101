@@ -919,7 +919,7 @@ class Board(SampleBase):
                 self.canvas = self.matrix.SwapOnVSync(self.canvas)
                 os.system("sudo shutdown now")
                 while True:
-                    print("shutting down")
+                    time.sleep(1)
 
 
             #canvas = self.matrix.CreateFrameCanvas()
