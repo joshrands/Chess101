@@ -16,6 +16,7 @@ from Tree import Tree
 from AI import AI
 import copy
 import argparse
+import os
 
 class Board(SampleBase):
 
@@ -878,12 +879,16 @@ class Board(SampleBase):
 
         team1Found = False
         team2Found = False
+        shutDownKey1 = False
+        shutDownKey2 = False
 
         self.canvas = self.matrix.SwapOnVSync(self.canvas)
 
         while not (team1Found and team2Found):
             team1Found = False
             team2Found = False
+            shutDownKey1 = False
+            shutDownKey2 = False
             self.master.readData()
             for i in range(0, 8):
                 if (self.master.getCellState(2, i) == 0):
@@ -896,6 +901,22 @@ class Board(SampleBase):
                     self.teamL.r = self.teamArray[i].r
                     self.teamL.g = self.teamArray[i].g
                     self.teamL.b = self.teamArray[i].b
+            for i in range (0, 8):
+                if (self.master.getCellState(3, i) == 0):
+                    shutDownKey1 = True
+                if (self.master.getCellState(4, i) == 0):
+                    shutDownKey2 = True
+
+            if (shutDownKey1 and shutDownKey2):
+                self.canvas.Clear()
+                for i in range (0, 8):
+                    for j in range (0, 8):
+                        self.lightCell(self.canvas, i, j, 255, 0, 0)
+                self.canvas = self.matrix.SwapOnVSync(self.canvas)
+                time.sleep(1)
+                os.system("sudo shutdown")
+
+
             #canvas = self.matrix.CreateFrameCanvas()
             self.canvas.Clear()
             if (team1Found and team2Found):
