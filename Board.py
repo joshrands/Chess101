@@ -748,6 +748,7 @@ class Board(SampleBase):
         if (checkMate):
             print("Check mate!")
             self.sethVictory(canvas, team)
+            return
 
         #Create the whole tree recursively
         root = Tree(self.grid, None, None, self.teamR, self.teamL)
