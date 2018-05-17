@@ -3,5 +3,5 @@
 from Board import Board
 
 while True:
-    self.board = Board()
-    self.board.process()
+    board = Board()
+    board.process()
