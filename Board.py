@@ -931,13 +931,14 @@ class Board(SampleBase):
         self.canvas.Clear()
         print("The only winning move is not to play")
 
-        modesPicked = False
         team1Decided = False
         team2Decided = False
 
         think = 0
+        thinkL = 0
+        thinkR = 0
 
-        while (not modesPicked):
+        while True:
             team1Decided = False
             team2Decided = False
             self.master.readData()
@@ -960,27 +961,47 @@ class Board(SampleBase):
                 if (team1Decided and team2Decided):
                     break
 
-            #light human squares
-            for i in range (0, 8):
-                if (i < 4):
-                    if (not team1Decided or not self.computerPlayerR):
+            #light teamR's squares
+            if (team1Decided):
+                if (computerPlayerR):
+                    for i in range (0, 8):
+                        if (i == thinkR):
+                            self.lightCell(self.canvas, 3, i, self.teamL.r, self.teamL.g, self.teamL.b)
+                        else:
+                            self.lightCell(self.canvas, 3, i, self.teamR.r, self.teamR.g, self.teamR.b)
+                else:
+                    for i in range (0, 8):
                         self.lightCell(self.canvas, 3, i, 255, 255, 255)
-                else:
-                    if (not team2Decided or not self.computerPlayerL):
-                        self.lightCell(self.canvas, 4, i, 255, 255, 255)
+            else:
+                for i in range (0, 8):
+                    if (i < 4):
+                        self.lightCell(self.canvas, 3, i, 255, 255, 255)
+                    else:
+                        if (i == (7 - think)):
+                            self.lightCell(self.canvas, 3, 7 - think, self.teamL.r, self.teamL.g, self.teamL.b)
+                        else:
+                            self.lightCell(self.canvas, 3, i, self.teamR.r, self.teamR.g, self.teamR.b)
 
-            #light AI squares
-            for i in range (0, 8):
-                if (i < 4):
-                    if (not team2Decided or self.computerPlayerL):
-                        self.lightCell(self.canvas, 4, i, self.teamL.r, self.teamL.g, self.teamL.b)
+            #light teamL's squares
+            if (team2Decided):
+                if (computerPlayerL):
+                    for i in range (0, 8):
+                        if (i == thinkL):
+                            self.lightCell(self.canvas, 4, i, self.teamR.r, self.teamR.g, self.teamR.b)
+                        else:
+                            self.lightCell(self.canvas, 4, i, self.teamL.r, self.teamL.g, self.teamL.b)
                 else:
-                    if (not team1Decided or self.computerPlayerR):
-                        self.lightCell(self.canvas, 3, i, self.teamR.r, self.teamR.g, self.teamR.b)
-            if (not team1Decided or self.computerPlayerR):
-                self.lightCell(self.canvas, 3, 7 - think, self.teamL.r, self.teamL.g, self.teamL.b)
-            if (not team2Decided or self.computerPlayerL):
-                self.lightCell(self.canvas, 4, think, self.teamR.r, self.teamR.g, self.teamR.b)
+                    for i in range (0, 8):
+                        self.lightCell(self.canvas, 4, i, 255, 255, 255)
+            else:
+                for i in range (0, 8):
+                    if (i < 4):
+                        if (i == think):
+                            self.lightCell(self.canvas, 4, think, self.teamR.r, self.teamR.g, self.teamR.b)
+                        else:
+                            self.lightCell(self.canvas, 4, i, self.teamL.r, self.teamL.g, self.teamL.b)
+                    else:
+                        self.lightCell(self.canvas, 4, i, 255, 255, 255)
 
             self.canvas = self.matrix.SwapOnVSync(self.canvas)
 
@@ -989,6 +1010,8 @@ class Board(SampleBase):
             time.sleep(0.2)
 
             think = (think + 1) % 4
+            thinkL = (thinkL + 1) % 8
+            thinkR = (thinkR + 1) % 8
 
             if (team1Decided and team2Decided):
                 break
