@@ -18,4 +18,5 @@ game = GameManager()
 while True:
     game.startGame()
     again = raw_input("Do you want to play again? (y/n)")
-    if (again == "y") break;
+    if (again == "y"):
+        break;
