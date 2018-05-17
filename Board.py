@@ -919,7 +919,7 @@ class Board(SampleBase):
                             self.canvas.SetPixel(j, k, 255, 0, 0)
                     self.canvas = self.matrix.SwapOnVSync(self.canvas)
                     #sleep here
-                    time.sleep(0.075 * np.exp(-1/16*(i - 12)))
+                    time.sleep(0.035 * np.exp(-1/16*(i - 12)))
 
                 for i in range (0, 12):
                     self.canvas.Clear()
@@ -929,7 +929,7 @@ class Board(SampleBase):
                             self.canvas.SetPixel(k, j, 255, 0, 0)
                     self.canvas = self.matrix.SwapOnVSync(self.canvas)
                     #sleep here
-                    time.sleep(0.075 * np.exp(-1/16*(i - 12)))
+                    time.sleep(0.035 * np.exp(-1/16*(i - 12)))
 
 
                 time.sleep(2)
