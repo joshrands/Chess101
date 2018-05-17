@@ -984,6 +984,10 @@ class Board(SampleBase):
 
             self.canvas = self.matrix.SwapOnVSync(self.canvas)
 
+            self.canvas.Clear()
+
+            time.sleep(0.2)
+
             think = (think + 1) % 4
 
             if (team1Decided and team2Decided):
