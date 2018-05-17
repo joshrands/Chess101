@@ -913,23 +913,23 @@ class Board(SampleBase):
 
                 for i in range (0, 12):
                     self.canvas.Clear()
-                    for j in range (i, 31 - i):
+                    for j in range (i, 32 - i):
                         #color these rows
                         for k in range (0, 32):
                             self.canvas.SetPixel(j, k, 255, 0, 0)
                     self.canvas = self.matrix.SwapOnVSync(self.canvas)
                     #sleep here
-                    time.sleep(0.75 * np.exp(1/16*(i - 16)))
+                    time.sleep(0.075 * np.exp(-1/16*(i - 12)))
 
                 for i in range (0, 12):
                     self.canvas.Clear()
-                    for j in range (i, 31 - i):
+                    for j in range (i, 32 - i):
                         #color these rows
-                        for k in range (11, 21):
+                        for k in range (12, 20):
                             self.canvas.SetPixel(k, j, 255, 0, 0)
                     self.canvas = self.matrix.SwapOnVSync(self.canvas)
                     #sleep here
-                    time.sleep(0.75 * np.exp(1/16*(i - 12)))
+                    time.sleep(0.075 * np.exp(-1/16*(i - 12)))
 
 
                 time.sleep(2)
