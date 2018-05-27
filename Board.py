@@ -852,7 +852,7 @@ class Board(SampleBase):
 #                input("press enter when ready to continue")
 
     def drawBoard(self, boardState):
-        canvas = self.matrix.CreateFrameCanvas()
+        self.canvas.Clear()
         self.checkerBrightness = self.checkerBrightness + self.checkerBrightnessDir
         if (self.checkerBrightness <= 0):
             self.checkerBrightnessDir = self.checkerBrightnessDir * -1
@@ -865,11 +865,11 @@ class Board(SampleBase):
         for row in boardState:
             for piece in row:
                 if (piece != None):
-                    self.lightCell(canvas, piece.row, piece.col, piece.team.r, piece.team.g, piece.team.b)
+                    self.lightCell(self.canvas, piece.row, piece.col, piece.team.r, piece.team.g, piece.team.b)
 
-        self.chooseLightCheckerTown(canvas)
+        self.chooseLightCheckerTown(self.canvas)
 
-        canvas = self.matrix.SwapOnVSync(canvas)
+        self.canvas = self.matrix.SwapOnVSync(self.canvas)
 
     def colorPicker(self):
         self.canvas.Clear()
