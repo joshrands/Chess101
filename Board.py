@@ -679,7 +679,7 @@ class Board(SampleBase):
         self.detectMismatch()
 
         if (self.grid[bestMove.newCell.row][bestMove.newCell.col] == None):
-            self.peaceTime++
+            self.peaceTime += 1
             while state == 0:
                 self.master.readData()
 
