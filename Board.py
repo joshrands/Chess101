@@ -65,8 +65,15 @@ class Board(SampleBase):
         self.createPlayers()
 
         # begin interactive setup
+        self.canvas.Clear()
+        tempCanvas = self.matrix.SwapOnVSync(self.canvas)
+
         self.interactiveSetup(self.teamR)
         self.interactiveSetup(self.teamL)
+
+        tempCanvas.Clear()
+        self.lightCheckerTown(tempCanvas)
+        self.canvas = self.matrix.SwapOnVSync(tempCanvas)
 
         self.initializeGameBoard()
 
@@ -123,8 +130,6 @@ class Board(SampleBase):
                 self.lightCell(self.canvas, (2*x), 1 + 2*y, r, g, b)
 
     def interactiveSetup(self, team):
-        self.canvas.Clear()
-        tempCanvas = self.matrix.SwapOnVSync(self.canvas)
         if (team == self.teamR):
             # setup Rook
             self.detectPiece(team, "Rook", 0, 0)
@@ -157,9 +162,6 @@ class Board(SampleBase):
             self.detectPiece(team, "King", 7, 4)
             # setup Pawns
             self.detectPawns(team, 6)
-        tempCanvas.Clear()
-        self.lightCheckerTown(tempCanvas)
-        self.canvas = self.matrix.SwapOnVSync(tempCanvas)
 
     def detectMismatch(self):
         # read data into master
