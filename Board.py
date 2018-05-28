@@ -1080,8 +1080,10 @@ class Board(SampleBase):
             return
         else:
             if (team == self.teamL):
+                print("using left, length of days:", len(self.daysLeftSinceInjury), "length double:", len(self.doubleLeftJeopardy))
                 self.bobRossJr(team, tron, self.daysLeftSinceInjury, self.doubleLeftJeopardy)
             else:
+                print("using right, length of days:", len(self.daysRightSinceInjury), "length double:", len(self.doubleRightJeopardy))
                 self.bobRossJr(team, tron, self.daysRightSinceInjury, self.doubleRightJeopardy)
 
     def bobRossJr(self, team, tron, daysSinceInjury, doubleJeopardy):
