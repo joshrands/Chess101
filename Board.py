@@ -1088,21 +1088,24 @@ class Board(SampleBase):
             elif (len(daysSinceInjury) == 0):
                 daysSinceInjury.append(tron)
             else:
-                secondMatch = True
-                for state in doubleJeopardy:
-                    for row in tron:
-                        for col in tron:
-                            if (state[row][col] == None or tron[row][col] == None):
-                                if (not (state[row][col] == None and tron[row][col] == None)):
+                if (len(doubleJeopardy) == 0):
+                    secondMatch = False
+                else:
+                    secondMatch = True
+                    for state in doubleJeopardy:
+                        for row in tron:
+                            for col in tron:
+                                if (state[row][col] == None or tron[row][col] == None):
+                                    if (not (state[row][col] == None and tron[row][col] == None)):
+                                        secondMatch = False
+                                        break
+                                elif (not(isinstance(state[row][col], type(tron[row][col])))):
                                     secondMatch = False
                                     break
-                            elif (not(isinstance(state[row][col], type(tron[row][col])))):
-                                secondMatch = False
+                            if (not secondMatch):
                                 break
                         if (not secondMatch):
                             break
-                    if (not secondMatch):
-                        break
                 if (secondMatch):
                     self.gameOver = True
                     self.staleMate()
