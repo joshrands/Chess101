@@ -1093,6 +1093,9 @@ class Board(SampleBase):
             daysSinceInjury.append(copy.deepcopy(tron))
             print("clearing and adding")
             print("length: ", len(daysSinceInjury))
+            print("using left, length of days:", len(self.daysLeftSinceInjury), "length double:", len(self.doubleLeftJeopardy))
+            print("using right, length of days:", len(self.daysRightSinceInjury), "length double:", len(self.doubleRightJeopardy))
+
         else:
             secondMatch = False
             print("setting seconddMatch to false")
