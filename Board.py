@@ -103,8 +103,10 @@ class Board(SampleBase):
             offset_canvas = self.matrix.SwapOnVSync(offset_canvas)
             del self.matrix
             self.matrix = RGBMatrix(options = self.options)
+            self.canvas = self.matrix.CreateFrameCanvas()
         del self.matrix
         self.matrix = RGBMatrix(options = self.options)
+        self.canvas = self.matrix.CreateFrameCanvas()
 
     ### Member Functions ###
     def lightPath(self, canvas, startRow, startCol, endRow, endCol):
@@ -170,7 +172,6 @@ class Board(SampleBase):
             self.detectPawns(canvas, team, 6)
 
     def detectMismatch(self, canvas):
-        tempMatrix = self.matrix
         # read data into master
         self.master.readData()
         # set color of piece that needs correction
@@ -233,7 +234,8 @@ class Board(SampleBase):
             canvas = self.matrix.SwapOnVSync(canvas)
 
         del self.matrix
-        self.matrix = tempMatrix
+        self.matrix = RGBMatrix(options = self.options)
+        self.canvas = self.matrix.CreateFrameCanvas()
         # mismatch complete return true
         return True
 
@@ -257,7 +259,6 @@ class Board(SampleBase):
         #print("Pawns placed.")
 
     def detectPiece(self, canvas, team, piece, row, col):
-        tempMatrix = self.matrix
         # setup teamR
         #print("Place " + piece + " here:")
         # light up cell white
@@ -274,7 +275,8 @@ class Board(SampleBase):
         # just added
         #canvas = self.matrix.SwapOnVSync(canvas)
         del self.matrix
-        self.matrix = tempMatrix
+        self.matrix = RGBMatrix(options = self.options)
+        self.canvas = self.matrix.CreateFrameCanvas()
 
     # detect lift off
     def detectLiftOff(self, team):
@@ -352,8 +354,8 @@ class Board(SampleBase):
                 activatedTarget = cell
 
         del self.matrix
-        self.matrix = tempMatrix
-        # return true if valid target
+        self.matrix = RGBMatrix(options = self.options)
+        self.canvas = self.matrix.CreateFrameCanvas()
         return valid, activatedTarget
 
     def victory(self, canvas, team):
@@ -420,6 +422,7 @@ class Board(SampleBase):
             time.sleep(0.1)
         del self.matrix
         self.matrix = RGBMatrix(options = self.options)
+        self.canvas = self.matrix.CreateFrameCanvas()
 
     def staleMate(self, canvas):
         canvas = self.matrix.CreateFrameCanvas()
