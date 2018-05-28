@@ -1074,7 +1074,6 @@ class Board(SampleBase):
 
     def bobRoss(self, team, tron):
         print(self.peaceTime)
-        print("HELLOOOOOOOOOEOEOEOHFWIGFIUAGWfgwlkugefkrg")
         if (self.peaceTime >= 50):
             self.gameOver = True
             self.staleMate()
@@ -1091,9 +1090,6 @@ class Board(SampleBase):
             doubleJeopardy = []
             daysSinceInjury.append(copy.deepcopy(tron))
             print("clearing")
-        elif (len(daysSinceInjury) == 0):
-            daysSinceInjury.append(copy.deepcopy(tron))
-            print("adding for 0")
         else:
             secondMatch = False
             print("setting seconddMatch to false")
@@ -1133,10 +1129,13 @@ class Board(SampleBase):
                             if (not(type(state[row][col]) is type(tron[row][col]))):
                                 print("problem")
                                 firstMatch = False
+                                print ("break 1")
                                 break
                         if (not firstMatch):
+                            print ("break 2")
                             break
                     if (firstMatch):
+                        print("counter break")
                         break
                 if (firstMatch):
                     doubleJeopardy.append(copy.deepcopy(tron))
