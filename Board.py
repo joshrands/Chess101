@@ -64,43 +64,36 @@ class Board(SampleBase):
 
         self.createPlayers()
 
-        # Josh added this, hopefully it's okay
-        offset_canvas = self.matrix.CreateFrameCanvas()
-
-   #     self.lightCheckerTown(offset_canvas)
-   #     offset_canvas = self.matrix.SwapOnVSync(offset_canvas)
-   #     time.sleep(1)
         # begin interactive setup
-        self.interactiveSetup(offset_canvas, self.teamR)
-        self.interactiveSetup(offset_canvas, self.teamL)
+        self.interactiveSetup(self.canvas, self.teamR)
+        self.interactiveSetup(self.canvas, self.teamL)
 
         self.initializeGameBoard()
 
         while (not self.gameOver):
-            offset_canvas = self.matrix.CreateFrameCanvas()
-            #self.lightPieces(offset_canvas, self.teamR)
-            self.lightCheckerTown(offset_canvas)
-            offset_canvas = self.matrix.SwapOnVSync(offset_canvas)
+            self.canvas = self.matrix.CreateFrameCanvas()
+            self.lightCheckerTown(self.canvas)
+            self.canvas = self.matrix.SwapOnVSync(self.canvas)
 
             # Do player 1's turn
-            offset_canvas = self.matrix.CreateFrameCanvas()
+            self.canvas = self.matrix.CreateFrameCanvas()
 
             if (self.computerPlayerR):
-                self.computerMove(self.teamR, offset_canvas)
+                self.computerMove(self.teamR, self.canvas)
             else:
-                self.doTurn(offset_canvas, self.teamR)
-                offset_canvas = self.matrix.CreateFrameCanvas()
+                self.doTurn(canvas, self.teamR)
+                self.canvas = self.matrix.CreateFrameCanvas()
 
             if (self.gameOver):
                 break
 
             if (self.computerPlayerL):
-                self.computerMove(self.teamL, offset_canvas)
+                self.computerMove(self.teamL, self.canvas)
             else:
-                self.doTurn(offset_canvas, self.teamL)
-                offset_canvas = self.matrix.CreateFrameCanvas()
+                self.doTurn(self.canvas, self.teamL)
+                self.canvas = self.matrix.CreateFrameCanvas()
 
-            offset_canvas = self.matrix.SwapOnVSync(offset_canvas)
+            self.canvas = self.matrix.SwapOnVSync(self.canvas)
             del self.matrix
             self.matrix = RGBMatrix(options = self.options)
             self.canvas = self.matrix.CreateFrameCanvas()
@@ -627,7 +620,7 @@ class Board(SampleBase):
             #print("Target: ", cell.row, cell.col)
             self.lightCell(canvas, cell.row, cell.col, r, g, b)
 
-    def lightPieces(self, offset_canvas, team):
+    def lightPieces(self, canvas, team):
         r = 0
         c = 0
         for row in self.grid:
@@ -639,9 +632,9 @@ class Board(SampleBase):
                     #if (self.grid[row][col].team
                     # light up cell!
  #                   if (piece.team == self.teamR):
- #                       self.lightCell(offset_canvas, r, c, self.teamR.r, self.teamR.g, self.teamR.b)
+ #                       self.lightCell(canvas, r, c, self.teamR.r, self.teamR.g, self.teamR.b)
                     #print(r, c, team.r, team.g, team.b)
-                    self.lightCell(offset_canvas, r, c, piece.team.r, piece.team.g, piece.team.b)
+                    self.lightCell(canvas, r, c, piece.team.r, piece.team.g, piece.team.b)
                 c = c + 1
             r = r + 1
 
@@ -690,7 +683,7 @@ class Board(SampleBase):
         #self.teamL.setColor()
 
     def lightCell(self, canvas, x, y, r, g, b):
-        #offset_canvas = self.matrix.CreateFrameCanvas()
+        #canvas = self.matrix.CreateFrameCanvas()
         #print(x, y, r, g, b)
         for i in range(0, 4):
             for j in range(0, 4):
