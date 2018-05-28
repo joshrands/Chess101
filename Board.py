@@ -86,7 +86,7 @@ class Board(SampleBase):
             self.canvas.Clear()
 
             if (self.computerPlayerR):
-                self.computerMove(self.teamR, self.canvas)
+                self.computerMove(self.teamR)
             else:
                 self.doTurn(self.teamR)
 
