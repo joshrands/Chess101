@@ -1102,6 +1102,8 @@ class Board(SampleBase):
                         print("row")
                         for col in range(0, 8):
                             print("col")
+                            print(type(state[row][col]))
+                            print(type(tron[row][col]))
                             if (not(type(state[row][col]) is type(tron[row][col]))):
                                 print("problem")
                                 secondMatch = False
