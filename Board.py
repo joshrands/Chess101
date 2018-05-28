@@ -1091,7 +1091,7 @@ class Board(SampleBase):
                     for row in tron:
                         for col in tron:
                             if (state[row][col] == None or tron[row][col] == None):
-                                if (not (state[row][col] == None and tron[row][col] == None):
+                                if (not (state[row][col] == None and tron[row][col] == None)):
                                     secondMatch = False
                                     break
                             elif (not(type(state[row][col]) is type(tron[row][col]))):
@@ -1111,7 +1111,7 @@ class Board(SampleBase):
                         for row in tron:
                             for col in tron:
                                 if (state[row][col] == None or tron[row][col] == None):
-                                    if (not (state[row][col] == None and tron[row][col] == None):
+                                    if (not (state[row][col] == None and tron[row][col] == None)):
                                         firstMatch = False
                                         break
                                 elif (not(type(state[row][col]) is type(tron[row][col]))):
