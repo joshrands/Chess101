@@ -57,9 +57,6 @@ class Board(SampleBase):
     def run(self):
         print("Running game...")
         self.canvas = self.matrix.CreateFrameCanvas()
-        self.matrix.SwapOnVSync(self.canvas)
-        self.lightCell(self.canvas, 0, 0, 255, 255, 0)
-        time.sleep(5)
 
         self.colorPicker()
 
@@ -133,10 +130,10 @@ class Board(SampleBase):
 
     def interactiveSetup(self, team):
         self.canvas.Clear()
+        tempCanvas = self.matrix.SwapOnVSync(self.canvas)
         if (team == self.teamR):
             # setup Rook
             self.detectPiece(team, "Rook", 0, 0)
-            self.lightCell(self.canvas, 0, 0, team.r, team.g, team.b) # light team color
             self.detectPiece(team, "Rook", 0, 7)
             # setup Knight
             self.detectPiece(team, "Knight", 0, 1)
@@ -166,6 +163,9 @@ class Board(SampleBase):
             self.detectPiece(team, "King", 7, 4)
             # setup Pawns
             self.detectPawns(team, 6)
+        tempCanvas.Clear()
+        self.lightCheckerTown(tempCanvas)
+        self.canvas = self.matrix.SwapOnVSync(tempCanvas)
 
     def detectMismatch(self, canvas):
         # read data into master
@@ -229,6 +229,7 @@ class Board(SampleBase):
                     time.sleep(0.01)
             canvas = self.matrix.SwapOnVSync(canvas)
 
+
         del self.matrix
         self.matrix = RGBMatrix(options = self.options)
         self.canvas = self.matrix.CreateFrameCanvas()
@@ -259,7 +260,6 @@ class Board(SampleBase):
         #print("Place " + piece + " here:")
         # light up cell white
         self.lightCell(self.canvas, row, col, 255, 255, 255)
-        self.canvas = self.matrix.SwapOnVSync(self.canvas)
         placed = False
         while not placed:
             self.master.readData()
@@ -267,9 +267,7 @@ class Board(SampleBase):
                 placed = True
             time.sleep(0.01)
         #print(piece + " set.")
-        self.lightCell(canvas, row, col, team.r, team.g, team.b) # light team color
-        # just added
-        self.matrix.SwapOnVSync(self.canvas)
+        self.lightCell(self.canvas, row, col, team.r, team.g, team.b) # light team color
     # detect lift off
     def detectLiftOff(self, team):
         # team is current team
