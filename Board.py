@@ -537,7 +537,7 @@ class Board(SampleBase):
                         self.lightCheckerTown(self.canvas)
 
                         self.canvas = self.matrix.SwapOnVSync(self.canvas)
-            self.bobRoss(team, self.grid)
+        self.bobRoss(team, self.grid)
 
     def lightTargets(self, piece):
         #piece.calcTargets(self.grid)
