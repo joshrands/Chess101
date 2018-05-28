@@ -1088,8 +1088,8 @@ class Board(SampleBase):
 
     def bobRossJr(self, team, tron, daysSinceInjury, doubleJeopardy):
         if (self.peaceTime == 0):
-            daysSinceInjury = []
-            doubleJeopardy = []
+            daysSinceInjury.clear()
+            doubleJeopardy.clear()
             daysSinceInjury.append(copy.deepcopy(tron))
             print("clearing and adding")
             print("length: ", len(daysSinceInjury))
