@@ -1092,23 +1092,20 @@ class Board(SampleBase):
             elif (len(daysSinceInjury) == 0):
                 daysSinceInjury.append(tron)
             else:
-                if (len(doubleJeopardy) == 0):
-                    secondMatch = False
-                else:
-                    secondMatch = False
-                    for state in doubleJeopardy:
-                        secondMatch = True
-                        for row in range(0, 8):
-                            for col in range(0, 8):
-                                print(type(state[row][col]))
-                                print(type(tron[row][col]))
-                                if (not(type(state[row][col]) is type(tron[row][col]))):
-                                    secondMatch = False
-                                    break
-                            if (not secondMatch):
+                secondMatch = False
+                for state in doubleJeopardy:
+                    secondMatch = True
+                    for row in range(0, 8):
+                        for col in range(0, 8):
+                            print(type(state[row][col]))
+                            print(type(tron[row][col]))
+                            if (not(type(state[row][col]) is type(tron[row][col]))):
+                                secondMatch = False
                                 break
-                        if (secondMatch):
+                        if (not secondMatch):
                             break
+                    if (secondMatch):
+                        break
                 if (secondMatch):
                     self.gameOver = True
                     self.staleMate()
