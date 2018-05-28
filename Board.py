@@ -368,7 +368,6 @@ class Board(SampleBase):
 
     def doTurn(self, team):
 
-        self.bobRoss(team, self.grid)
         # disable enPassantable
         # calculate targets for all pieces
 
@@ -539,7 +538,7 @@ class Board(SampleBase):
                         self.lightCheckerTown(self.canvas)
 
                         self.canvas = self.matrix.SwapOnVSync(self.canvas)
-        #self.bobRoss(team, self.grid)
+        self.bobRoss(team, self.grid)
 
     def lightTargets(self, piece):
         #piece.calcTargets(self.grid)
@@ -1088,10 +1087,10 @@ class Board(SampleBase):
         if (self.peaceTime == 0):
             daysSinceInjury = []
             doubleJeopardy = []
-            daysSinceInjury.append(tron)
+            daysSinceInjury.append(copy.deepcopy(tron))
             print("clearing")
         elif (len(daysSinceInjury) == 0):
-            daysSinceInjury.append(tron)
+            daysSinceInjury.append(copy.deepcopy(tron))
             print("adding for 0")
         else:
             secondMatch = False
@@ -1138,8 +1137,8 @@ class Board(SampleBase):
                     if (firstMatch):
                         break
                 if (firstMatch):
-                    doubleJeopardy.append(tron)
+                    doubleJeopardy.append(copy.deepcopy(tron))
                     print("double state")
                 else:
-                    daysSinceInjury.append(tron)
+                    daysSinceInjury.append(copy.deepcopy(tron))
         return
