@@ -39,6 +39,11 @@ class Board(SampleBase):
         self.checkerBrightnessDir = 2
 
         self.gameOver = False
+        self.peaceTime = 0
+        self.daysLeftSinceInjury = []
+        self.daysRightSinceInjury = []
+        self.doubleLeftJeopardy = []
+        self.doubleRightJeopardy = []
 
         self.teamArray = []
         self.teamArray.append(Team(64, 180, 232)) #Blue
@@ -477,8 +482,13 @@ class Board(SampleBase):
                         if (cell.row == targetRow and cell.col == targetCol):
                             validMove = True
                             #print("Moving piece...")
+                            if (self.grid[targetRow][targetCol] != None):
+                                self.peaceTime = 0
+                            else:
+                                self.peaceTime++
                             self.grid[targetRow][targetCol] = self.grid[row][col]
                             if (isinstance(self.grid[targetRow][targetCol], Pawn)):
+                                self.peaceTime = 0
                                 enemy = self.grid[targetRow][targetCol].move(targetRow, targetCol, self.grid)
                                 if (enemy != None):
                                     self.grid[enemy.row][enemy.col] = None
@@ -516,7 +526,7 @@ class Board(SampleBase):
                                     self.grid[rookLocation.row][rookLocation.col] = None
                                     self.grid[rookTarget.row][rookTarget.col].move(rookTarget.row, rookTarget.col, self.grid)
                             else:
-                                self.grid[targetRow][targetCol].move(targetRow, targetCol,self.grid)
+                                self.grid[targetRow][targetCol].move(targetRow, targetCol, self.grid)
 
                             self.grid[row][col] = None
 
@@ -527,6 +537,7 @@ class Board(SampleBase):
                         self.lightCheckerTown(self.canvas)
 
                         self.canvas = self.matrix.SwapOnVSync(self.canvas)
+                self.bobRoss(team, self.grid)
 
     def lightTargets(self, piece):
         #piece.calcTargets(self.grid)
@@ -668,6 +679,7 @@ class Board(SampleBase):
         self.detectMismatch()
 
         if (self.grid[bestMove.newCell.row][bestMove.newCell.col] == None):
+            self.peaceTime++
             while state == 0:
                 self.master.readData()
 
@@ -694,6 +706,7 @@ class Board(SampleBase):
                 state = self.master.getCellState(bestMove.newCell.row, bestMove.newCell.col)
         else:
             # detect removal of other piece and then move of this guy
+            peaceTime = 0
             state = 0
             while state == 0:
                 self.master.readData()
@@ -733,13 +746,56 @@ class Board(SampleBase):
                 state = self.master.getCellState(bestMove.newCell.row, bestMove.newCell.col)
 
 
-        self.grid[bestMove.oldCell.row][bestMove.oldCell.col].move(bestMove.newCell.row, bestMove.newCell.col, self.grid)
         self.grid[bestMove.newCell.row][bestMove.newCell.col] = self.grid[bestMove.oldCell.row][bestMove.oldCell.col]
+
+        if (isinstance(self.grid[bestMove.newCell.row][bestMove.newCell.col], Pawn)):
+            self.peaceTime = 0
+            enemy = self.grid[bestMove.newCell.row][bestMove.newCell.col].move(bestMove.newCell.row, bestMove.newCell.col, self.grid)
+            if (enemy != None):
+                self.grid[enemy.row][enemy.col] = None
+                #print("enPassant!")
+                # make player remove piece
+                state = self.master.getCellState(enemy.row, enemy.col)
+                while state == 0:
+                    self.master.readData()
+                    time.sleep(0.4)
+                    # fade in red
+                    for r in range(201):
+                        self.canvas.Clear()
+                        self.lightCheckerTown(self.canvas)
+                        self.lightCell(self.canvas, enemy.row, enemy.col, 50+r, 0, 0)
+                        self.canvas = self.matrix.SwapOnVSync(self.canvas)
+                        time.sleep(0.002)
+
+                    self.master.readData()
+                    time.sleep(0.4)
+                    # fade out red
+                    for r in range(201):
+                        self.canvas.Clear()
+                        self.lightCheckerTown(self.canvas)
+                        self.lightCell(self.canvas, enemy.row, enemy.col, 255-r, 0, 0)
+                        self.canvas = self.matrix.SwapOnVSync(self.canvas)
+                        time.sleep(0.002)
+
+                    state = self.master.getCellState(enemy.row, enemy.col)
+
+        elif (isinstance(self.grid[bestMove.newCell.row][bestMove.newCell.col], King)):
+            rookLocation, rookTarget = self.grid[bestMove.newCell.row][bestMove.newCell.col].move(bestMove.newCell.row, bestMove.newCell.col, self.grid)
+            if (rookLocation != None):
+                # do castling
+                self.grid[rookTarget.row][rookTarget.col] = self.grid[rookLocation.row][rookLocation.col]
+                self.grid[rookLocation.row][rookLocation.col] = None
+                self.grid[rookTarget.row][rookTarget.col].move(rookTarget.row, rookTarget.col, self.grid)
+        else:
+            self.grid[bestMove.newCell.row][bestMove.newCell.col].move(bestMove.newCell.row, bestMove.newCell.col, self.grid)
+
         self.grid[bestMove.oldCell.row][bestMove.oldCell.col] = None
 
         self.canvas.Clear()
         self.lightCheckerTown(self.canvas)
         self.canvas = self.matrix.SwapOnVSync(self.canvas)
+
+        self.bobRoss(team, self.grid)
 
 
 #                input("press enter when ready to continue")
@@ -1012,3 +1068,53 @@ class Board(SampleBase):
             return True
         else:
             return False
+
+
+    def bobRoss(self, team, tron):
+        if (self.peaceTime >= 50):
+            self.gameOver = True
+            self.staleMate()
+            return
+        else:
+            if (team == self.teamL):
+                daysSinceInjury = self.daysLeftSinceInjury
+                doubleJeopardy = self.doubleLeftJeopardy
+            else:
+                daysSinceInjury = self.daysRightSinceInjury
+                doubleJeopardy = self.doubleRightJeopardy
+            if (self.peaceTime == 0):
+                daysSinceInjury = []
+                doubleJeopardy = []
+            else:
+                secondMatch = True
+                for state in doubleJeopardy:
+                    for row in tron:
+                        for col in tron:
+                            if (state[row][col] != tron[row][col]):
+                                secondMatch = False
+                                break
+                        if (not secondMatch):
+                            break
+                    if (not secondMatch):
+                        break
+                if (secondMatch):
+                    self.gameOver = True
+                    self.staleMate()
+                    return
+                else:
+                    firstMatch = True
+                    for state in daysSinceInjury:
+                        for row in tron:
+                            for col in tron:
+                                if (state[row][col] != tron[row][col]):
+                                    firstMatch = False
+                                    break
+                            if (not secondMatch):
+                                break
+                        if (not secondMatch):
+                            break
+                    if (firstMatch):
+                        doubleJeopardy.append(tron)
+                    else:
+                        daysSinceInjury.append(tron)
+        return
