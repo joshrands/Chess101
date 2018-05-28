@@ -1069,7 +1069,6 @@ class Board(SampleBase):
         else:
             return False
 
-
     def bobRoss(self, team, tron):
         print(self.peaceTime)
         print("HELLOOOOOOOOOEOEOEOHFWIGFIUAGWfgwlkugefkrg")
@@ -1079,64 +1078,64 @@ class Board(SampleBase):
             return
         else:
             if (team == self.teamL):
-                daysSinceInjury = self.daysLeftSinceInjury
-                doubleJeopardy = self.doubleLeftJeopardy
+                self.bobRossJr(team, tron, daysLeftSinceInjury, doubleLeftJeopardy)
             else:
-                daysSinceInjury = self.daysRightSinceInjury
-                doubleJeopardy = self.doubleRightJeopardy
-            if (self.peaceTime == 0):
-                daysSinceInjury = []
-                doubleJeopardy = []
-                daysSinceInjury.append(tron)
-                print("clearing")
-            elif (len(daysSinceInjury) == 0):
-                daysSinceInjury.append(tron)
-                print("adding for 0")
-            else:
-                secondMatch = False
-                print("setting seconddMatch to false")
-                for state in doubleJeopardy:
-                    print("going through a state")
-                    secondMatch = True
-                    for row in range(0, 8):
-                        print("row")
-                        for col in range(0, 8):
-                            print("col")
-                            print(type(state[row][col]))
-                            print(type(tron[row][col]))
-                            if (not(type(state[row][col]) is type(tron[row][col]))):
-                                print("problem")
-                                secondMatch = False
-                                break
-                        if (not secondMatch):
+                self.bobRossJr(team, tron, daysRightSinceInjury, doubleRightJeopardy)
+
+    def bobRossJr(self, team, tron, daysSinceInjury, doubleJeopardy):
+        if (self.peaceTime == 0):
+            daysSinceInjury = []
+            doubleJeopardy = []
+            daysSinceInjury.append(tron)
+            print("clearing")
+        elif (len(daysSinceInjury) == 0):
+            daysSinceInjury.append(tron)
+            print("adding for 0")
+        else:
+            secondMatch = False
+            print("setting seconddMatch to false")
+            for state in doubleJeopardy:
+                print("going through a state")
+                secondMatch = True
+                for row in range(0, 8):
+                    print("row")
+                    for col in range(0, 8):
+                        print("col")
+                        print(type(state[row][col]))
+                        print(type(tron[row][col]))
+                        if (not(type(state[row][col]) is type(tron[row][col]))):
+                            print("problem")
+                            secondMatch = False
                             break
-                    if (secondMatch):
+                    if (not secondMatch):
                         break
                 if (secondMatch):
-                    self.gameOver = True
-                    self.staleMate()
-                    return
-                else:
-                    print("not a second dmatch")
-                    firstMatch = False
-                    for state in daysSinceInjury:
-                        print("new state")
-                        firstMatch = True
-                        for row in range(0, 8):
-                            print ("row")
-                            for col in range(0, 8):
-                                print ("col")
-                                if (not(type(state[row][col]) is type(tron[row][col]))):
-                                    print("problem")
-                                    firstMatch = False
-                                    break
-                            if (not firstMatch):
+                    break
+            if (secondMatch):
+                self.gameOver = True
+                self.staleMate()
+                return
+            else:
+                print("not a second dmatch")
+                firstMatch = False
+                for state in daysSinceInjury:
+                    print("new state")
+                    firstMatch = True
+                    for row in range(0, 8):
+                        print ("row")
+                        for col in range(0, 8):
+                            print ("col")
+                            if (not(type(state[row][col]) is type(tron[row][col]))):
+                                print("problem")
+                                firstMatch = False
                                 break
-                        if (firstMatch):
+                        if (not firstMatch):
                             break
                     if (firstMatch):
-                        doubleJeopardy.append(tron)
-                        print("double state")
-                    else:
-                        daysSinceInjury.append(tron)
+                        break
+                if (firstMatch):
+                    doubleJeopardy.append(tron)
+                    print("double state")
+                else:
+                    daysSinceInjury.append(tron)
         return
