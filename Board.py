@@ -1095,6 +1095,7 @@ class Board(SampleBase):
                 if (len(doubleJeopardy) == 0):
                     secondMatch = False
                 else:
+                    secondMatch = False
                     for state in doubleJeopardy:
                         secondMatch = True
                         for row in range(0, 8):
@@ -1106,13 +1107,14 @@ class Board(SampleBase):
                                     break
                             if (not secondMatch):
                                 break
-                        if (not secondMatch):
+                        if (secondMatch):
                             break
                 if (secondMatch):
                     self.gameOver = True
                     self.staleMate()
                     return
                 else:
+                    firstMatch = False
                     for state in daysSinceInjury:
                         firstMatch = True
                         for row in range(0, 8):
@@ -1124,7 +1126,7 @@ class Board(SampleBase):
                                     break
                             if (not firstMatch):
                                 break
-                        if (not firstMatch):
+                        if (firstMatch):
                             break
                     if (firstMatch):
                         doubleJeopardy.append(tron)
