@@ -912,11 +912,11 @@ class Board(SampleBase):
             for i in range (0, 8):
                 if (self.master.getCellState(3, i) == 0):
                     shutDownKey1 = True
-                    if (i = 7):
+                    if (i == 7):
                         restartKey1 = True
                 if (self.master.getCellState(4, i) == 0):
                     shutDownKey2 = True
-                    if (i = 7):
+                    if (i == 7):
                         restartKey2 = True
 
             if (shutDownKey1 and shutDownKey2):
