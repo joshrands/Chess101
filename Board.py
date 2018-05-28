@@ -1091,15 +1091,19 @@ class Board(SampleBase):
                 print("clearing")
             elif (len(daysSinceInjury) == 0):
                 daysSinceInjury.append(tron)
+                print("adding for 0")
             else:
                 secondMatch = False
+                print("setting seconddMatch to false")
                 for state in doubleJeopardy:
+                    print("going through a state")
                     secondMatch = True
                     for row in range(0, 8):
+                        print("row")
                         for col in range(0, 8):
-                            print(type(state[row][col]))
-                            print(type(tron[row][col]))
+                            print("col")
                             if (not(type(state[row][col]) is type(tron[row][col]))):
+                                print("problem")
                                 secondMatch = False
                                 break
                         if (not secondMatch):
@@ -1111,14 +1115,17 @@ class Board(SampleBase):
                     self.staleMate()
                     return
                 else:
+                    print("not a second dmatch")
                     firstMatch = False
                     for state in daysSinceInjury:
+                        print("new state")
                         firstMatch = True
                         for row in range(0, 8):
+                            print ("row")
                             for col in range(0, 8):
-                                print(type(state[row][col]))
-                                print(type(tron[row][col]))
+                                print ("col")
                                 if (not(type(state[row][col]) is type(tron[row][col]))):
+                                    print("problem")
                                     firstMatch = False
                                     break
                             if (not firstMatch):
