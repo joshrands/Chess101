@@ -368,9 +368,8 @@ class Board(SampleBase):
 
     def doTurn(self, team):
 
-        if(self.bobRoss(team, self.grid)){
+        if(self.bobRoss(team, self.grid)):
             return
-        }
 
         # disable enPassantable
         # calculate targets for all pieces
@@ -615,9 +614,8 @@ class Board(SampleBase):
 
     def computerMove(self, team, depth=2):
 
-        if(self.bobRoss(team, self.grid)){
+        if(self.bobRoss(team, self.grid)):
             return
-        }
 
         check = False
         checkMate = False
