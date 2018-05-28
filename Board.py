@@ -595,8 +595,8 @@ class Board(SampleBase):
             self.teamL.setName("Computer")
             self.teamR.setName("Human")
         else:
-            self.teamL.setName("Player 1")
-            self.teamR.setName("Player 2")
+            self.teamL.setName("Player 2")
+            self.teamR.setName("Player 1")
         #self.teamL.setColor()
 
     def lightCell(self, canvas, x, y, r, g, b):
@@ -1145,4 +1145,5 @@ class Board(SampleBase):
                 else:
                     print("adding to singles")
                     daysSinceInjury.append(copy.deepcopy(tron))
+                    print("length: ", len(daysSinceInjury))
         return
