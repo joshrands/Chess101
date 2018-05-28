@@ -1085,6 +1085,7 @@ class Board(SampleBase):
             if (self.peaceTime == 0):
                 daysSinceInjury = []
                 doubleJeopardy = []
+                daysSinceInjury.append(tron)
             elif (len(daysSinceInjury) == 0):
                 daysSinceInjury.append(tron)
             else:
