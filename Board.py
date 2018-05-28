@@ -57,6 +57,9 @@ class Board(SampleBase):
     def run(self):
         print("Running game...")
         self.canvas = self.matrix.CreateFrameCanvas()
+        self.matrix.SwapOnVSync(self.canvas)
+        self.lightCell(self.canvas, 0, 0, 255, 255, 0)
+        time.sleep(5)
 
         self.colorPicker()
 
@@ -65,8 +68,8 @@ class Board(SampleBase):
         self.createPlayers()
 
         # begin interactive setup
-        self.interactiveSetup(self.canvas, self.teamR)
-        self.interactiveSetup(self.canvas, self.teamL)
+        self.interactiveSetup(self.teamR)
+        self.interactiveSetup(self.teamL)
 
         self.initializeGameBoard()
 
@@ -128,41 +131,41 @@ class Board(SampleBase):
             for y in range(4):
                 self.lightCell(canvas, (2*x), 1 + 2*y, r, g, b)
 
-    def interactiveSetup(self, canvas, team):
-#        canvas = self.matrix.SwapOnVSync(canvas)
+    def interactiveSetup(self, team):
+        self.canvas.Clear()
         if (team == self.teamR):
             # setup Rook
-            self.detectPiece(canvas, team, "Rook", 0, 0)
-            self.lightCell(canvas, 0, 0, team.r, team.g, team.b) # light team color
-            self.detectPiece(canvas, team, "Rook", 0, 7)
+            self.detectPiece(team, "Rook", 0, 0)
+            self.lightCell(self.canvas, 0, 0, team.r, team.g, team.b) # light team color
+            self.detectPiece(team, "Rook", 0, 7)
             # setup Knight
-            self.detectPiece(canvas, team, "Knight", 0, 1)
-            self.detectPiece(canvas, team, "Knight", 0, 6)
+            self.detectPiece(team, "Knight", 0, 1)
+            self.detectPiece(team, "Knight", 0, 6)
             # setup bishop
-            self.detectPiece(canvas, team, "Bishop", 0, 2)
-            self.detectPiece(canvas, team, "Bishop", 0, 5)
+            self.detectPiece(team, "Bishop", 0, 2)
+            self.detectPiece(team, "Bishop", 0, 5)
             # setup Queen
-            self.detectPiece(canvas, team, "Queen", 0, 3)
+            self.detectPiece(team, "Queen", 0, 3)
             # setup King
-            self.detectPiece(canvas, team, "King", 0, 4)
+            self.detectPiece(team, "King", 0, 4)
             # setup Pawns
-            self.detectPawns(canvas, team, 1)
+            self.detectPawns(team, 1)
         else:
             # setup Rook
-            self.detectPiece(canvas, team, "Rook", 7, 0)
-            self.detectPiece(canvas, team, "Rook", 7, 7)
+            self.detectPiece(team, "Rook", 7, 0)
+            self.detectPiece(team, "Rook", 7, 7)
             # setup Knight
-            self.detectPiece(canvas, team, "Knight", 7, 1)
-            self.detectPiece(canvas, team, "Knight", 7, 6)
+            self.detectPiece(team, "Knight", 7, 1)
+            self.detectPiece(team, "Knight", 7, 6)
             # setup bishop
-            self.detectPiece(canvas, team, "Bishop", 7, 2)
-            self.detectPiece(canvas, team, "Bishop", 7, 5)
+            self.detectPiece(team, "Bishop", 7, 2)
+            self.detectPiece(team, "Bishop", 7, 5)
             # setup Queen
-            self.detectPiece(canvas, team, "Queen", 7, 3)
+            self.detectPiece(team, "Queen", 7, 3)
             # setup King
-            self.detectPiece(canvas, team, "King", 7, 4)
+            self.detectPiece(team, "King", 7, 4)
             # setup Pawns
-            self.detectPawns(canvas, team, 6)
+            self.detectPawns(team, 6)
 
     def detectMismatch(self, canvas):
         # read data into master
@@ -232,10 +235,10 @@ class Board(SampleBase):
         # mismatch complete return true
         return True
 
-    def detectPawns(self, canvas, team, row):
+    def detectPawns(self, team, row):
         #print("Please place pawns")
         for col in range(8):
-            self.lightCell(canvas, row, col, 255, 255, 255)
+            self.lightCell(self.canvas, row, col, 255, 255, 255)
         placed = False
         while not placed:
             placed = True
@@ -244,19 +247,19 @@ class Board(SampleBase):
                 # why read every time? self.master.readData()
                 if (self.master.getCellState(row, col) == 1):
                     placed = False
-                    self.lightCell(canvas, row, col, 255, 255, 255)
+                    self.lightCell(self.canvas, row, col, 255, 255, 255)
                 else:
-                    self.lightCell(canvas, row, col, team.r, team.g, team.b)
+                    self.lightCell(self.canvas, row, col, team.r, team.g, team.b)
                     # pawn was placed, light cell team color
             time.sleep(0.1)
         #print("Pawns placed.")
 
-    def detectPiece(self, canvas, team, piece, row, col):
+    def detectPiece(self, team, piece, row, col):
         # setup teamR
         #print("Place " + piece + " here:")
         # light up cell white
-        self.lightCell(canvas, row, col, 255, 255, 255)
-        canvas = self.matrix.SwapOnVSync(canvas)
+        self.lightCell(self.canvas, row, col, 255, 255, 255)
+        self.canvas = self.matrix.SwapOnVSync(self.canvas)
         placed = False
         while not placed:
             self.master.readData()
@@ -266,11 +269,7 @@ class Board(SampleBase):
         #print(piece + " set.")
         self.lightCell(canvas, row, col, team.r, team.g, team.b) # light team color
         # just added
-        #canvas = self.matrix.SwapOnVSync(canvas)
-        del self.matrix
-        self.matrix = RGBMatrix(options = self.options)
-        self.canvas = self.matrix.CreateFrameCanvas()
-
+        self.matrix.SwapOnVSync(self.canvas)
     # detect lift off
     def detectLiftOff(self, team):
         # team is current team
