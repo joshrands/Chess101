@@ -1094,7 +1094,7 @@ class Board(SampleBase):
                                 if (not (state[row][col] == None and tron[row][col] == None)):
                                     secondMatch = False
                                     break
-                            elif (not(type(state[row][col]) is type(tron[row][col]))):
+                            elif (not(isinstance(state[row][col], type(tron[row][col])))):
                                 secondMatch = False
                                 break
                         if (not secondMatch):
@@ -1114,7 +1114,7 @@ class Board(SampleBase):
                                     if (not (state[row][col] == None and tron[row][col] == None)):
                                         firstMatch = False
                                         break
-                                elif (not(type(state[row][col]) is type(tron[row][col]))):
+                                elif (not(isinstance(state[row][col], type(tron[row][col])))):
                                     firstMatch = False
                                     break
                             if (not firstMatch):
