@@ -1103,6 +1103,8 @@ class Board(SampleBase):
                                     if (not (state[row][col] == None and tron[row][col] == None)):
                                         secondMatch = False
                                         break
+                                print(type(state[row][col]))
+                                print(type(tron[row][col]))
                                 elif (not(isinstance(state[row][col], type(tron[row][col])))):
                                     secondMatch = False
                                     break
@@ -1123,6 +1125,8 @@ class Board(SampleBase):
                                     if (not (state[row][col] == None and tron[row][col] == None)):
                                         firstMatch = False
                                         break
+                                print(type(state[row][col]))
+                                print(type(tron[row][col]))
                                 elif (not(isinstance(state[row][col], type(tron[row][col])))):
                                     firstMatch = False
                                     break
