@@ -1093,8 +1093,8 @@ class Board(SampleBase):
                 else:
                     secondMatch = True
                     for state in doubleJeopardy:
-                        for row in tron:
-                            for col in tron:
+                        for row in range(0, 8):
+                            for col in range(0, 8):
                                 if (state[row][col] == None or tron[row][col] == None):
                                     if (not (state[row][col] == None and tron[row][col] == None)):
                                         secondMatch = False
@@ -1113,8 +1113,8 @@ class Board(SampleBase):
                 else:
                     firstMatch = True
                     for state in daysSinceInjury:
-                        for row in tron:
-                            for col in tron:
+                        for row in range(0, 8):
+                            for col in range(0, 8):
                                 if (state[row][col] == None or tron[row][col] == None):
                                     if (not (state[row][col] == None and tron[row][col] == None)):
                                         firstMatch = False
