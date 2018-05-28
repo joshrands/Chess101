@@ -1078,9 +1078,9 @@ class Board(SampleBase):
             return
         else:
             if (team == self.teamL):
-                self.bobRossJr(team, tron, daysLeftSinceInjury, doubleLeftJeopardy)
+                self.bobRossJr(team, tron, self.daysLeftSinceInjury, self.doubleLeftJeopardy)
             else:
-                self.bobRossJr(team, tron, daysRightSinceInjury, doubleRightJeopardy)
+                self.bobRossJr(team, tron, self.daysRightSinceInjury, self.doubleRightJeopardy)
 
     def bobRossJr(self, team, tron, daysSinceInjury, doubleJeopardy):
         if (self.peaceTime == 0):
