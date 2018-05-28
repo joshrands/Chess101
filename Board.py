@@ -603,7 +603,6 @@ class Board(SampleBase):
         piecesWithMoves = 0
         self.checkerBrightness = 255;
 
-
         #count total targets for this team for stalemate purposes
         #count = 0;
         for row in self.grid:
