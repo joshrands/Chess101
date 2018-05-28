@@ -485,7 +485,7 @@ class Board(SampleBase):
                             if (self.grid[targetRow][targetCol] != None):
                                 self.peaceTime = 0
                             else:
-                                self.peaceTime++
+                                self.peaceTime += 1
                             self.grid[targetRow][targetCol] = self.grid[row][col]
                             if (isinstance(self.grid[targetRow][targetCol], Pawn)):
                                 self.peaceTime = 0
