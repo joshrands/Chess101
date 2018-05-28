@@ -81,7 +81,7 @@ class Board(SampleBase):
             if (self.computerPlayerR):
                 self.computerMove(self.teamR, self.canvas)
             else:
-                self.doTurn(canvas, self.teamR)
+                self.doTurn(self.canvas, self.teamR)
                 self.canvas = self.matrix.CreateFrameCanvas()
 
             if (self.gameOver):
