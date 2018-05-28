@@ -1116,7 +1116,7 @@ class Board(SampleBase):
                     return
                 else:
                     for state in daysSinceInjury:
-                        secondMatch = True
+                        firstMatch = True
                         for row in range(0, 8):
                             for col in range(0, 8):
                                 if (state[row][col] == None or tron[row][col] == None):
