@@ -1090,6 +1090,7 @@ class Board(SampleBase):
             doubleJeopardy = []
             daysSinceInjury.append(copy.deepcopy(tron))
             print("clearing and adding")
+            print("length: ", len(daysSinceInjury))
         else:
             secondMatch = False
             print("setting seconddMatch to false")
