@@ -1093,6 +1093,7 @@ class Board(SampleBase):
         else:
             secondMatch = False
             print("setting seconddMatch to false")
+            print (len(doubleJeopardy))
             for state in doubleJeopardy:
                 print("going through a state")
                 secondMatch = True
@@ -1117,6 +1118,7 @@ class Board(SampleBase):
             else:
                 print("not a second dmatch")
                 firstMatch = False
+                print (len(daysSinceInjury))
                 for state in daysSinceInjury:
                     print("new state")
                     firstMatch = True
