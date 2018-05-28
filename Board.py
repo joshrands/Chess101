@@ -919,7 +919,7 @@ class Board(SampleBase):
                     if (i == 7):
                         restartKey2 = True
 
-            if (shutDownKey3 and shutDownKey2):
+            if (shutDownKey1 and shutDownKey2):
                 self.canvas.Clear()
 
                 for i in range (0, 12):
