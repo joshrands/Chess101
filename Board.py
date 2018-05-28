@@ -1099,12 +1099,12 @@ class Board(SampleBase):
                         secondMatch = True
                         for row in range(0, 8):
                             for col in range(0, 8):
+                                print(type(state[row][col]))
+                                print(type(tron[row][col]))
                                 if (state[row][col] == None or tron[row][col] == None):
                                     if (not (state[row][col] == None and tron[row][col] == None)):
                                         secondMatch = False
                                         break
-                                print(type(state[row][col]))
-                                print(type(tron[row][col]))
                                 elif (not(isinstance(state[row][col], type(tron[row][col])))):
                                     secondMatch = False
                                     break
@@ -1121,12 +1121,12 @@ class Board(SampleBase):
                         firstMatch = True
                         for row in range(0, 8):
                             for col in range(0, 8):
+                                print(type(state[row][col]))
+                                print(type(tron[row][col]))
                                 if (state[row][col] == None or tron[row][col] == None):
                                     if (not (state[row][col] == None and tron[row][col] == None)):
                                         firstMatch = False
                                         break
-                                print(type(state[row][col]))
-                                print(type(tron[row][col]))
                                 elif (not(isinstance(state[row][col], type(tron[row][col])))):
                                     firstMatch = False
                                     break
