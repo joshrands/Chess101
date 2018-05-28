@@ -367,6 +367,8 @@ class Board(SampleBase):
 
 
     def doTurn(self, team):
+
+        self.bobRoss(team, self.grid)
         # disable enPassantable
         # calculate targets for all pieces
 
@@ -537,7 +539,7 @@ class Board(SampleBase):
                         self.lightCheckerTown(self.canvas)
 
                         self.canvas = self.matrix.SwapOnVSync(self.canvas)
-        self.bobRoss(team, self.grid)
+        #self.bobRoss(team, self.grid)
 
     def lightTargets(self, piece):
         #piece.calcTargets(self.grid)
