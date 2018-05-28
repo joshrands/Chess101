@@ -1085,6 +1085,8 @@ class Board(SampleBase):
             if (self.peaceTime == 0):
                 daysSinceInjury = []
                 doubleJeopardy = []
+            elif (self.peaceTime == 1):
+                daysSinceInjury.append(tron)
             else:
                 secondMatch = True
                 for state in doubleJeopardy:
