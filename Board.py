@@ -1090,7 +1090,11 @@ class Board(SampleBase):
                 for state in doubleJeopardy:
                     for row in tron:
                         for col in tron:
-                            if (state[row][col] != tron[row][col]):
+                            if (state[row][col] == None or tron[row][col] == None):
+                                if (not (state[row][col] == None and tron[row][col] == None):
+                                    secondMatch = False
+                                    break
+                            elif (not(type(state[row][col]) is type(tron[row][col]))):
                                 secondMatch = False
                                 break
                         if (not secondMatch):
@@ -1106,12 +1110,16 @@ class Board(SampleBase):
                     for state in daysSinceInjury:
                         for row in tron:
                             for col in tron:
-                                if (state[row][col] != tron[row][col]):
+                                if (state[row][col] == None or tron[row][col] == None):
+                                    if (not (state[row][col] == None and tron[row][col] == None):
+                                        firstMatch = False
+                                        break
+                                elif (not(type(state[row][col]) is type(tron[row][col]))):
                                     firstMatch = False
                                     break
-                            if (not secondMatch):
+                            if (not firstMatch):
                                 break
-                        if (not secondMatch):
+                        if (not firstMatch):
                             break
                     if (firstMatch):
                         doubleJeopardy.append(tron)
