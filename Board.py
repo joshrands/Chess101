@@ -367,6 +367,10 @@ class Board(SampleBase):
 
 
     def doTurn(self, team):
+
+        if(self.bobRoss(team, self.grid)):
+            return
+
         # disable enPassantable
         # calculate targets for all pieces
 
@@ -538,7 +542,7 @@ class Board(SampleBase):
                         self.lightCheckerTown(self.canvas)
 
                         self.canvas = self.matrix.SwapOnVSync(self.canvas)
-        self.bobRoss(team, self.grid)
+        #self.bobRoss(team, self.grid)
 
     def lightTargets(self, piece):
         #piece.calcTargets(self.grid)
@@ -630,8 +634,8 @@ class Board(SampleBase):
             self.teamL.setName("Computer")
             self.teamR.setName("Human")
         else:
-            self.teamL.setName("Player 1")
-            self.teamR.setName("Player 2")
+            self.teamL.setName("Player 2")
+            self.teamR.setName("Player 1")
         #self.teamL.setColor()
 
     def lightCell(self, canvas, x, y, r, g, b):
@@ -647,6 +651,10 @@ class Board(SampleBase):
             print(grid[r])
 
     def computerMove(self, team, depth=2):
+
+        if(self.bobRoss(team, self.grid)):
+            return
+
         check = False
         checkMate = False
         kingRow = -1
@@ -832,8 +840,6 @@ class Board(SampleBase):
         self.canvas.Clear()
         self.lightCheckerTown(self.canvas)
         self.canvas = self.matrix.SwapOnVSync(self.canvas)
-
-        self.bobRoss(team, self.grid)
 
 
 #                input("press enter when ready to continue")
@@ -1107,70 +1113,84 @@ class Board(SampleBase):
         else:
             return False
 
-
     def bobRoss(self, team, tron):
         print(self.peaceTime)
-        print("HELLOOOOOOOOOEOEOEOHFWIGFIUAGWfgwlkugefkrg")
         if (self.peaceTime >= 50):
             self.gameOver = True
             self.staleMate()
-            return
+            return True
         else:
             if (team == self.teamL):
-                daysSinceInjury = self.daysLeftSinceInjury
-                doubleJeopardy = self.doubleLeftJeopardy
+                #print("using left, length of days:", len(self.daysLeftSinceInjury), "length double:", len(self.doubleLeftJeopardy))
+                return self.bobRossJr(team, tron, self.daysLeftSinceInjury, self.doubleLeftJeopardy)
             else:
-                daysSinceInjury = self.daysRightSinceInjury
-                doubleJeopardy = self.doubleRightJeopardy
-            if (self.peaceTime == 0):
-                daysSinceInjury = []
-                doubleJeopardy = []
-                daysSinceInjury.append(tron)
-                print("clearing")
-            elif (len(daysSinceInjury) == 0):
-                daysSinceInjury.append(tron)
-            else:
-                if (len(doubleJeopardy) == 0):
-                    secondMatch = False
-                else:
-                    for state in doubleJeopardy:
-                        secondMatch = True
-                        for row in range(0, 8):
-                            for col in range(0, 8):
-                                if (state[row][col] == None or tron[row][col] == None):
-                                    if (not (state[row][col] == None and tron[row][col] == None)):
-                                        secondMatch = False
-                                        break
-                                elif (not(isinstance(state[row][col], type(tron[row][col])))):
-                                    secondMatch = False
-                                    break
-                            if (not secondMatch):
-                                break
-                        if (not secondMatch):
+                #print("using right, length of days:", len(self.daysRightSinceInjury), "length double:", len(self.doubleRightJeopardy))
+                return self.bobRossJr(team, tron, self.daysRightSinceInjury, self.doubleRightJeopardy)
+
+    def bobRossJr(self, team, tron, daysSinceInjury, doubleJeopardy):
+        if (self.peaceTime == 0):
+            daysSinceInjury.clear()
+            doubleJeopardy.clear()
+            daysSinceInjury.append(copy.deepcopy(tron))
+            #print("clearing and adding")
+            #print("length: ", len(daysSinceInjury))
+            #print("using left, length of days:", len(self.daysLeftSinceInjury), "length double:", len(self.doubleLeftJeopardy))
+            #print("using right, length of days:", len(self.daysRightSinceInjury), "length double:", len(self.doubleRightJeopardy))
+
+        else:
+            secondMatch = False
+            #print("setting seconddMatch to false")
+            #print (len(doubleJeopardy))
+            for state in doubleJeopardy:
+                #print("going through a state")
+                secondMatch = True
+                for row in range(0, 8):
+                    #print("row")
+                    for col in range(0, 8):
+                        #print("col")
+                        #print(type(state[row][col]))
+                        #print(type(tron[row][col]))
+                        if (not(type(state[row][col]) is type(tron[row][col]))):
+                            #print("problem")
+                            secondMatch = False
                             break
+                    if (not secondMatch):
+                        break
                 if (secondMatch):
-                    self.gameOver = True
-                    self.staleMate()
-                    return
-                else:
-                    for state in daysSinceInjury:
-                        firstMatch = True
-                        for row in range(0, 8):
-                            for col in range(0, 8):
-                                if (state[row][col] == None or tron[row][col] == None):
-                                    if (not (state[row][col] == None and tron[row][col] == None)):
-                                        firstMatch = False
-                                        break
-                                elif (not(isinstance(state[row][col], type(tron[row][col])))):
-                                    firstMatch = False
-                                    break
-                            if (not firstMatch):
+                    break
+            if (secondMatch):
+                self.gameOver = True
+                self.staleMate()
+                return True
+            else:
+                #print("not a second dmatch")
+                firstMatch = False
+                #print (len(daysSinceInjury))
+                for state in daysSinceInjury:
+                    #print("new state")
+                    firstMatch = True
+                    for row in range(0, 8):
+                        #print ("row")
+                        for col in range(0, 8):
+                            #print ("col")
+                            #print(type(state[row][col]))
+                            #print(type(tron[row][col]))
+                            if (not(type(state[row][col]) is type(tron[row][col]))):
+                                #print("problem")
+                                firstMatch = False
+                                #print ("break 1")
                                 break
                         if (not firstMatch):
+                            #print ("break 2")
                             break
                     if (firstMatch):
-                        doubleJeopardy.append(tron)
-                        print("double state")
-                    else:
-                        daysSinceInjury.append(tron)
-        return
+                        #print("counter break")
+                        break
+                if (firstMatch):
+                    doubleJeopardy.append(copy.deepcopy(tron))
+                    #print("double state")
+                else:
+                    #print("adding to singles")
+                    daysSinceInjury.append(copy.deepcopy(tron))
+                    #print("length: ", len(daysSinceInjury))
+        return False
