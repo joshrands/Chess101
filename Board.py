@@ -73,14 +73,14 @@ class Board(SampleBase):
         self.canvas.Clear()
         tempCanvas = self.matrix.SwapOnVSync(self.canvas)
 
-        self.interactiveSetup(self.teamR)
-        self.interactiveSetup(self.teamL)
+        #self.interactiveSetup(self.teamR)
+        #self.interactiveSetup(self.teamL)
 
         tempCanvas.Clear()
         self.lightCheckerTown(tempCanvas)
         self.canvas = self.matrix.SwapOnVSync(tempCanvas)
 
-        self.initializeGameBoard()
+        self.initializeGameBoard2()
 
         while (not self.gameOver):
             self.canvas.Clear()
@@ -419,6 +419,7 @@ class Board(SampleBase):
 
         # check for mismatch
         self.detectMismatch()
+        self.detectMismatch()
 
         time.sleep(0.25)
 
@@ -584,6 +585,43 @@ class Board(SampleBase):
         self.grid[7][3] = Queen(7, 3, self.teamL)
         self.grid[7][4] = King(7, 4, self.teamL)
 
+    def initializeGameBoard2(self):
+        # create pieces in each team
+        # TEAM R
+        # create pawns for teamR
+        for col in range(0, 7):
+            self.grid[1][col] = Pawn(1, col, self.teamR)
+
+        self.grid[5][7] = Pawn(5, 7, self.teamR)
+        # create bishop for teamR
+        self.grid[0][2] = Bishop(0, 2, self.teamR)
+        self.grid[0][5] = Bishop(0, 5, self.teamR)
+        # create rook for teamR
+        self.grid[0][0] = Rook(0, 0, self.teamR)
+        self.grid[0][7] = Rook(0, 7, self.teamR)
+        self.grid[0][1] = Knight(0, 1, self.teamR)
+        self.grid[0][6] = Knight(0, 6, self.teamR)
+        self.grid[0][3] = Queen(0, 3, self.teamR)
+        self.grid[0][4] = King(0, 4, self.teamR)
+
+        # TEAM L
+        # create pawns for teamL
+        for col in range(0, 6):
+            if col == 3:
+                continue
+            self.grid[6][col] = Pawn(6, col, self.teamL)
+        # create bishop for teamL
+        self.grid[7][2] = Bishop(7, 2, self.teamL)
+
+        # create rook for teamL
+        self.grid[7][0] = Rook(7, 0, self.teamL)
+
+        self.grid[7][1] = Knight(7, 1, self.teamL)
+
+        self.grid[6][6] = Queen(6, 6, self.teamL)
+        self.grid[7][4] = King(7, 4, self.teamL)
+
+
     def createPlayers(self):
         if (self.computerPlayerR):
             self.teamR.setName("Computer")
@@ -614,7 +652,7 @@ class Board(SampleBase):
         kingRow = -1
         kingCol = -1
         piecesWithMoves = 0
-        self.checkerBrightness = 255;
+        self.checkerBrightness = 255
 
         #count total targets for this team for stalemate purposes
         #count = 0;
