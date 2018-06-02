@@ -73,14 +73,14 @@ class Board(SampleBase):
         self.canvas.Clear()
         tempCanvas = self.matrix.SwapOnVSync(self.canvas)
 
-        #self.interactiveSetup(self.teamR)
-        #self.interactiveSetup(self.teamL)
+        self.interactiveSetup(self.teamR)
+        self.interactiveSetup(self.teamL)
 
         tempCanvas.Clear()
         self.lightCheckerTown(tempCanvas)
         self.canvas = self.matrix.SwapOnVSync(tempCanvas)
 
-        self.initializeGameBoard2()
+        self.initializeGameBoard()
 
         while (not self.gameOver):
             self.canvas.Clear()
@@ -597,7 +597,7 @@ class Board(SampleBase):
             self.grid[1][col] = Pawn(1, col, self.teamR)
 
         self.grid[5][7] = Pawn(5, 7, self.teamR)
-        
+
 
         # TEAM L
         # create pawns for teamL
