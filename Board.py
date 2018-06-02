@@ -597,16 +597,7 @@ class Board(SampleBase):
             self.grid[1][col] = Pawn(1, col, self.teamR)
 
         self.grid[5][7] = Pawn(5, 7, self.teamR)
-        # create bishop for teamR
-        self.grid[0][2] = Bishop(0, 2, self.teamR)
-        self.grid[0][5] = Bishop(0, 5, self.teamR)
-        # create rook for teamR
-        self.grid[0][0] = Rook(0, 0, self.teamR)
-        self.grid[0][7] = Rook(0, 7, self.teamR)
-        self.grid[0][1] = Knight(0, 1, self.teamR)
-        self.grid[0][6] = Knight(0, 6, self.teamR)
-        self.grid[0][3] = Queen(0, 3, self.teamR)
-        self.grid[0][4] = King(0, 4, self.teamR)
+        
 
         # TEAM L
         # create pawns for teamL
