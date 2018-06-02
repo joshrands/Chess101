@@ -610,7 +610,7 @@ class Board(SampleBase):
 
         # TEAM L
         # create pawns for teamL
-        for col in range(0, 7):
+        for col in range(0, 6):
             if col == 3:
                 continue
             self.grid[6][col] = Pawn(6, col, self.teamL)
@@ -619,11 +619,11 @@ class Board(SampleBase):
 
         # create rook for teamL
         self.grid[7][0] = Rook(7, 0, self.teamL)
-        self.grid[7][6] = Rook(7, 6, self.teamL)
+        self.grid[7][7] = Rook(7, 7, self.teamL)
 
         self.grid[7][1] = Knight(7, 1, self.teamL)
 
-        self.grid[7][3] = Queen(7, 3, self.teamL)
+        self.grid[6][6] = Queen(6, 6, self.teamL)
         self.grid[7][4] = King(7, 4, self.teamL)
 
 
