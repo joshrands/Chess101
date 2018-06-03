@@ -73,14 +73,14 @@ class Board(SampleBase):
         self.canvas.Clear()
         tempCanvas = self.matrix.SwapOnVSync(self.canvas)
 
-        #self.interactiveSetup(self.teamR)
-        #self.interactiveSetup(self.teamL)
+        self.interactiveSetup(self.teamR)
+        self.interactiveSetup(self.teamL)
 
         tempCanvas.Clear()
         self.lightCheckerTown(tempCanvas)
         self.canvas = self.matrix.SwapOnVSync(tempCanvas)
 
-        self.initializeGameBoard5()
+        self.initializeGameBoard()
 
         while (not self.gameOver):
             self.canvas.Clear()
