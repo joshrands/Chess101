@@ -639,9 +639,11 @@ class Board(SampleBase):
 
         # TEAM L
         self.grid[5][0] = Pawn(5, 0, self.teamL)
+        self.grid[5][0].direction = -1
         self.grid[6][1] = Pawn(6, 1, self.teamL)
         self.grid[6][2] = Pawn(6, 2, self.teamL)
         self.grid[5][3] = Pawn(5, 3, self.teamL)
+        self.grid[5][3].direction = -1
         self.grid[6][7] = Pawn(6, 7, self.teamL)
 
         # create bishop for teamL
