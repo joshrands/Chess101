@@ -635,6 +635,7 @@ class Board(SampleBase):
         self.grid[1][4] = Knight(1, 4, self.teamR)
         self.grid[2][2] = Queen(2, 2, self.teamR)
         self.grid[0][5] = King(0, 5, self.teamR)
+        self.grid[0][5].touched = True
 
         # TEAM L
         self.grid[5][0] = Pawn(5, 0, self.teamL)
@@ -654,6 +655,7 @@ class Board(SampleBase):
 
         self.grid[4][5] = Queen(4, 5, self.teamL)
         self.grid[6][4] = King(6, 4, self.teamL)
+        self.grid[6][4].touched = True
 
 
     def createPlayers(self):
