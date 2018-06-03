@@ -6,7 +6,7 @@ from Piece import Piece
 class Tree(object):
     def __init__(self, boardState, oldCell, newCell, teamR, teamL):
         self.children = []
-        self.boardState = boardState
+        self.boardState = copy.deepcopy(boardState)
 
         #Instead of tracking the piece that's moving, just track the cells and handle it appropriately further up
         self.oldCell = oldCell
