@@ -73,14 +73,14 @@ class Board(SampleBase):
         self.canvas.Clear()
         tempCanvas = self.matrix.SwapOnVSync(self.canvas)
 
-        self.interactiveSetup(self.teamR)
-        self.interactiveSetup(self.teamL)
+        #self.interactiveSetup(self.teamR)
+        #self.interactiveSetup(self.teamL)
 
         tempCanvas.Clear()
         self.lightCheckerTown(tempCanvas)
         self.canvas = self.matrix.SwapOnVSync(tempCanvas)
 
-        self.initializeGameBoard()
+        self.initializeGameBoard3()
 
         while (not self.gameOver):
             self.canvas.Clear()
@@ -617,6 +617,44 @@ class Board(SampleBase):
         self.grid[6][6] = Queen(6, 6, self.teamL)
         self.grid[7][4] = King(7, 4, self.teamL)
 
+    def initializeGameBoard3(self):
+        # create pieces in each team
+        # TEAM R
+        # create pawns for teamR
+        self.grid[1][0] = Pawn(1, 0, self.teamR)
+        self.grid[2][1] = Pawn(2, 1, self.teamR)
+        self.grid[1][6] = Pawn(1, 6, self.teamR)
+        self.grid[1][7] = Pawn(1, 7, self.teamR)
+        self.grid[5][2] = Pawn(5, 2, self.teamR)
+
+        # create bishop for teamR
+        self.grid[0][2] = Bishop(0, 2, self.teamR)
+        self.grid[4][7] = Bishop(4, 7, self.teamR)
+        # create rook for teamR
+        self.grid[0][7] = Rook(0, 7, self.teamR)
+        self.grid[1][4] = Knight(1, 4, self.teamR)
+        self.grid[2][2] = Queen(2, 2, self.teamR)
+        self.grid[0][5] = King(0, 5, self.teamR)
+
+        # TEAM L
+        self.grid[5][0] = Pawn(5, 0, self.teamL)
+        self.grid[6][1] = Pawn(6, 1, self.teamL)
+        self.grid[6][2] = Pawn(6, 2, self.teamL)
+        self.grid[5][3] = Pawn(5, 3, self.teamL)
+        self.grid[6][7] = Pawn(6, 7, self.teamL)
+
+        # create bishop for teamL
+        self.grid[1][5] = Bishop(1, 5, self.teamL)
+
+        # create rook for teamL
+        self.grid[7][0] = Rook(7, 0, self.teamL)
+        self.grid[7][6] = Rook(7, 6, self.teamL)
+
+        self.grid[0][0] = Knight(0, 0, self.teamL)
+
+        self.grid[4][5] = Queen(4, 5, self.teamL)
+        self.grid[6][4] = King(6, 4, self.teamL)
+
 
     def createPlayers(self):
         if (self.computerPlayerR):
@@ -1054,7 +1092,7 @@ class Board(SampleBase):
 
     def addNodes(self, currentNode, team, depth=2):
         #print ("depth remaining: " + str(depth))
-
+        currentNode = copy.deepcopy(currentNode)
         #if the depth is 0, we've reached the "bottom" of the tree (as far as we initially told it to go)
         if (depth == 0):
             return
