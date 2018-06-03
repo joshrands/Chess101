@@ -705,6 +705,7 @@ class Board(SampleBase):
         # create pawns for teamR
 
         self.grid[6][1] = Pawn(6, 1, self.teamR)
+        self.grid[6][1].direction = 1
 
         # create bishop for teamR
         self.grid[0][5] = King(0, 5, self.teamR)
@@ -712,8 +713,6 @@ class Board(SampleBase):
 
         # TEAM L
         self.grid[7][0] = Rook(7, 0, self.teamL)
-        self.grid[1][7] = Rook(1, 7, self.teamL)
-        self.grid[2][5] = Knight(2, 5, self.teamL)
 
         self.grid[6][4] = King(6, 4, self.teamL)
         self.grid[6][4].touched = True
