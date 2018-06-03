@@ -1094,7 +1094,7 @@ class Board(SampleBase):
 
     def addNodes(self, currentNode, team, depth=2):
         #print ("depth remaining: " + str(depth))
-        currentNode = copy.deepcopy(currentNode)
+        currentNode = currentNode
         #if the depth is 0, we've reached the "bottom" of the tree (as far as we initially told it to go)
         if (depth == 0):
             return
