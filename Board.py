@@ -80,7 +80,7 @@ class Board(SampleBase):
         self.lightCheckerTown(tempCanvas)
         self.canvas = self.matrix.SwapOnVSync(tempCanvas)
 
-        self.initializeGameBoard3()
+        self.initializeGameBoard4()
 
         while (not self.gameOver):
             self.canvas.Clear()
@@ -652,6 +652,46 @@ class Board(SampleBase):
         # create rook for teamL
         self.grid[7][0] = Rook(7, 0, self.teamL)
         self.grid[7][6] = Rook(7, 6, self.teamL)
+
+        self.grid[0][0] = Knight(0, 0, self.teamL)
+
+        self.grid[4][5] = Queen(4, 5, self.teamL)
+        self.grid[6][4] = King(6, 4, self.teamL)
+        self.grid[6][4].touched = True
+
+    def initializeGameBoard4(self):
+        # create pieces in each team
+        # TEAM R
+        # create pawns for teamR
+        self.grid[1][0] = Pawn(1, 0, self.teamR)
+        self.grid[2][1] = Pawn(2, 1, self.teamR)
+        self.grid[1][6] = Pawn(1, 6, self.teamR)
+        self.grid[1][7] = Pawn(1, 7, self.teamR)
+        self.grid[6][1] = Pawn(6, 1, self.teamR)
+
+        # create bishop for teamR
+        self.grid[0][2] = Bishop(0, 2, self.teamR)
+        self.grid[4][7] = Bishop(4, 7, self.teamR)
+        # create rook for teamR
+        self.grid[0][7] = Rook(0, 7, self.teamR)
+        self.grid[1][4] = Knight(1, 4, self.teamR)
+        self.grid[2][2] = Queen(2, 2, self.teamR)
+        self.grid[0][5] = King(0, 5, self.teamR)
+        self.grid[0][5].touched = True
+
+        # TEAM L
+        self.grid[5][0] = Pawn(5, 0, self.teamL)
+        self.grid[5][0].direction = -1
+        self.grid[6][2] = Pawn(6, 2, self.teamL)
+        self.grid[5][3] = Pawn(5, 3, self.teamL)
+        self.grid[5][3].direction = -1
+        self.grid[6][7] = Pawn(6, 7, self.teamL)
+
+        # create bishop for teamL
+        self.grid[1][5] = Bishop(1, 5, self.teamL)
+
+        # create rook for teamL
+        self.grid[7][0] = Rook(7, 0, self.teamL)
 
         self.grid[0][0] = Knight(0, 0, self.teamL)
 
