@@ -1170,7 +1170,7 @@ class Board(SampleBase):
                 newPiece = newBoard[piece.row][piece.col]
                 #If it is, make the move and add the child to the current node
                 newBoard[target.row][target.col] = newPiece
-                newPiece.move(target.row, target.col, currentNode.boardState)
+                newPiece.move(target.row, target.col, newBoard)
                 newBoard[piece.row][piece.col] = None
 
                 #TODO comment this out once boardstates was complete
