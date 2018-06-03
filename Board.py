@@ -1169,7 +1169,7 @@ class Board(SampleBase):
                 newBoard = copy.deepcopy(currentNode.boardState)
                 newPiece = newBoard[piece.row][piece.col]
                 #If it is, make the move and add the child to the current node
-                newPiece.move(target.row, target.col, self.grid)
+                newPiece.move(target.row, target.col, currentNode.boardState)
                 newBoard[piece.row][piece.col] = None
                 newBoard[target.row][target.col] = newPiece
                 #TODO comment this out once boardstates was complete
