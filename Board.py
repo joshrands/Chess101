@@ -706,7 +706,7 @@ class Board(SampleBase):
 
         self.grid[6][1] = Pawn(6, 1, self.teamR)
         self.grid[6][1].direction = 1
-        self.grid[6][1].touched = True
+        self.grid[6][1].startingRow = 1
 
         # create bishop for teamR
         self.grid[0][5] = King(0, 5, self.teamR)
