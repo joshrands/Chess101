@@ -735,7 +735,7 @@ class Board(SampleBase):
                 return
 
         #Create the whole tree recursively
-        root = Tree(self.grid, None, None, self.teamR, self.teamL)
+        root = Tree(copy.deepcopy(self.grid), None, None, self.teamR, self.teamL)
         self.addNodes(root, team, depth)
 
         #Create a new AI object with tree
