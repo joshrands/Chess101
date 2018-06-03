@@ -80,7 +80,7 @@ class Board(SampleBase):
         self.lightCheckerTown(tempCanvas)
         self.canvas = self.matrix.SwapOnVSync(tempCanvas)
 
-        self.initializeGameBoard4()
+        self.initializeGameBoard5()
 
         while (not self.gameOver):
             self.canvas.Clear()
@@ -696,6 +696,23 @@ class Board(SampleBase):
         self.grid[0][0] = Knight(0, 0, self.teamL)
 
         self.grid[4][5] = Queen(4, 5, self.teamL)
+        self.grid[6][4] = King(6, 4, self.teamL)
+        self.grid[6][4].touched = True
+
+    def initializeGameBoard5(self):
+        # create pieces in each team
+        # TEAM R
+        # create pawns for teamR
+
+        self.grid[6][1] = Pawn(6, 1, self.teamR)
+
+        # create bishop for teamR
+        self.grid[0][5] = King(0, 5, self.teamR)
+        self.grid[0][5].touched = True
+
+        # TEAM L
+        self.grid[7][0] = Rook(7, 0, self.teamL)
+
         self.grid[6][4] = King(6, 4, self.teamL)
         self.grid[6][4].touched = True
 
