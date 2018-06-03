@@ -1084,14 +1084,14 @@ class Board(SampleBase):
                     if (self.master.getCellState(3, i) == 0 and not team1Decided):
                         team1Decided = True
                         self.computerPlayerR = False
-                    elif (self.master.getCellState(4, i) == 0 and not team2Decided):
+                    if (self.master.getCellState(4, i) == 0 and not team2Decided):
                         team2Decided = True
                         self.computerPlayerL = True
                 else:
                     if (self.master.getCellState(3, i) == 0 and not team1Decided):
                         team1Decided = True
                         self.computerPlayerR = True
-                    elif (self.master.getCellState(4, i) == 0 and not team2Decided):
+                    if (self.master.getCellState(4, i) == 0 and not team2Decided):
                         team2Decided = True
                         self.computerPlayerL = False
                 if (team1Decided and team2Decided):
