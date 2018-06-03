@@ -1,6 +1,7 @@
 from Team import Team
 from Piece import Piece
 import copy
+from King import King
 
 #Basic tree structure for holding the score/children of each node
 
@@ -34,6 +35,7 @@ class Tree(object):
                     whiteCount += piece.getValue(self.boardState)
                 else:
                     blackCount += piece.getValue(self.boardState)
+                
 
         #print("White piece value is " + str(whiteCount))
         #print("Black piece value is " + str(blackCount))

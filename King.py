@@ -115,7 +115,10 @@ class King(Piece):
         return inCheck
 
     def getValue(self, board):
-        return 1000
+        value = 1000
+        if self.amIGonnaDie(board):
+            value = 0
+        return value
 
     def move(self, newRow, newCol, checkerTown):
     # calculate new targets
