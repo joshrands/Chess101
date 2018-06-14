@@ -1160,17 +1160,19 @@ class Board(SampleBase):
         if (depth == 0):
             return
         teamKing = None
+        check = False
         for piece in self.getTeamPieces(team, currentNode.boardState):
             if (isinstance(piece, King)):
                 teamKing = piece
-                teamKing.calcTargets(currentNode.boardState)
+                check = teamKing.calcTargets(currentNode.boardState)
 
         #change how the pieces are grabbed
         for piece in self.getTeamPieces(team, currentNode.boardState):
             #TODO Parameter for this guy?
             #print("found a piece")
             piece.calcTargets(currentNode.boardState)
-            piece.skyFall(teamKing)
+            if check:
+                piece.skyFall(teamKing)
             for target in piece.targets:
                 newBoard = copy.deepcopy(currentNode.boardState)
                 newPiece = newBoard[piece.row][piece.col]
