@@ -1159,10 +1159,11 @@ class Board(SampleBase):
         #if the depth is 0, we've reached the "bottom" of the tree (as far as we initially told it to go)
         if (depth == 0):
             return
-        teamKing = 0
+        teamKing = None
         for piece in self.getTeamPieces(team, currentNode.boardState):
             if (isinstance(piece, King)):
                 teamKing = piece
+                teamKing.calcTargets(currentNode.boardState)
 
         #change how the pieces are grabbed
         for piece in self.getTeamPieces(team, currentNode.boardState):
