@@ -1229,7 +1229,7 @@ class Board(SampleBase):
             #print("found a piece")
             piece.calcTargets(currentNode.boardState)
             if check:
-                if not isinstance(piece, King):
+                if (not isinstance(piece, King)):
                     piece.skyFall(teamKing)
             for target in piece.targets:
                 newBoard = copy.deepcopy(currentNode.boardState)
