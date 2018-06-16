@@ -73,14 +73,14 @@ class Board(SampleBase):
         self.canvas.Clear()
         tempCanvas = self.matrix.SwapOnVSync(self.canvas)
 
-        self.interactiveSetup(self.teamR)
-        self.interactiveSetup(self.teamL)
+        #self.interactiveSetup(self.teamR)
+        #self.interactiveSetup(self.teamL)
 
         tempCanvas.Clear()
         self.lightCheckerTown(tempCanvas)
         self.canvas = self.matrix.SwapOnVSync(tempCanvas)
 
-        self.initializeGameBoard()
+        self.initializeGameBoard6()
 
         while (not self.gameOver):
             self.canvas.Clear()
@@ -718,6 +718,63 @@ class Board(SampleBase):
         self.grid[6][4] = King(6, 4, self.teamL)
         self.grid[6][4].touched = True
 
+    def initializeGameBoard6(self):
+        # create pieces in each team
+        # TEAM R
+        # create pawns for teamR
+
+        self.grid[1][0] = Pawn(1, 0, self.teamR)
+        self.grid[1][0].direction = 1
+        self.grid[1][0].startingRow = 1
+        self.grid[1][1] = Pawn(1, 1, self.teamR)
+        self.grid[1][1].direction = 1
+        self.grid[1][1].startingRow = 1
+        self.grid[1][6] = Pawn(1, 6, self.teamR)
+        self.grid[1][6].direction = 1
+        self.grid[1][6].startingRow = 1
+        self.grid[1][7] = Pawn(1, 7, self.teamR)
+        self.grid[1][7].direction = 1
+        self.grid[1][7].startingRow = 1
+
+        # create bishop for teamR
+        self.grid[0][3] = King(0, 3, self.teamR)
+        self.grid[0][3].touched = True
+
+        self.grid[0][0] = Rook(0, 0, self.teamR)
+        self.grid[3][4] = Rook(3, 4, self.teamR)
+        self.grid[1][3] = Bishop(1, 3, self.teamR)
+
+        # TEAM L
+        self.grid[6][1] = Pawn(6, 1, self.teamL)
+        self.grid[6][1].direction = -1
+        self.grid[6][1].startingRow = 6
+        self.grid[5][1] = Pawn(5, 1, self.teamL)
+        self.grid[5][1].direction = -1
+        self.grid[5][1].startingRow = 6
+        self.grid[5][1].touched = True
+        self.grid[3][3] = Pawn(3, 3, self.teamL)
+        self.grid[3][3].direction = -1
+        self.grid[3][3].startingRow = 6
+        self.grid[3][3].touched = True
+        self.grid[5][5] = Pawn(5, 5, self.teamL)
+        self.grid[5][5].direction = -1
+        self.grid[5][5].startingRow = 6
+        self.grid[5][5].touched = True
+        self.grid[5][6] = Pawn(5, 6, self.teamL)
+        self.grid[5][6].direction = -1
+        self.grid[5][6].startingRow = 6
+        self.grid[5][6].touched = True
+        self.grid[6][7] = Pawn(6, 7, self.teamL)
+        self.grid[6][7].direction = -1
+        self.grid[6][7].startingRow = 6
+
+        self.grid[7][0] = Rook(7, 0, self.teamL)
+        self.grid[7][7] = Rook(7, 7, self.teamL)
+        self.grid[7][5] = Bishop(7, 5, self.teamL)
+
+        self.grid[7][3] = King(7, 3, self.teamL)
+        self.grid[7][3].touched = True
+
 
     def createPlayers(self):
         if (self.computerPlayerR):
@@ -1172,7 +1229,8 @@ class Board(SampleBase):
             #print("found a piece")
             piece.calcTargets(currentNode.boardState)
             if check:
-                piece.skyFall(teamKing)
+                if not isinstance(piece, King):
+                    piece.skyFall(teamKing)
             for target in piece.targets:
                 newBoard = copy.deepcopy(currentNode.boardState)
                 newPiece = newBoard[piece.row][piece.col]
