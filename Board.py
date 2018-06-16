@@ -771,6 +771,7 @@ class Board(SampleBase):
         self.grid[7][0] = Rook(7, 0, self.teamL)
         self.grid[7][7] = Rook(7, 7, self.teamL)
         self.grid[7][5] = Bishop(7, 5, self.teamL)
+        self.grid[1][5] = Knight(1, 5, self.teamL)
 
         self.grid[7][3] = King(7, 3, self.teamL)
         self.grid[7][3].touched = True
