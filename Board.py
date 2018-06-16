@@ -1222,7 +1222,8 @@ class Board(SampleBase):
             if (isinstance(piece, King)):
                 teamKing = piece
                 check = teamKing.calcTargets(currentNode.boardState)
-                print("KING IS IN CHECK")
+                if check:
+                    print("KING IS IN CHECK")
 
         #change how the pieces are grabbed
         for piece in self.getTeamPieces(team, currentNode.boardState):
