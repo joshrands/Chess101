@@ -465,7 +465,8 @@ class Board(SampleBase):
                     self.canvas.Clear()
                     self.lightCheckerTown(self.canvas)
                     self.lightTargets(self.grid[row][col])
-                    self.lightCell(self.canvas, row, col, liftedPiece.team.r, liftedPiece.team.g, liftedPiece.team.b)
+                    if (time.time() - int(time.time()) > 0.5):
+                        self.lightCell(self.canvas, row, col, liftedPiece.team.r, liftedPiece.team.g, liftedPiece.team.b)
                     self.canvas = self.matrix.SwapOnVSync(self.canvas)
                     #print("Please choose a target already")
                     placed, targetCell = self.detectLanding(self.grid[row][col])
@@ -475,10 +476,6 @@ class Board(SampleBase):
                         if (targetCell.row == row and targetCell.col == col):
                             #print("Piece returned.")
                             returned = True
-                    self.canvas.Clear()
-                    self.lightCheckerTown(self.canvas)
-                    self.lightTargets(self.grid[row][col])
-                    self.canvas = self.matrix.SwapOnVSync(self.canvas)
                 if returned:
                     # go back to detecting which piece player wants to move
                     move = False
