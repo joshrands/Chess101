@@ -465,7 +465,7 @@ class Board(SampleBase):
                     self.canvas.Clear()
                     self.lightCheckerTown(self.canvas)
                     self.lightTargets(self.grid[row][col])
-                    self.lightCell(row, col)
+                    self.lightCell(self.canvas, row, col, liftedPiece.team.r, liftedPiece.team.g, liftedPiece.team.b)
                     self.canvas = self.matrix.SwapOnVSync(self.canvas)
                     #print("Please choose a target already")
                     placed, targetCell = self.detectLanding(self.grid[row][col])
