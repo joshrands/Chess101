@@ -458,11 +458,6 @@ class Board(SampleBase):
                 # add detect lift off
                 #targetRow = int(input("Enter a row for target: "))
                 #targetCol = int(input("Enter a col for target: "))
-                self.canvas.Clear()
-                self.lightCheckerTown(self.canvas)
-                self.lightTargets(self.grid[row][col])
-                self.lightCell(row, col)
-                self.canvas = self.matrix.SwapOnVSync(self.canvas)
 
                 placed = False
                 returned = False
