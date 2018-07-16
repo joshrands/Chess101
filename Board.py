@@ -311,17 +311,13 @@ class Board(SampleBase):
                     while (state == 1):
                         self.canvas.Clear()
                         self.lightCheckerTown(self.canvas)
-                        self.lightCell(self.canvas, cell.row, cell.col, piece.team.r, piece.team.g, piece.team.b)
+                        if (self.time() - int(self.time()) > 0.5):
+                            self.lightCell(self.canvas, cell.row, cell.col, piece.team.r, piece.team.g, piece.team.b)
                         self.canvas = self.matrix.SwapOnVSync(self.canvas)
 
                         self.master.readData()
                         #print("You are taking an enemy, please place your piece")
                         state = self.master.getCellState(cell.row, cell.col)
-
-                        self.canvas.Clear()
-                        self.lightCheckerTown(self.canvas)
-                        self.canvas = self.matrix.SwapOnVSync(self.canvas)
-                        self.master.readData()
 
                     valid = True
 
@@ -465,7 +461,7 @@ class Board(SampleBase):
                     self.canvas.Clear()
                     self.lightCheckerTown(self.canvas)
                     self.lightTargets(self.grid[row][col])
-                    if ((time.time() - int(time.time())) / 2.0 > 0.25):
+                    if (time.time() - int(time.time()) > 0.25):
                         self.lightCell(self.canvas, row, col, liftedPiece.team.r, liftedPiece.team.g, liftedPiece.team.b)
                     self.canvas = self.matrix.SwapOnVSync(self.canvas)
                     #print("Please choose a target already")
