@@ -458,9 +458,20 @@ class Board(SampleBase):
                 # add detect lift off
                 #targetRow = int(input("Enter a row for target: "))
                 #targetCol = int(input("Enter a col for target: "))
+                self.canvas.Clear()
+                self.lightCheckerTown(self.canvas)
+                self.lightTargets(self.grid[row][col])
+                self.lightCell(row, col)
+                self.canvas = self.matrix.SwapOnVSync(self.canvas)
+
                 placed = False
                 returned = False
                 while (not placed):
+                    self.canvas.Clear()
+                    self.lightCheckerTown(self.canvas)
+                    self.lightTargets(self.grid[row][col])
+                    self.lightCell(row, col)
+                    self.canvas = self.matrix.SwapOnVSync(self.canvas)
                     #print("Please choose a target already")
                     placed, targetCell = self.detectLanding(self.grid[row][col])
                     #print(placed, targetCell.row, targetCell.col, row, col)
@@ -469,6 +480,10 @@ class Board(SampleBase):
                         if (targetCell.row == row and targetCell.col == col):
                             #print("Piece returned.")
                             returned = True
+                    self.canvas.Clear()
+                    self.lightCheckerTown(self.canvas)
+                    self.lightTargets(self.grid[row][col])
+                    self.canvas = self.matrix.SwapOnVSync(self.canvas)
                 if returned:
                     # go back to detecting which piece player wants to move
                     move = False
@@ -550,7 +565,7 @@ class Board(SampleBase):
         g = piece.team.g
         b = piece.team.b
         # light your cell
-        self.lightCell(self.canvas, piece.row, piece.col, r, g, b)
+        #self.lightCell(self.canvas, piece.row, piece.col, r, g, b)
 
         targets = piece.getTargets()
         for cell in targets:
