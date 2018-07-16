@@ -311,7 +311,7 @@ class Board(SampleBase):
                     while (state == 1):
                         self.canvas.Clear()
                         self.lightCheckerTown(self.canvas)
-                        if ((time.time() - int(time.time())) / 4 > 0.125):
+                        if (((time.time() - int(time.time())) * 1000) % 250 > 125):
                             self.lightCell(self.canvas, cell.row, cell.col, piece.team.r, piece.team.g, piece.team.b)
                         self.canvas = self.matrix.SwapOnVSync(self.canvas)
 
