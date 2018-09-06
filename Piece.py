@@ -1,6 +1,7 @@
 from Team import Team
 from Cell import Cell
 
+
 class Piece:
     # team?
 
@@ -51,7 +52,7 @@ class Piece:
         self.targets = newTargets
 
     def skyFall(self, king):
-        #refactor the targets because the king is in check and only godSaveTheKing spaces should appear as targets
+        # refactor the targets because the king is in check and only godSaveTheKing spaces should appear as targets
         newTargets = []
         for target in self.targets:
             for savingTarget in king.godSaveTheKing:
@@ -60,7 +61,7 @@ class Piece:
         self.targets = newTargets
 
     def printPiece(self, board):
-        print ("Piece at", self.row , "," , self.col)
+        print("Piece at", self.row, ",", self.col)
 
     def getTargets(self):
         return self.targets

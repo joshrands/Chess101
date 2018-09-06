@@ -3,14 +3,15 @@ from Piece import Piece
 import copy
 from King import King
 
-#Basic tree structure for holding the score/children of each node
+# Basic tree structure for holding the score/children of each node
+
 
 class Tree(object):
     def __init__(self, boardState, oldCell, newCell, teamR, teamL):
         self.children = []
         self.boardState = boardState
 
-        #Instead of tracking the piece that's moving, just track the cells and handle it appropriately further up
+        # Instead of tracking the piece that's moving, just track the cells and handle it appropriately further up
         self.oldCell = oldCell
         self.newCell = newCell
         #white is right
@@ -18,30 +19,28 @@ class Tree(object):
         self.teamL = Team(teamL.r, teamL.g, teamL.b)
 
     def addChild(self, child):
-    	self.children.append(child)
+        self.children.append(child)
 
     def getBoardState(self):
-    	return self.boardState
+        return self.boardState
 
-    #Heuristic function, for now this will work until the tree is fully made
+    # Heuristic function, for now this will work until the tree is fully made
     def getUtility(self, team):
         whiteCount = 0
         blackCount = 0
-        for r in range(0,8):
+        for r in range(0, 8):
             for piece in self.boardState[r]:
                 if (piece == None):
                     continue
-                elif (piece.team.r ==  self.teamR.r):
+                elif (piece.team.r == self.teamR.r):
                     whiteCount += piece.getValue(self.boardState)
                 else:
                     blackCount += piece.getValue(self.boardState)
-                
 
         #print("White piece value is " + str(whiteCount))
         #print("Black piece value is " + str(blackCount))
 
-
-        total = whiteCount-blackCount
+        total = whiteCount - blackCount
         if (team.r == self.teamL.r):
             total = -total
        #    will be used for testing once we integrate AI into actual game

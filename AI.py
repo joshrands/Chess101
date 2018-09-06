@@ -1,10 +1,12 @@
 from Tree import Tree
 
+
 class AI:
     # print utility value of root node (assuming it is max)
     # print names of all nodes visited during search
     def __init__(self, game_tree, team):
-        self.game_tree = game_tree  # Whole tree (only the root node, but this node will contain the children)
+        # Whole tree (only the root node, but this node will contain the children)
+        self.game_tree = game_tree
         self.team = team
         return
 
@@ -16,14 +18,16 @@ class AI:
 
         successors = self.getSuccessors(self.game_tree)
         best_state = None
-        for state in successors: # for every node..
+        for state in successors:  # for every node..
             value = self.min_value(state, best_val, beta)
             if value > best_val:
                 best_val = value
                 best_state = state
         #print ("AlphaBeta:  Utility Value of Root Node: = " + str(best_val))
-        print ("AlphaBeta:  Best Piece to move is located at: " + str(best_state.oldCell.row) + str(best_state.oldCell.col))
-        print ("AlphaBeta:  This piece should be moved to: " + str(best_state.newCell.row) + str(best_state.newCell.col))
+        print("AlphaBeta:  Best Piece to move is located at: " +
+              str(best_state.oldCell.row) + str(best_state.oldCell.col))
+        print("AlphaBeta:  This piece should be moved to: " +
+              str(best_state.newCell.row) + str(best_state.newCell.col))
         return best_state
 
     def max_value(self, node, alpha, beta):

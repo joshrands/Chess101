@@ -6,8 +6,9 @@
 import smbus
 import time
 
+
 class Master:
-   
+
     bus = smbus.SMBus(1)
 
     # Define arduino addresses
@@ -27,9 +28,9 @@ class Master:
         # populate states
         for i in range(8):
             self.gridStates[i] = [1] * 8
-   
+
         self.initialize()
-    
+
     def initialize(self):
         # loop through and compare every cell to gridStates
         self.fillRowData(self.rowA, 0)
@@ -59,24 +60,24 @@ class Master:
     def updateRowStates(self, row, colStates):
         change = False
         for i in range(7, -1, -1):
-#            print(colStates)
+            #            print(colStates)
             if (colStates - 2**i >= 0):
                 colStates = colStates - 2**i
                 # check if change
                 if (self.gridStates[row][i] != 1):
                     self.gridStates[row][i] = 1
-                    change = True 
+                    change = True
             else:
                 if (self.gridStates[row][i] != 0):
                     self.gridStates[row][i] = 0
-                    change = True 
+                    change = True
         if (change == True):
             print("Board Changed: ")
             self.printBoardStates()
 
     # get all occupied cells
     def readData(self):
-        self.fillRowData(self.rowA, 0)        
+        self.fillRowData(self.rowA, 0)
         self.fillRowData(self.rowB, 1)
         self.fillRowData(self.rowC, 2)
         self.fillRowData(self.rowD, 3)
@@ -97,7 +98,7 @@ class Master:
                 handled = False
                 print("I/O error... handling...")
                 time.sleep(0.5)
-                
+
         return -1
 
     def readFromRow(self, address):
@@ -117,7 +118,7 @@ class Master:
 # Test master class
 #master = Master()
 
-#while True:
+# while True:
     # loop through and detect changes
 #    master.readData()
 #    time.sleep(0.5)

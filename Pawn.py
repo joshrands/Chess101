@@ -1,7 +1,8 @@
-#child class of Piece that represents a Pawn
+# child class of Piece that represents a Pawn
 from Piece import Piece
 from Cell import Cell
 from Queen import Queen
+
 
 class Pawn(Piece):
     def __init__(self, row, col, team):
@@ -20,42 +21,49 @@ class Pawn(Piece):
         self.critical = False
         self.criticalTargets = []
 
-    #calcTargets, which is abstract in the parent
+    # calcTargets, which is abstract in the parent
     def calcTargets(self, checkerTown):
         self.enPassantLoc = None
         self.targets = []
         if (self.row != 0 and self.row != 7):
-            #check the squares diagonal in the direction of self.direction for an enemy Piece
+            # check the squares diagonal in the direction of self.direction for an enemy Piece
             #
             if (self.col != 0 and isinstance(checkerTown[self.row + self.direction][self.col - 1], Piece)):
                 if (checkerTown[self.row + self.direction][self.col - 1].team != self.team):
-                    self.targets.append(Cell(self.row + self.direction, self.col - 1))
+                    self.targets.append(
+                        Cell(self.row + self.direction, self.col - 1))
 
-            #Check the diagonal to the right
+            # Check the diagonal to the right
             if (self.col != 7 and isinstance(checkerTown[self.row + self.direction][self.col + 1], Piece)):
                 if (checkerTown[self.row + self.direction][self.col + 1].team != self.team):
-                    self.targets.append(Cell(self.row + self.direction, self.col + 1))
+                    self.targets.append(
+                        Cell(self.row + self.direction, self.col + 1))
 
-            #check the square in front
+            # check the square in front
             if (checkerTown[self.row + self.direction][self.col] == None):
                 self.targets.append(Cell(self.row + self.direction, self.col))
-            #if row and col = starting row and col then check 2 in front
+            # if row and col = starting row and col then check 2 in front
             if (self.row == self.startingRow):
                 if (checkerTown[self.row + 2 * self.direction][self.col] == None and checkerTown[self.row + self.direction][self.col] == None):
-                    self.targets.append(Cell(self.row + 2 * self.direction, self.col))
-            #check for en passant
-            #check left
+                    self.targets.append(
+                        Cell(self.row + 2 * self.direction, self.col))
+            # check for en passant
+            # check left
             if (self.col != 0 and isinstance(checkerTown[self.row][self.col - 1], Pawn) and checkerTown[self.row][self.col - 1].team != self.team):
                 if (checkerTown[self.row][self.col - 1].enPassantable):
-                    self.targets.append(Cell(self.row + self.direction, self.col - 1))
-                    self.enPassantLoc = Cell(self.row + self.direction, self.col - 1)
-            #check right
+                    self.targets.append(
+                        Cell(self.row + self.direction, self.col - 1))
+                    self.enPassantLoc = Cell(
+                        self.row + self.direction, self.col - 1)
+            # check right
             if (self.col != 7 and isinstance(checkerTown[self.row][self.col + 1], Pawn) and checkerTown[self.row][self.col + 1].team != self.team):
                 if (checkerTown[self.row][self.col + 1].enPassantable):
-                    self.targets.append(Cell(self.row + self.direction, self.col + 1))
-                    self.enPassantLoc = Cell(self.row + self.direction, self.col + 1)
+                    self.targets.append(
+                        Cell(self.row + self.direction, self.col + 1))
+                    self.enPassantLoc = Cell(
+                        self.row + self.direction, self.col + 1)
 
-        #if critical, check calculated targets against criticalTargets and only keep cells that appear on both
+        # if critical, check calculated targets against criticalTargets and only keep cells that appear on both
         if (self.critical):
             super().criticalMan()
 
@@ -70,18 +78,19 @@ class Pawn(Piece):
         return total
 
     def skyFall(self, king):
-        #refactor the targets because the king is in check and only godSaveTheKing spaces should appear as targets
+        # refactor the targets because the king is in check and only godSaveTheKing spaces should appear as targets
         newTargets = []
         for target in self.targets:
             for savingTarget in king.godSaveTheKing:
                 if (target.row == savingTarget.row and target.col == savingTarget.col):
                     newTargets.append(target)
         if(self.enPassantLoc != None):
-            newTargets.append(Cell(self.enPassantLoc.row, self.enPassantLoc.col))
+            newTargets.append(
+                Cell(self.enPassantLoc.row, self.enPassantLoc.col))
         self.targets = newTargets
 
+    # override move method to set enPassantable
 
-    #override move method to set enPassantable
     def move(self, newRow, newCol, checkerTown):
         # calculate new targets
         oldRow = self.row
@@ -89,9 +98,10 @@ class Pawn(Piece):
 
         self.row = newRow
         self.col = newCol
-        #check for at end of rowTargets
+        # check for at end of rowTargets
         if ((self.startingRow + 6) % 12 == self.row):
-            checkerTown[self.row][self.col] = Queen(self.row, self.col, self.team)
+            checkerTown[self.row][self.col] = Queen(
+                self.row, self.col, self.team)
         if (oldRow == self.startingRow and oldCol == self.startingCol and (newRow - oldRow) == 2 * self.direction):
             self.enPassantable = True
         if (self.enPassantLoc != None and newRow == self.enPassantLoc.row and newCol == self.enPassantLoc.col):
