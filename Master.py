@@ -96,7 +96,6 @@ class Master:
                 handled = True
             except IOError:
                 handled = False
-                print("I/O error... handling...")
                 time.sleep(0.5)
 
         return -1
@@ -110,7 +109,6 @@ class Master:
                 handled = True
             except IOError:
                 handled = False
-                print("I/O error... handling...")
                 time.sleep(0.5)
 
         return number
