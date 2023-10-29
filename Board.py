@@ -190,7 +190,7 @@ class Board(SampleBase):
             time.sleep(0.2)
             self.canvas.Clear()
             self.lightCheckerTown(self.canvas)
-            for piece in teamRPieces:
+            for piece in teamRPieces + teamLPieces:
                 state = self.master.getCellState(piece.row, piece.col)
                 if state == 1:
                     mismatch = True
@@ -199,28 +199,6 @@ class Board(SampleBase):
                     # light cell warning color
                     self.lightCell(self.canvas, piece.row, piece.col, r, g, b)
                     # time.sleep(0.01)
-            self.canvas = self.matrix.SwapOnVSync(self.canvas)
-
-        mismatch = True
-        self.canvas.Clear()
-        self.lightCheckerTown(self.canvas)
-        self.canvas = self.matrix.SwapOnVSync(self.canvas)
-
-        while mismatch:
-            mismatch = False
-            self.master.readData()
-            self.canvas.Clear()
-            self.lightCheckerTown(self.canvas)
-
-            for piece in teamLPieces:
-                state = self.master.getCellState(piece.row, piece.col)
-                if state == 1:
-                    mismatch = True
-                    #print("Piece should be here")
-                    #print(piece.row, piece.col)
-                    # light cell warning color
-                    self.lightCell(self.canvas, piece.row, piece.col, r, g, b)
-                    time.sleep(0.01)
             self.canvas = self.matrix.SwapOnVSync(self.canvas)
         # mismatch complete return true
         return True
