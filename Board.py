@@ -113,10 +113,8 @@ class Board(SampleBase):
         rowIncrement = (endRow - startRow) / 8.0
         colIncrement = (endCol - startCol) / 8.0
 
-    def lightCheckerTown(self, canvas):
-        r = 255
-        g = 255
-        b = 255
+    def lightCheckerTown(self, canvas, color=(255, 255, 255)):
+        r, g, b = color
         for x in range(4):
             for y in range(4):
                 self.lightCell(canvas, 1 + (2 * x), 2 * y, r, g, b)
@@ -124,16 +122,9 @@ class Board(SampleBase):
             for y in range(4):
                 self.lightCell(canvas, (2 * x), 1 + 2 * y, r, g, b)
 
-    def chooseLightCheckerTown(self):
-        r = self.checkerBrightness
-        g = self.checkerBrightness
-        b = self.checkerBrightness
-        for x in range(4):
-            for y in range(4):
-                self.lightCell(self.canvas, 1 + (2 * x), 2 * y, r, g, b)
-        for x in range(4):
-            for y in range(4):
-                self.lightCell(self.canvas, (2 * x), 1 + 2 * y, r, g, b)
+    def chooseLightCheckerTown(self, color=(255, 255, 255)):
+        r, g, b = map(lambda val: int(val * (self.checkerBrightness / 255)), color)
+        self.lightCheckerTown(self.canvas, color=(r, g, b))
 
     def interactiveSetup(self, team):
         if (team == self.teamR):
@@ -172,16 +163,17 @@ class Board(SampleBase):
     def detectMismatch(self):
         # read data into master
         self.master.readData()
-        # set color of piece that needs correction
-        r = 255
-        g = 0
-        b = 0
+        # Color for the background checkerboard
+        bg_color = (255, 0, 0) # red
+        # Color of piece that needs correction
+        piece_color = (255, 255, 0) # yellow
+        r, g, b = piece_color
         # loop through valid pieces and make sure they are there
         teamRPieces = self.getTeamPieces(self.teamR)
         teamLPieces = self.getTeamPieces(self.teamL)
         mismatch = True
         self.canvas.Clear()
-        self.lightCheckerTown(self.canvas)
+        self.lightCheckerTown(self.canvas, color=bg_color)
         self.canvas = self.matrix.SwapOnVSync(self.canvas)
 
         while mismatch:
@@ -189,7 +181,7 @@ class Board(SampleBase):
             self.master.readData()
             time.sleep(0.2)
             self.canvas.Clear()
-            self.lightCheckerTown(self.canvas)
+            self.lightCheckerTown(self.canvas, color=bg_color)
             for piece in teamRPieces + teamLPieces:
                 state = self.master.getCellState(piece.row, piece.col)
                 if state == 1:
