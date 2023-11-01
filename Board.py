@@ -394,7 +394,8 @@ class Board(SampleBase):
 
         # check for mismatch
         self.detectMismatch()
-        self.detectMismatch()
+        self.lightCheckerTown(self.canvas)
+        self.canvas = self.matrix.SwapOnVSync(self.canvas)
 
         time.sleep(0.25)
 
@@ -860,10 +861,9 @@ class Board(SampleBase):
         state = 0
 
         self.canvas.Clear()
+        self.detectMismatch()
         self.lightCheckerTown(self.canvas)
         self.canvas = self.matrix.SwapOnVSync(self.canvas)
-        self.detectMismatch()
-        self.detectMismatch()
 
         if (self.grid[bestMove.newCell.row][bestMove.newCell.col] == None):
             self.peaceTime += 1
