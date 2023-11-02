@@ -173,7 +173,7 @@ class Board(SampleBase):
         teamLPieces = self.getTeamPieces(self.teamL)
         mismatch = True
         self.canvas.Clear()
-        self.lightCheckerTown(self.canvas, color=bg_color)
+        self.lightCheckerTown(self.canvas)
         self.canvas = self.matrix.SwapOnVSync(self.canvas)
 
         while mismatch:
