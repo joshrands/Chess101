@@ -33,7 +33,7 @@ class SampleBase(object):
     def run(self):
         print("Running")
 
-    def process(self):
+    def process(self, skip_setup=False, init_num=""):
         self.args = self.parser.parse_args()
 
         self.options = RGBMatrixOptions()
@@ -69,7 +69,7 @@ class SampleBase(object):
         try:
             # Start loop
             print("Press CTRL-C to stop sample")
-            self.run()
+            self.run(skip_setup, init_num)
         except KeyboardInterrupt:
             print("Exiting\n")
             sys.exit(0)

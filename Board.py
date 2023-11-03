@@ -60,13 +60,14 @@ class Board(SampleBase):
             self.grid.append([None, None, None, None, None, None, None, None])
 
     # RUN GAME
-    def run(self):
+    def run(self, skip_setup=False, init_num=""):
         print("Running game...")
         self.canvas = self.matrix.CreateFrameCanvas()
 
-        self.colorPicker()
+        if not skip_setup:
+            self.colorPicker()
 
-        self.warGames()
+            self.warGames()
 
         self.createPlayers()
 
@@ -74,14 +75,15 @@ class Board(SampleBase):
         self.canvas.Clear()
         tempCanvas = self.matrix.SwapOnVSync(self.canvas)
 
-        self.interactiveSetup(self.teamR)
-        self.interactiveSetup(self.teamL)
+        if not skip_setup:
+            self.interactiveSetup(self.teamR)
+            self.interactiveSetup(self.teamL)
 
         tempCanvas.Clear()
         self.lightCheckerTown(tempCanvas)
         self.canvas = self.matrix.SwapOnVSync(tempCanvas)
 
-        self.initializeGameBoard()
+        eval("self.initializeGameBoard{}()".format(init_num))
 
         while (not self.gameOver):
             self.canvas.Clear()
@@ -186,8 +188,8 @@ class Board(SampleBase):
                 state = self.master.getCellState(piece.row, piece.col)
                 if state == 1:
                     mismatch = True
-                    #print("Piece should be here")
-                    #print(piece.row, piece.col)
+                    print("{}'s {} should be here".format(piece.team.name, type(piece)))
+                    print(piece.row, piece.col)
                     # light cell warning color
                     self.lightCell(self.canvas, piece.row, piece.col, r, g, b)
                     # time.sleep(0.01)
@@ -585,31 +587,19 @@ class Board(SampleBase):
         self.grid[7][4] = King(7, 4, self.teamL)
 
     def initializeGameBoard2(self):
+        # PWN UPGRADE
         # create pieces in each team
         # TEAM R
         # create pawns for teamR
         for col in range(0, 7):
-            self.grid[1][col] = Pawn(1, col, self.teamR)
+            self.grid[1][col] = Pawn(1, col, self.teamL)
+            self.grid[1][col].direction=-1
+            self.grid[1][col].startingRow=6
+        for col in range(0, 8):
+            self.grid[6][col] = Pawn(6, col, self.teamR)
+            self.grid[6][col].direction=1
+            self.grid[6][col].startingRow=1
 
-        self.grid[5][7] = Pawn(5, 7, self.teamR)
-
-        # TEAM L
-        # create pawns for teamL
-        for col in range(0, 6):
-            if col == 3:
-                continue
-            self.grid[6][col] = Pawn(6, col, self.teamL)
-        # create bishop for teamL
-        self.grid[3][5] = Bishop(3, 5, self.teamL)
-
-        # create rook for teamL
-        self.grid[7][0] = Rook(7, 0, self.teamL)
-        self.grid[7][7] = Rook(7, 7, self.teamL)
-
-        self.grid[7][1] = Knight(7, 1, self.teamL)
-
-        self.grid[6][6] = Queen(6, 6, self.teamL)
-        self.grid[7][4] = King(7, 4, self.teamL)
 
     def initializeGameBoard3(self):
         # create pieces in each team
