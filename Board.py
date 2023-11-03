@@ -193,6 +193,10 @@ class Board(SampleBase):
                     # time.sleep(0.01)
             self.canvas = self.matrix.SwapOnVSync(self.canvas)
         # mismatch complete return true
+        self.canvas.Clear()
+        self.lightCheckerTown(self.canvas)
+        self.canvas = self.matrix.SwapOnVSync(self.canvas)
+
         return True
 
     def detectPawns(self, team, row):
