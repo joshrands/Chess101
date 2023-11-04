@@ -274,7 +274,7 @@ class Board(SampleBase):
             if state:
                 lifted.append(cell)
 
-        return cells
+        return lifted
 
     def getTeamPieces(self, team, grid=None):
         if (grid == None):
@@ -821,18 +821,20 @@ class Board(SampleBase):
     def upgradePawn(self, startCell, endCell, team):
         test_grid = [[None] * 8] * 8
         candidates = [
-            Bishop(endCell.row, endCell.col, team),
-            Knight(endCell.row, endCell.col, team),
             Queen(endCell.row, endCell.col, team),
+            Knight(endCell.row, endCell.col, team),
+            Bishop(endCell.row, endCell.col, team),
             Rook(endCell.row, endCell.col, team)
         ]
         index = 0
         # blink to begin upgrade process
         while not self.isLifted([endCell]):
+            print("Waiting to begin upgrade process")
             with self.freshCheckerTown() as canvas:
                 self.blinkCell(canvas, endCell, fps=2)
 
         # they've begun. Light pieces and wait for landing
+        print("Piece lifted. Beginning upgrade process")
         examining = True
         test_grid = [[None] * 8] * 8
         while True:
@@ -844,13 +846,15 @@ class Board(SampleBase):
                 if examining:
                     self.blinkCell(canvas, startCell)
                 else:
-                    self.lightCell(canvas)
+                    self.lightCell(canvas, startCell.row, startCell.col, team.r, team.g, team.b)
 
             if not self.isLifted([startCell]):
                 if examining:
+                    print("Choosing next option")
                     index = (index + 1) % len(candidates)
                 examining = False
             elif not self.isLifted([endCell]):
+                print("Choice made")
                 break
             else:
                 examining = True
