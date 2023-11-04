@@ -622,8 +622,10 @@ class Board(SampleBase):
             self.grid[6][col].direction=1
             self.grid[6][col].startingRow=1
 
-        self.grid[3][0] = King(3, 0, self.teamL)
-        self.grid[4][7] = King(4, 7, self.teamR)
+        # self.grid[3][0] = King(3, 0, self.teamL)
+        # self.grid[3][0].touched=1
+        # self.grid[4][7] = King(4, 7, self.teamR)
+        # self.grid[4][7].touched=1
 
 
     def initializeGameBoard3(self):
@@ -862,7 +864,7 @@ class Board(SampleBase):
             else:
                 examining = True
 
-        self.grid[endCell.row, endCell.col] = candidates[index]
+        self.grid[endCell.row][endCell.col] = candidates[index]
     
 
     def computerMove(self, team, depth=2):
