@@ -840,6 +840,7 @@ class Board(SampleBase):
         print("Piece lifted. Beginning upgrade process")
         examining = True
         test_grid = [[None] * 8 for _ in range(8)]
+        other_team = self.teamL if team == self.teamR else self.teamR
         while True:
             with self.freshCheckerTown() as canvas:
                 test_grid[endCell.row][endCell.col] = candidates[index]
@@ -847,9 +848,9 @@ class Board(SampleBase):
                 self.lightTargets(test_grid[endCell.row][endCell.col])
 
                 if examining:
-                    self.blinkCell(canvas, startCell, color=(team.r,team.g,team.b))
+                    self.blinkCell(canvas, startCell, color=(other_team.r,other_team.g,other_team.b))
                 else:
-                    self.lightCell(canvas, startCell.row, startCell.col, team.r, team.g, team.b)
+                    self.lightCell(canvas, startCell.row, startCell.col, other_team.r, other_team.g, other_team.b)
 
             if not self.isLifted([startCell]):
                 if examining:
