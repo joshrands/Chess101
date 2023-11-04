@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+from contextlib import contextmanager
 from samplebase import SampleBase
 from rgbmatrix import RGBMatrix, RGBMatrixOptions
 from Team import Team
@@ -128,6 +129,13 @@ class Board(SampleBase):
         r, g, b = map(lambda val: int(val * (self.checkerBrightness / 255)), color)
         self.lightCheckerTown(self.canvas, color=(r, g, b))
 
+    def blinkCell(self, canvas, cell, fps=4, duty_cycle=50, color=(255,255,255)):
+        blinkTime = 1000/fps # ms
+        onTime = (duty_cycle/100) * blinkTime
+        r, g, b = color
+        if (((time.time() - int(time.time())) * 1000) % blinkTime > onTime):
+            self.lightCell(canvas, cell.row, cell.col, r, g, b)
+
     def interactiveSetup(self, team):
         if (team == self.teamR):
             # setup Rook
@@ -256,6 +264,17 @@ class Board(SampleBase):
 
         # if valid liftoff
         return valid, lifted
+    
+    def isLifted(self, cells):
+        self.master.readData()
+        # check each piece and see if any have been lifted
+        lifted = []
+        for cell in cells:
+            state = self.master.getCellState(cell.row, cell.col)
+            if state:
+                lifted.append(cell)
+
+        return cells
 
     def getTeamPieces(self, team, grid=None):
         if (grid == None):
@@ -291,9 +310,8 @@ class Board(SampleBase):
                     while (state == 1):
                         self.canvas.Clear()
                         self.lightCheckerTown(self.canvas)
-                        if (((time.time() - int(time.time())) * 1000) % 250 > 125):
-                            self.lightCell(
-                                self.canvas, cell.row, cell.col, piece.team.r, piece.team.g, piece.team.b)
+                        color=(piece.team.r, piece.team.g, peice.team.b)
+                        self.blinkCell(cell, fps, duty_cycle, color)
                         self.canvas = self.matrix.SwapOnVSync(self.canvas)
 
                         self.master.readData()
@@ -516,6 +534,10 @@ class Board(SampleBase):
 
                                         state = self.master.getCellState(
                                             enemy.row, enemy.col)
+                                
+                                if (self.grid[targetRow][targetCol].startingRow + 6) % 12 == targetRow:
+                                    # Pawn Upgrade
+                                    self.upgradePawn(Cell(row,col), targetCell, team)
 
                             elif (isinstance(self.grid[targetRow][targetCol], King)):
                                 rookLocation, rookTarget = self.grid[targetRow][targetCol].move(
@@ -772,6 +794,18 @@ class Board(SampleBase):
             self.teamR.setName("Player 1")
         # self.teamL.setColor()
 
+    @contextmanager
+    def canvasSwap(self):
+        self.canvas.Clear()
+        yield self.canvas
+        self.canvas = self.matrix.SwapOnVSync(self.canvas)
+
+    @contextmanager
+    def freshCheckerTown(self, color=(255,255,255)):
+        with self.canvasSwap() as canvas:
+            self.lightCheckerTown(canvas, color)
+            yield canvas
+
     def lightCell(self, canvas, x, y, r, g, b):
         #print(x, y, r, g, b)
         for i in range(0, 4):
@@ -783,6 +817,46 @@ class Board(SampleBase):
             grid = self.grid
         for r in range(8):
             print(grid[r])
+
+    def upgradePawn(self, startCell, endCell, team):
+        test_grid = [[None] * 8] * 8
+        candidates = [
+            Bishop(endCell.row, endCell.col, team),
+            Knight(endCell.row, endCell.col, team),
+            Queen(endCell.row, endCell.col, team),
+            Rook(endCell.row, endCell.col, team)
+        ]
+        index = 0
+        # blink to begin upgrade process
+        while not self.isLifted([endCell]):
+            with self.freshCheckerTown() as canvas:
+                self.blinkCell(canvas, endCell, fps=2)
+
+        # they've begun. Light pieces and wait for landing
+        examining = True
+        test_grid = [[None] * 8] * 8
+        while True:
+            with self.freshCheckerTown() as canvas:
+                test_grid[endCell.row][endCell.col] = candidates[index]
+                test_grid[endCell.row][endCell.col].calcTargets(test_grid)
+                self.lightTargets(test_grid[endCell.row][endCell.col])
+
+                if examining:
+                    self.blinkCell(canvas, startCell)
+                else:
+                    self.lightCell(canvas)
+
+            if not self.isLifted([startCell]):
+                if examining:
+                    index = (index + 1) % len(candidates)
+                examining = False
+            elif not self.isLifted([endCell]):
+                break
+            else:
+                examining = True
+
+        self.grid[endCell.row, endCell.col] = candidates[index]
+    
 
     def computerMove(self, team, depth=2):
 
