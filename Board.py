@@ -308,11 +308,9 @@ class Board(SampleBase):
                     # enter while loop, wait for player to place theres
                     activatedTarget = cell
                     while (state == 1):
-                        self.canvas.Clear()
-                        self.lightCheckerTown(self.canvas)
-                        color=(piece.team.r, piece.team.g, peice.team.b)
-                        self.blinkCell(cell, fps, duty_cycle, color)
-                        self.canvas = self.matrix.SwapOnVSync(self.canvas)
+                        with self.freshCheckerTown() as canvas:
+                            color=(piece.team.r, piece.team.g, piece.team.b)
+                            self.blinkCell(canvas, cell, color=color)
 
                         self.master.readData()
                         #print("You are taking an enemy, please place your piece")
