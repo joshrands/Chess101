@@ -845,6 +845,7 @@ class Board(SampleBase):
             with self.freshCheckerTown() as canvas:
                 test_grid[endCell.row][endCell.col] = candidates[index]
                 test_grid[endCell.row][endCell.col].calcTargets(test_grid)
+                test_grid[endCell.row][endCell.col].targets.remove(startCell)
                 self.lightTargets(test_grid[endCell.row][endCell.col])
 
                 if examining:
