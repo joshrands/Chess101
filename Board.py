@@ -622,6 +622,9 @@ class Board(SampleBase):
             self.grid[6][col].direction=1
             self.grid[6][col].startingRow=1
 
+        self.grid[3][0] = King(3, 0, self.teamL)
+        self.grid[4][7] = King(4, 7, self.teamR)
+
 
     def initializeGameBoard3(self):
         # create pieces in each team
@@ -831,7 +834,7 @@ class Board(SampleBase):
         while not self.isLifted([endCell]):
             print("Waiting to begin upgrade process")
             with self.freshCheckerTown() as canvas:
-                self.blinkCell(canvas, endCell, fps=2)
+                self.blinkCell(canvas, endCell, fps=2, color=(team.r,team.g,team.b))
 
         # they've begun. Light pieces and wait for landing
         print("Piece lifted. Beginning upgrade process")
