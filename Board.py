@@ -839,7 +839,7 @@ class Board(SampleBase):
         # they've begun. Light pieces and wait for landing
         print("Piece lifted. Beginning upgrade process")
         examining = True
-        test_grid = [[None] * 8] * 8
+        test_grid = [[None] * 8 for _ in range(8)]
         while True:
             with self.freshCheckerTown() as canvas:
                 test_grid[endCell.row][endCell.col] = candidates[index]
