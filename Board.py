@@ -844,7 +844,7 @@ class Board(SampleBase):
                 self.lightTargets(test_grid[endCell.row][endCell.col])
 
                 if examining:
-                    self.blinkCell(canvas, startCell)
+                    self.blinkCell(canvas, startCell, color=(team.r,team.g,team.b))
                 else:
                     self.lightCell(canvas, startCell.row, startCell.col, team.r, team.g, team.b)
 
