@@ -1386,7 +1386,7 @@ class Board(SampleBase):
             self.counters[name] = [value]
             return
         else:
-            if self.counters[name][-1] == value:
+            if len(self.counters[name]) and self.counters[name][-1] == value:
                 self.counters[name].append(value)
             else:
                 self.counters[name] = value
