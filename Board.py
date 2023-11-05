@@ -613,7 +613,7 @@ class Board(SampleBase):
         # create pieces in each team
         # TEAM R
         # create pawns for teamR
-        for col in range(0, 7):
+        for col in range(0, 8):
             self.grid[1][col] = Pawn(1, col, self.teamL)
             self.grid[1][col].direction=-1
             self.grid[1][col].startingRow=6
@@ -864,7 +864,7 @@ class Board(SampleBase):
                     print("Choosing next option")
                     index = (index + 1) % len(candidates)
                 examining = False
-            elif not self.confident("select_trigger", self.isLifted([endCell]), True, threshold=7):
+            elif not self.confident("select_trigger", self.isLifted([endCell]), True, threshold=5):
                 print("Choice made")
                 break
             else:
