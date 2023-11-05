@@ -40,6 +40,8 @@ class Board(SampleBase):
         self.checkerBrightness = 0
         self.checkerBrightnessDir = 2
 
+        self.counters = {}
+
         self.gameOver = False
         self.peaceTime = 0
         self.daysLeftSinceInjury = []
@@ -840,6 +842,8 @@ class Board(SampleBase):
         print("Piece lifted. Beginning upgrade process")
         examining = True
         test_grid = [[None] * 8 for _ in range(8)]
+        self.resetCounter("switch_trigger")
+        self.resetCounter("select_trigger")
         while True:
             with self.freshCheckerTown() as canvas:
                 pick = candidates[index]
@@ -854,12 +858,12 @@ class Board(SampleBase):
                 else:
                     self.lightCell(canvas, startCell.row, startCell.col, team.r, team.g, team.b)
 
-            if not self.isLifted([startCell]):
+            if not self.confident("switch_trigger", self.isLifted([startCell]), False):
                 if examining:
                     print("Choosing next option")
                     index = (index + 1) % len(candidates)
                 examining = False
-            elif not self.isLifted([endCell]):
+            elif not self.confident("select_trigger", self.isLifted([endCell]), False):
                 print("Choice made")
                 break
             else:
@@ -1370,6 +1374,33 @@ class Board(SampleBase):
 
         for child in currentNode.children:
             self.addNodes(child, team, depth - 1)
+
+    def queryCounter(self, name):
+        if name in self.counters:
+            return self.counters[name][0], len(self.counters[name])
+        else:
+            return None, 0
+        
+    def updateCounter(self, name, value):
+        if name not in self.counters:
+            self.counters[name] = [value]
+            return
+        else:
+            if self.counters[name][-1] == value:
+                self.counters[name].append(value)
+            else:
+                self.counters[name] = value
+
+    def resetCounter(self, name):
+        self.counters[name] = []
+
+    def confident(self, name, value, expected, threshold=5):
+        self.updateCounter(name, value)
+        confident_value, count = self.queryCounter(name)
+        if count >= threshold:
+            return confident_value
+        else:
+            return expected
 
     def checkNewGame(self):
         self.master.readData()
