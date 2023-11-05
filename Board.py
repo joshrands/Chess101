@@ -858,12 +858,12 @@ class Board(SampleBase):
                 else:
                     self.lightCell(canvas, startCell.row, startCell.col, team.r, team.g, team.b)
 
-            if not self.confident("switch_trigger", self.isLifted([startCell]), False):
+            if not self.confident("switch_trigger", self.isLifted([startCell]), True):
                 if examining:
                     print("Choosing next option")
                     index = (index + 1) % len(candidates)
                 examining = False
-            elif not self.confident("select_trigger", self.isLifted([endCell]), False):
+            elif not self.confident("select_trigger", self.isLifted([endCell]), True):
                 print("Choice made")
                 break
             else:
