@@ -5,4 +5,6 @@ class Cell:
         self.col = col
 
     def __eq__(self, other):
+        if not isinstance(other, Cell):
+            return False
         return self.row == other.row and self.col == other.col
