@@ -1383,13 +1383,13 @@ class Board(SampleBase):
         
     def updateCounter(self, name, value):
         if name not in self.counters:
-            self.counters[name] = [value]
+            self.counters[name] = [copy.copy(value)]
             return
         else:
             if len(self.counters[name]) and self.counters[name][-1] == value:
-                self.counters[name].append(value)
+                self.counters[name].append(copy.copy(value))
             else:
-                self.counters[name] = value
+                self.counters[name] = [copy.copy(value)]
 
     def resetCounter(self, name):
         self.counters[name] = []
