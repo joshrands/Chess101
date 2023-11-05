@@ -176,9 +176,9 @@ class Board(SampleBase):
         # read data into master
         self.master.readData()
         # Color for the background checkerboard
-        bg_color = (255, 0, 0) # red
+        bg_color = (255, 255, 255) # red
         # Color of piece that needs correction
-        piece_color = (255, 255, 0) # yellow
+        piece_color = (255, 0, 0) # yellow
         r, g, b = piece_color
         # loop through valid pieces and make sure they are there
         teamRPieces = self.getTeamPieces(self.teamR)
@@ -189,7 +189,7 @@ class Board(SampleBase):
         self.canvas = self.matrix.SwapOnVSync(self.canvas)
 
         self.resetCounter("mismatch")
-        while self.confident("mismatch", mismatch, True, threshold=2):
+        while self.confident("mismatch", mismatch, True, threshold=3):
             mismatch = False
             self.master.readData()
             time.sleep(0.2)
