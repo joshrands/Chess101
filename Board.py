@@ -188,7 +188,8 @@ class Board(SampleBase):
         self.lightCheckerTown(self.canvas)
         self.canvas = self.matrix.SwapOnVSync(self.canvas)
 
-        while mismatch:
+        self.resetCounter("mismatch")
+        while self.confident("mismatch", mismatch, True, threshold=3):
             mismatch = False
             self.master.readData()
             time.sleep(0.2)
@@ -196,7 +197,7 @@ class Board(SampleBase):
             self.lightCheckerTown(self.canvas, color=bg_color)
             for piece in teamRPieces + teamLPieces:
                 state = self.master.getCellState(piece.row, piece.col)
-                if state == 1:
+                if self.confident("mismatch_{}".format(piece), state == 1, False, threshold=2):
                     mismatch = True
                     print("{}'s {} should be here".format(piece.team.name, type(piece)))
                     print(piece.row, piece.col)
@@ -852,18 +853,19 @@ class Board(SampleBase):
                 if startCell in pick.targets:
                     pick.targets.remove(startCell)
                 self.lightTargets(pick)
+                self.lightCell(canvas, endCell.row, endCell.col, team.r, team.g, team.b)
 
                 if examining:
                     self.blinkCell(canvas, startCell, color=(team.r,team.g,team.b))
                 else:
                     self.lightCell(canvas, startCell.row, startCell.col, team.r, team.g, team.b)
 
-            if not self.confident("switch_trigger", self.isLifted([startCell]), True):
+            if not self.confident("switch_trigger", self.isLifted([startCell]), True, threshold=2):
                 if examining:
                     print("Choosing next option")
                     index = (index + 1) % len(candidates)
                 examining = False
-            elif not self.confident("select_trigger", self.isLifted([endCell]), True):
+            elif not self.confident("select_trigger", self.isLifted([endCell]), True, threshold=7):
                 print("Choice made")
                 break
             else:
