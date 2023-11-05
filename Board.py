@@ -189,7 +189,7 @@ class Board(SampleBase):
         self.canvas = self.matrix.SwapOnVSync(self.canvas)
 
         self.resetCounter("mismatch")
-        while self.confident("mismatch", mismatch, True, threshold=3):
+        while self.confident("mismatch", mismatch, True, threshold=2):
             mismatch = False
             self.master.readData()
             time.sleep(0.2)
@@ -197,7 +197,7 @@ class Board(SampleBase):
             self.lightCheckerTown(self.canvas, color=bg_color)
             for piece in teamRPieces + teamLPieces:
                 state = self.master.getCellState(piece.row, piece.col)
-                if self.confident("mismatch_{}".format(piece), state == 1, False, threshold=2):
+                if self.confident("mismatch_{}".format(piece), state == 1, False, threshold=3):
                     mismatch = True
                     print("{}'s {} should be here".format(piece.team.name, type(piece)))
                     print(piece.row, piece.col)
