@@ -19,6 +19,8 @@ from Cell import Cell
 import random
 from Master import Master
 from hardware.sensor import BoardSensor
+from game import rules as _rules
+from ui.renderer import light_cell as _light_cell
 from Tree import Tree
 from AI import AI
 import copy
@@ -439,7 +441,7 @@ class Board(SampleBase):
                             self.grid[row][col] = None
 
                     if not valid_move:
-                        print("Invalid target.")
+                        logger.debug("Invalid target.")
                     else:
                         self.canvas.Clear()
                         self.light_checker_town(self.canvas)
@@ -619,9 +621,7 @@ class Board(SampleBase):
             self.team_r.set_name("Player 1")
 
     def light_cell(self, canvas, x, y, r, g, b):
-        for i in range(4):
-            for j in range(4):
-                canvas.SetPixel(x * 4 + i, y * 4 + j, r, g, b)
+        _light_cell(canvas, x, y, r, g, b)
 
     def print_board_states(self, grid=None):
         if grid is None:
@@ -1019,7 +1019,7 @@ class Board(SampleBase):
                 team_king = piece
                 check = team_king.calc_targets(current_node.board_state)
                 if check:
-                    print("KING IS IN CHECK")
+                    logger.debug("KING IS IN CHECK")
 
         for piece in self.get_team_pieces(team, current_node.board_state):
             piece.calc_targets(current_node.board_state)
@@ -1067,58 +1067,8 @@ class Board(SampleBase):
             return False
 
     def check_fifty_move_rule(self, team, board_state):
-        logger.debug("peace_time=%s", self.peace_time)
-        if self.peace_time >= 50:
-            self.game_over = True
-            self.declare_stalemate()
-            return True
-        else:
-            if team == self.team_l:
-                return self.check_threefold_repetition(
-                    team, board_state,
-                    self.days_left_since_injury, self.double_left_jeopardy)
-            else:
-                return self.check_threefold_repetition(
-                    team, board_state,
-                    self.days_right_since_injury, self.double_right_jeopardy)
+        return _rules.check_fifty_move_rule(self, team, board_state)
 
     def check_threefold_repetition(self, team, board_state, days_since_injury, double_jeopardy):
-        if self.peace_time == 0:
-            days_since_injury.clear()
-            double_jeopardy.clear()
-            days_since_injury.append(copy.deepcopy(board_state))
-        else:
-            second_match = False
-            for state in double_jeopardy:
-                second_match = True
-                for row in range(8):
-                    for col in range(8):
-                        if not type(state[row][col]) is type(board_state[row][col]):
-                            second_match = False
-                            break
-                    if not second_match:
-                        break
-                if second_match:
-                    break
-            if second_match:
-                self.game_over = True
-                self.declare_stalemate()
-                return True
-            else:
-                first_match = False
-                for state in days_since_injury:
-                    first_match = True
-                    for row in range(8):
-                        for col in range(8):
-                            if not type(state[row][col]) is type(board_state[row][col]):
-                                first_match = False
-                                break
-                        if not first_match:
-                            break
-                    if first_match:
-                        break
-                if first_match:
-                    double_jeopardy.append(copy.deepcopy(board_state))
-                else:
-                    days_since_injury.append(copy.deepcopy(board_state))
-        return False
+        return _rules.check_threefold_repetition(
+            self, team, board_state, days_since_injury, double_jeopardy)
