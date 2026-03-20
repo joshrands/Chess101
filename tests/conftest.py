@@ -18,7 +18,7 @@ sys.modules.setdefault("rgbmatrix", _mock_rgb)
 sys.modules.setdefault("rgbmatrix.core", _mock_rgb)
 
 _mock_smbus = MagicMock()
-# read_byte must return an int so Master.updateRowStates arithmetic doesn't crash
+# read_byte must return an int so Master.update_row_states arithmetic doesn't crash
 _mock_smbus.SMBus.return_value.read_byte.return_value = 0
 sys.modules.setdefault("smbus", _mock_smbus)
 
@@ -46,19 +46,19 @@ from King import King          # noqa: E402
 
 @pytest.fixture
 def team_r():
-    """Default teamR — blue, matching Board.py defaults."""
+    """Default team_r — blue, matching Board.py defaults."""
     return Team(64, 180, 232)
 
 
 @pytest.fixture
 def team_l():
-    """Default teamL — orange, matching Board.py defaults."""
+    """Default team_l — orange, matching Board.py defaults."""
     return Team(255, 140, 0)
 
 
 @pytest.fixture
 def empty_board():
-    """8×8 grid of None values (the standard checkerTown shape)."""
+    """8×8 grid of None values (the standard board shape)."""
     return [[None] * 8 for _ in range(8)]
 
 
@@ -89,5 +89,5 @@ def board_instance():
     b.matrix = MagicMock()
     b.matrix.SwapOnVSync.return_value = MagicMock()
     b.master = MagicMock()
-    b.master.getCellState.return_value = 0  # 0 = piece present
+    b.master.get_cell_state.return_value = 0  # 0 = piece present
     return b

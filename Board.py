@@ -25,38 +25,34 @@ class Board(SampleBase):
     def __init__(self, *args, **kwargs):
         super(Board, self).__init__(*args, **kwargs)
 
-        self.teamR = Team(64, 180, 232)
-        self.teamL = Team(255, 140, 0)
-        #self.teamR = Team(0, 153, 76)
-        #self.teamL = Team(81, 0, 153)
-        #self.teamR = Team(255, 255, 0)
-        #self.teamL = Team(254, 0, 255)
+        self.team_r = Team(64, 180, 232)
+        self.team_l = Team(255, 140, 0)
         self.grid = []
         self.master = Master()
-        self.computerPlayerR = False
-        self.computerPlayerL = False
+        self.computer_player_r = False
+        self.computer_player_l = False
 
-        self.checkerBrightness = 0
-        self.checkerBrightnessDir = 2
+        self.checker_brightness = 0
+        self.checker_brightness_dir = 2
 
-        self.gameOver = False
-        self.peaceTime = 0
-        self.daysLeftSinceInjury = []
-        self.daysRightSinceInjury = []
-        self.doubleLeftJeopardy = []
-        self.doubleRightJeopardy = []
+        self.game_over = False
+        self.peace_time = 0
+        self.days_left_since_injury = []
+        self.days_right_since_injury = []
+        self.double_left_jeopardy = []
+        self.double_right_jeopardy = []
 
-        self.teamArray = []
-        self.teamArray.append(Team(64, 180, 232))  # Blue
-        self.teamArray.append(Team(190, 25, 255))  # Purple
-        self.teamArray.append(Team(254, 220, 0))  # Yellow
-        self.teamArray.append(Team(250, 125, 125))  # Pink
-        self.teamArray.append(Team(25, 255, 35))  # Green
-        self.teamArray.append(Team(245, 125, 0))  # Orange
-        self.teamArray.append(Team(0, 25, 230))  # Dark Blue
-        self.teamArray.append(Team(28, 225, 180))  # Cyan
+        self.team_array = []
+        self.team_array.append(Team(64, 180, 232))    # Blue
+        self.team_array.append(Team(190, 25, 255))    # Purple
+        self.team_array.append(Team(254, 220, 0))     # Yellow
+        self.team_array.append(Team(250, 125, 125))   # Pink
+        self.team_array.append(Team(25, 255, 35))     # Green
+        self.team_array.append(Team(245, 125, 0))     # Orange
+        self.team_array.append(Team(0, 25, 230))      # Dark Blue
+        self.team_array.append(Team(28, 225, 180))    # Cyan
 
-        for row in range(0, 8):
+        for row in range(8):
             self.grid.append([None, None, None, None, None, None, None, None])
 
     # RUN GAME
@@ -65,342 +61,275 @@ class Board(SampleBase):
         self.canvas = self.matrix.CreateFrameCanvas()
 
         if not skip_setup:
-            self.colorPicker()
+            self.color_picker()
+            self.war_games()
 
-            self.warGames()
-
-        self.createPlayers()
+        self.create_players()
 
         # begin interactive setup
         self.canvas.Clear()
-        tempCanvas = self.matrix.SwapOnVSync(self.canvas)
+        temp_canvas = self.matrix.SwapOnVSync(self.canvas)
 
         if not skip_setup:
-            self.interactiveSetup(self.teamR)
-            self.interactiveSetup(self.teamL)
+            self.interactive_setup(self.team_r)
+            self.interactive_setup(self.team_l)
 
-        tempCanvas.Clear()
-        self.lightCheckerTown(tempCanvas)
-        self.canvas = self.matrix.SwapOnVSync(tempCanvas)
+        temp_canvas.Clear()
+        self.light_checker_town(temp_canvas)
+        self.canvas = self.matrix.SwapOnVSync(temp_canvas)
 
-        eval("self.initializeGameBoard{}()".format(init_num))
+        eval("self.initialize_game_board{}()".format(init_num))
 
-        while (not self.gameOver):
+        while not self.game_over:
             self.canvas.Clear()
-            self.lightCheckerTown(self.canvas)
+            self.light_checker_town(self.canvas)
             self.canvas = self.matrix.SwapOnVSync(self.canvas)
 
-            # Do player 1's turn
             self.canvas.Clear()
 
-            if (self.computerPlayerR):
-                self.computerMove(self.teamR)
+            if self.computer_player_r:
+                self.computer_move(self.team_r)
             else:
-                self.doTurn(self.teamR)
+                self.do_turn(self.team_r)
 
             self.canvas.Clear()
 
-            if (self.gameOver):
+            if self.game_over:
                 break
 
-            if (self.computerPlayerL):
-                self.computerMove(self.teamL)
+            if self.computer_player_l:
+                self.computer_move(self.team_l)
             else:
-                self.doTurn(self.teamL)
+                self.do_turn(self.team_l)
 
             self.canvas = self.matrix.SwapOnVSync(self.canvas)
 
-    ### Member Functions ###
-    def lightPath(self, startRow, startCol, endRow, endCol):
-        rowIncrement = (endRow - startRow) / 8.0
-        colIncrement = (endCol - startCol) / 8.0
+    def light_path(self, start_row, start_col, end_row, end_col):
+        row_increment = (end_row - start_row) / 8.0
+        col_increment = (end_col - start_col) / 8.0
 
-    def lightCheckerTown(self, canvas, color=(255, 255, 255)):
+    def light_checker_town(self, canvas, color=(255, 255, 255)):
         r, g, b = color
         for x in range(4):
             for y in range(4):
-                self.lightCell(canvas, 1 + (2 * x), 2 * y, r, g, b)
+                self.light_cell(canvas, 1 + 2 * x, 2 * y, r, g, b)
         for x in range(4):
             for y in range(4):
-                self.lightCell(canvas, (2 * x), 1 + 2 * y, r, g, b)
+                self.light_cell(canvas, 2 * x, 1 + 2 * y, r, g, b)
 
-    def chooseLightCheckerTown(self, color=(255, 255, 255)):
-        r, g, b = map(lambda val: int(val * (self.checkerBrightness / 255)), color)
-        self.lightCheckerTown(self.canvas, color=(r, g, b))
+    def choose_light_checker_town(self, color=(255, 255, 255)):
+        r, g, b = map(lambda val: int(val * (self.checker_brightness / 255)), color)
+        self.light_checker_town(self.canvas, color=(r, g, b))
 
-    def interactiveSetup(self, team):
-        if (team == self.teamR):
-            # setup Rook
-            self.detectPiece(team, "Rook", 0, 0)
-            self.detectPiece(team, "Rook", 0, 7)
-            # setup Knight
-            self.detectPiece(team, "Knight", 0, 1)
-            self.detectPiece(team, "Knight", 0, 6)
-            # setup bishop
-            self.detectPiece(team, "Bishop", 0, 2)
-            self.detectPiece(team, "Bishop", 0, 5)
-            # setup Queen
-            self.detectPiece(team, "Queen", 0, 3)
-            # setup King
-            self.detectPiece(team, "King", 0, 4)
-            # setup Pawns
-            self.detectPawns(team, 1)
+    def interactive_setup(self, team):
+        if team == self.team_r:
+            self.detect_piece(team, "Rook", 0, 0)
+            self.detect_piece(team, "Rook", 0, 7)
+            self.detect_piece(team, "Knight", 0, 1)
+            self.detect_piece(team, "Knight", 0, 6)
+            self.detect_piece(team, "Bishop", 0, 2)
+            self.detect_piece(team, "Bishop", 0, 5)
+            self.detect_piece(team, "Queen", 0, 3)
+            self.detect_piece(team, "King", 0, 4)
+            self.detect_pawns(team, 1)
         else:
-            # setup Rook
-            self.detectPiece(team, "Rook", 7, 0)
-            self.detectPiece(team, "Rook", 7, 7)
-            # setup Knight
-            self.detectPiece(team, "Knight", 7, 1)
-            self.detectPiece(team, "Knight", 7, 6)
-            # setup bishop
-            self.detectPiece(team, "Bishop", 7, 2)
-            self.detectPiece(team, "Bishop", 7, 5)
-            # setup Queen
-            self.detectPiece(team, "Queen", 7, 3)
-            # setup King
-            self.detectPiece(team, "King", 7, 4)
-            # setup Pawns
-            self.detectPawns(team, 6)
+            self.detect_piece(team, "Rook", 7, 0)
+            self.detect_piece(team, "Rook", 7, 7)
+            self.detect_piece(team, "Knight", 7, 1)
+            self.detect_piece(team, "Knight", 7, 6)
+            self.detect_piece(team, "Bishop", 7, 2)
+            self.detect_piece(team, "Bishop", 7, 5)
+            self.detect_piece(team, "Queen", 7, 3)
+            self.detect_piece(team, "King", 7, 4)
+            self.detect_pawns(team, 6)
 
-    def detectMismatch(self):
-        # read data into master
-        self.master.readData()
-        # Color for the background checkerboard
-        bg_color = (255, 0, 0) # red
-        # Color of piece that needs correction
-        piece_color = (255, 255, 0) # yellow
+    def detect_mismatch(self):
+        self.master.read_data()
+        bg_color = (255, 0, 0)  # red
+        piece_color = (255, 255, 0)  # yellow
         r, g, b = piece_color
-        # loop through valid pieces and make sure they are there
-        teamRPieces = self.getTeamPieces(self.teamR)
-        teamLPieces = self.getTeamPieces(self.teamL)
+        team_r_pieces = self.get_team_pieces(self.team_r)
+        team_l_pieces = self.get_team_pieces(self.team_l)
         mismatch = True
         self.canvas.Clear()
-        self.lightCheckerTown(self.canvas)
+        self.light_checker_town(self.canvas)
         self.canvas = self.matrix.SwapOnVSync(self.canvas)
 
         while mismatch:
             mismatch = False
-            self.master.readData()
+            self.master.read_data()
             time.sleep(0.2)
             self.canvas.Clear()
-            self.lightCheckerTown(self.canvas, color=bg_color)
-            for piece in teamRPieces + teamLPieces:
-                state = self.master.getCellState(piece.row, piece.col)
+            self.light_checker_town(self.canvas, color=bg_color)
+            for piece in team_r_pieces + team_l_pieces:
+                state = self.master.get_cell_state(piece.row, piece.col)
                 if state == 1:
                     mismatch = True
-                    print("{}'s {} should be here".format(piece.team.name, type(piece)))
-                    print(piece.row, piece.col)
-                    # light cell warning color
-                    self.lightCell(self.canvas, piece.row, piece.col, r, g, b)
-                    # time.sleep(0.01)
+                    self.light_cell(self.canvas, piece.row, piece.col, r, g, b)
             self.canvas = self.matrix.SwapOnVSync(self.canvas)
         # mismatch complete return true
         self.canvas.Clear()
-        self.lightCheckerTown(self.canvas)
+        self.light_checker_town(self.canvas)
         self.canvas = self.matrix.SwapOnVSync(self.canvas)
+
 
         return True
 
-    def detectPawns(self, team, row):
-        #print("Please place pawns")
+    def detect_pawns(self, team, row):
         for col in range(8):
-            self.lightCell(self.canvas, row, col, 255, 255, 255)
+            self.light_cell(self.canvas, row, col, 255, 255, 255)
         placed = False
         while not placed:
             placed = True
-            self.master.readData()
+            self.master.read_data()
             for col in range(8):
-                # why read every time? self.master.readData()
-                if (self.master.getCellState(row, col) == 1):
+                if self.master.get_cell_state(row, col) == 1:
                     placed = False
-                    self.lightCell(self.canvas, row, col, 255, 255, 255)
+                    self.light_cell(self.canvas, row, col, 255, 255, 255)
                 else:
-                    self.lightCell(self.canvas, row, col,
-                                   team.r, team.g, team.b)
-                    # pawn was placed, light cell team color
+                    self.light_cell(self.canvas, row, col, team.r, team.g, team.b)
             time.sleep(0.1)
-        #print("Pawns placed.")
 
-    def detectPiece(self, team, piece, row, col):
-        # setup teamR
-        #print("Place " + piece + " here:")
-        # light up cell white
-        self.lightCell(self.canvas, row, col, 255, 255, 255)
+    def detect_piece(self, team, piece, row, col):
+        self.light_cell(self.canvas, row, col, 255, 255, 255)
         placed = False
         while not placed:
-            self.master.readData()
-            if (self.master.getCellState(row, col) == 0):
+            self.master.read_data()
+            if self.master.get_cell_state(row, col) == 0:
                 placed = True
             time.sleep(0.01)
-        #print(piece + " set.")
-        self.lightCell(self.canvas, row, col, team.r,
-                       team.g, team.b)  # light team color
-    # detect lift off
+        self.light_cell(self.canvas, row, col, team.r, team.g, team.b)
 
-    def detectLiftOff(self, team):
-        # team is current team
-        #print("Detecting lift off...")
-        # get all valid pieces that can move
-        validPieces = self.getTeamPieces(team)
-        # update board data
-        self.master.readData()
-        # check each piece and see if any have been lifted
+    def detect_lift_off(self, team):
+        valid_pieces = self.get_team_pieces(team)
+        self.master.read_data()
         valid = False
         lifted = None
-        for piece in validPieces:
-            state = self.master.getCellState(piece.row, piece.col)
-            if (state == 1 and valid == False):
-                #print("Yay you can move that good job")
+        for piece in valid_pieces:
+            state = self.master.get_cell_state(piece.row, piece.col)
+            if state == 1 and not valid:
                 valid = True
                 lifted = piece
-
-        # if valid liftoff
         return valid, lifted
 
-    def getTeamPieces(self, team, grid=None):
-        if (grid == None):
+    def get_team_pieces(self, team, grid=None):
+        if grid is None:
             grid = self.grid
-        validPieces = []
-
+        valid_pieces = []
         for row in grid:
             for piece in row:
-                if (piece != None and piece.team.r == team.r):
-                    validPieces.append(piece)
+                if piece is not None and piece.team.r == team.r:
+                    valid_pieces.append(piece)
+        return valid_pieces
 
-        return validPieces
-
-    def detectLanding(self, piece):
-        self.master.readData()
+    def detect_landing(self, piece):
+        self.master.read_data()
         targets = piece.targets
-        # piece is piece that is moving
         valid = False
-        activatedTarget = None
-        # check regret
-        state = self.master.getCellState(piece.row, piece.col)
-        if (state == 0):
-            returnCell = Cell(piece.row, piece.col)
-            return True, returnCell
+        activated_target = None
+        state = self.master.get_cell_state(piece.row, piece.col)
+        if state == 0:
+            return_cell = Cell(piece.row, piece.col)
+            return True, return_cell
         for cell in targets:
-            state = self.master.getCellState(cell.row, cell.col)
-            # if the piece is an enemy piece, lift yours then lift enemy, then take
-            if (self.grid[cell.row][cell.col] != None):
-                # there is a piece here
-                if (state == 1):
-                    # enter while loop, wait for player to place theres
-                    activatedTarget = cell
-                    while (state == 1):
+            state = self.master.get_cell_state(cell.row, cell.col)
+            if self.grid[cell.row][cell.col] is not None:
+                if state == 1:
+                    activated_target = cell
+                    while state == 1:
                         self.canvas.Clear()
-                        self.lightCheckerTown(self.canvas)
-                        if (((time.time() - int(time.time())) * 1000) % 250 > 125):
-                            self.lightCell(
-                                self.canvas, cell.row, cell.col, piece.team.r, piece.team.g, piece.team.b)
+                        self.light_checker_town(self.canvas)
+                        if ((time.time() - int(time.time())) * 1000) % 250 > 125:
+                            self.light_cell(
+                                self.canvas, cell.row, cell.col,
+                                piece.team.r, piece.team.g, piece.team.b)
                         self.canvas = self.matrix.SwapOnVSync(self.canvas)
-
-                        self.master.readData()
-                        #print("You are taking an enemy, please place your piece")
-                        state = self.master.getCellState(cell.row, cell.col)
-
+                        self.master.read_data()
+                        state = self.master.get_cell_state(cell.row, cell.col)
                     valid = True
-
-            elif (state == 0):
-                #print("Are you sure? Too bad")
+            elif state == 0:
                 valid = True
-                activatedTarget = cell
-        return valid, activatedTarget
+                activated_target = cell
+        return valid, activated_target
 
-    def sethVictory(self, team):
-        if (team == self.teamL):
-            team = self.teamR
+    def declare_victory(self, team):
+        if team == self.team_l:
+            team = self.team_r
         else:
-            team = self.teamL
+            team = self.team_l
         while True:
-            if self.checkNewGame():
+            if self.check_new_game():
                 return
             time.sleep(0.05)
             self.canvas.Clear()
-            for m in range(0, 8):
-                self.lightCell(self.canvas, m, 0, team.r, team.g, team.b)
-                self.lightCell(self.canvas, 0, m, team.r, team.g, team.b)
-                self.lightCell(self.canvas, m, 7, team.r, team.g, team.b)
-                self.lightCell(self.canvas, 7, m, team.r, team.g, team.b)
+            for m in range(8):
+                self.light_cell(self.canvas, m, 0, team.r, team.g, team.b)
+                self.light_cell(self.canvas, 0, m, team.r, team.g, team.b)
+                self.light_cell(self.canvas, m, 7, team.r, team.g, team.b)
+                self.light_cell(self.canvas, 7, m, team.r, team.g, team.b)
             for j in range(1, 7):
                 for k in range(1, 7):
-                    self.lightCell(self.canvas, j, k, random.randint(
-                        0, 255), random.randint(0, 255), random.randint(0, 255))
+                    self.light_cell(self.canvas, j, k,
+                                    random.randint(0, 255),
+                                    random.randint(0, 255),
+                                    random.randint(0, 255))
             self.canvas = self.matrix.SwapOnVSync(self.canvas)
 
-    def staleMate(self):
+    def declare_stalemate(self):
         self.canvas.Clear()
-        for i in range(0, 4):
-            for j in range(0, 8):
-                self.lightCell(self.canvas, i, j, self.teamR.r,
-                               self.teamR.g, self.teamR.b)
+        for i in range(4):
+            for j in range(8):
+                self.light_cell(self.canvas, i, j, self.team_r.r, self.team_r.g, self.team_r.b)
         for i in range(4, 8):
-            for j in range(0, 8):
-                self.lightCell(self.canvas, i, j, self.teamL.r,
-                               self.teamL.g, self.teamL.b)
+            for j in range(8):
+                self.light_cell(self.canvas, i, j, self.team_l.r, self.team_l.g, self.team_l.b)
         self.canvas = self.matrix.SwapOnVSync(self.canvas)
         while True:
-            if self.checkNewGame():
+            if self.check_new_game():
                 return
 
-    def doTurn(self, team):
-
-        if(self.bobRoss(team, self.grid)):
+    def do_turn(self, team):
+        if self.check_fifty_move_rule(team, self.grid):
             return
 
-        # disable enPassantable
-        # calculate targets for all pieces
-
         check = False
-        checkMate = False
-        kingRow = -1
-        kingCol = -1
-        piecesWithMoves = 0
-
-        # count total targets for this team for stalemate purposes
-        #count = 0;
-        for row in self.grid:
-            for piece in row:
-                if (piece != None):
-                    # increment number of moves
-                    #count += len(piece.getTargets());
-                    if (isinstance(piece, King) and piece.team == team):
-                        check = piece.calcTargets(self.grid)
-                        if (len(piece.getTargets()) > 0):
-                            piecesWithMoves = piecesWithMoves + 1
-                        kingRow = piece.row
-                        kingCol = piece.col
+        king_row = -1
+        king_col = -1
+        pieces_with_moves = 0
 
         for row in self.grid:
             for piece in row:
-                if (isinstance(piece, Pawn) and piece.team == team):
-                    piece.enPassantable = False
-                if (piece != None and not (isinstance(piece, King))):
-                    piece.calcTargets(self.grid)
-                    if (check):
-                        piece.skyFall(self.grid[kingRow][kingCol])
-                    # print pieces that can be moved
-                    if (len(piece.getTargets()) > 0 and piece.team == team):
-                        piecesWithMoves = piecesWithMoves + 1
+                if piece is not None:
+                    if isinstance(piece, King) and piece.team == team:
+                        check = piece.calc_targets(self.grid)
+                        if len(piece.get_targets()) > 0:
+                            pieces_with_moves += 1
+                        king_row = piece.row
+                        king_col = piece.col
 
-        # check if there are no legal moves
-        if (piecesWithMoves == 0):
-            # stalemate
-            if (not check):
-                self.gameOver = True
-                self.staleMate()
+        for row in self.grid:
+            for piece in row:
+                if isinstance(piece, Pawn) and piece.team == team:
+                    piece.en_passantable = False
+                if piece is not None and not isinstance(piece, King):
+                    piece.calc_targets(self.grid)
+                    if check:
+                        piece.filter_to_king_escape(self.grid[king_row][king_col])
+                    if len(piece.get_targets()) > 0 and piece.team == team:
+                        pieces_with_moves += 1
+
+        if pieces_with_moves == 0:
+            if not check:
+                self.game_over = True
+                self.declare_stalemate()
+                return
+            elif check:
+                self.game_over = True
+                self.declare_victory(team)
                 return
 
-            elif (check):
-                #print("Check mate!")
-                self.gameOver = True
-                self.sethVictory(team)
-                return
-
-        # check for mismatch
-        self.detectMismatch()
-        self.lightCheckerTown(self.canvas)
+        self.detect_mismatch()
+        self.light_checker_town(self.canvas)
         self.canvas = self.matrix.SwapOnVSync(self.canvas)
 
         time.sleep(0.25)
@@ -408,687 +337,536 @@ class Board(SampleBase):
         move = False
         row = 0
         col = 0
-        print("Player:", team.name, "'s move.")
+        print(f"Player: {team.name}'s move.")
 
-        while (move == False):
-
+        while not move:
             self.canvas.Clear()
+            piece_lifted = False
+            lifted_piece = None
+            while not piece_lifted:
+                piece_lifted, lifted_piece = self.detect_lift_off(team)
 
-            # move a piece!
-#            row = int(input("Enter row for desired piece: "))
-#            col = int(input("Enter col for desired piece: "))
-            pieceLifted = False
-            liftedPiece = None
-            while (pieceLifted == False):
-                pieceLifted, liftedPiece = self.detectLiftOff(team)
-                #print("Waiting for player move...")
-
-            row = liftedPiece.row
-            col = liftedPiece.col
-            self.lightCheckerTown(self.canvas)
-            self.lightTargets(self.grid[row][col])
+            row = lifted_piece.row
+            col = lifted_piece.col
+            self.light_checker_town(self.canvas)
+            self.light_targets(self.grid[row][col])
             self.canvas = self.matrix.SwapOnVSync(self.canvas)
 
-            move = True  # the player is moving a piece, is it valid? Will they continue?
-            validMove = False
-            # check if valid move
-            while (validMove == False):
-                # add detect lift off
-                #targetRow = int(input("Enter a row for target: "))
-                #targetCol = int(input("Enter a col for target: "))
-
+            move = True
+            valid_move = False
+            while not valid_move:
                 placed = False
                 returned = False
-                while (not placed):
+                while not placed:
                     self.canvas.Clear()
-                    self.lightCheckerTown(self.canvas)
-                    self.lightTargets(self.grid[row][col])
-                    if (time.time() - int(time.time()) > 0.5):
-                        self.lightCell(
-                            self.canvas, row, col, liftedPiece.team.r, liftedPiece.team.g, liftedPiece.team.b)
+                    self.light_checker_town(self.canvas)
+                    self.light_targets(self.grid[row][col])
+                    if time.time() - int(time.time()) > 0.5:
+                        self.light_cell(
+                            self.canvas, row, col,
+                            lifted_piece.team.r, lifted_piece.team.g, lifted_piece.team.b)
                     self.canvas = self.matrix.SwapOnVSync(self.canvas)
-                    #print("Please choose a target already")
-                    placed, targetCell = self.detectLanding(
-                        self.grid[row][col])
-                    #print(placed, targetCell.row, targetCell.col, row, col)
+                    placed, target_cell = self.detect_landing(self.grid[row][col])
                     if placed:
-                        #print(targetCell.row, targetCell.col, row, col)
-                        if (targetCell.row == row and targetCell.col == col):
-                            #print("Piece returned.")
+                        if target_cell.row == row and target_cell.col == col:
                             returned = True
                 if returned:
-                    # go back to detecting which piece player wants to move
                     move = False
-                    validMove = True
+                    valid_move = True
                     self.canvas.Clear()
-                    self.lightCheckerTown(self.canvas)
+                    self.light_checker_town(self.canvas)
                     self.canvas = self.matrix.SwapOnVSync(self.canvas)
-                    # print("Regret.")
-                    # continue
 
                 if move:
-                    targetRow = targetCell.row
-                    targetCol = targetCell.col
+                    target_row = target_cell.row
+                    target_col = target_cell.col
 
-                    for cell in self.grid[row][col].getTargets():
-                        if (cell.row == targetRow and cell.col == targetCol):
-                            validMove = True
-                            #print("Moving piece...")
-                            if (self.grid[targetRow][targetCol] != None):
-                                self.peaceTime = 0
+                    for cell in self.grid[row][col].get_targets():
+                        if cell.row == target_row and cell.col == target_col:
+                            valid_move = True
+                            if self.grid[target_row][target_col] is not None:
+                                self.peace_time = 0
                             else:
-                                self.peaceTime += 1
-                            self.grid[targetRow][targetCol] = self.grid[row][col]
-                            if (isinstance(self.grid[targetRow][targetCol], Pawn)):
-                                self.peaceTime = 0
-                                enemy = self.grid[targetRow][targetCol].move(
-                                    targetRow, targetCol, self.grid)
-                                if (enemy != None):
+                                self.peace_time += 1
+                            self.grid[target_row][target_col] = self.grid[row][col]
+                            if isinstance(self.grid[target_row][target_col], Pawn):
+                                self.peace_time = 0
+                                enemy = self.grid[target_row][target_col].move(
+                                    target_row, target_col, self.grid)
+                                if enemy is not None:
                                     self.grid[enemy.row][enemy.col] = None
-                                    # print("enPassant!")
-                                    # make player remove piece
-                                    state = self.master.getCellState(
-                                        enemy.row, enemy.col)
+                                    state = self.master.get_cell_state(enemy.row, enemy.col)
                                     while state == 0:
-                                        self.master.readData()
+                                        self.master.read_data()
                                         time.sleep(0.4)
-                                        # fade in red
                                         for r in range(201):
                                             self.canvas.Clear()
-                                            self.lightCheckerTown(self.canvas)
-                                            self.lightCell(
+                                            self.light_checker_town(self.canvas)
+                                            self.light_cell(
                                                 self.canvas, enemy.row, enemy.col, 50 + r, 0, 0)
-                                            self.canvas = self.matrix.SwapOnVSync(
-                                                self.canvas)
+                                            self.canvas = self.matrix.SwapOnVSync(self.canvas)
                                             time.sleep(0.002)
-
-                                        self.master.readData()
+                                        self.master.read_data()
                                         time.sleep(0.4)
-                                        # fade out red
                                         for r in range(201):
                                             self.canvas.Clear()
-                                            self.lightCheckerTown(self.canvas)
-                                            self.lightCell(
+                                            self.light_checker_town(self.canvas)
+                                            self.light_cell(
                                                 self.canvas, enemy.row, enemy.col, 255 - r, 0, 0)
-                                            self.canvas = self.matrix.SwapOnVSync(
-                                                self.canvas)
+                                            self.canvas = self.matrix.SwapOnVSync(self.canvas)
                                             time.sleep(0.002)
-
-                                        state = self.master.getCellState(
-                                            enemy.row, enemy.col)
-
-                            elif (isinstance(self.grid[targetRow][targetCol], King)):
-                                rookLocation, rookTarget = self.grid[targetRow][targetCol].move(
-                                    targetRow, targetCol, self.grid)
-                                if (rookLocation != None):
-                                    # do castling
-                                    self.grid[rookTarget.row][rookTarget.col] = self.grid[rookLocation.row][rookLocation.col]
-                                    self.grid[rookLocation.row][rookLocation.col] = None
-                                    self.grid[rookTarget.row][rookTarget.col].move(
-                                        rookTarget.row, rookTarget.col, self.grid)
+                                        state = self.master.get_cell_state(enemy.row, enemy.col)
+                            elif isinstance(self.grid[target_row][target_col], King):
+                                rook_location, rook_target = self.grid[target_row][target_col].move(
+                                    target_row, target_col, self.grid)
+                                if rook_location is not None:
+                                    self.grid[rook_target.row][rook_target.col] = (
+                                        self.grid[rook_location.row][rook_location.col])
+                                    self.grid[rook_location.row][rook_location.col] = None
+                                    self.grid[rook_target.row][rook_target.col].move(
+                                        rook_target.row, rook_target.col, self.grid)
                             else:
-                                self.grid[targetRow][targetCol].move(
-                                    targetRow, targetCol, self.grid)
+                                self.grid[target_row][target_col].move(
+                                    target_row, target_col, self.grid)
 
                             self.grid[row][col] = None
 
-                    if (validMove == False):
+                    if not valid_move:
                         print("Invalid target.")
                     else:
                         self.canvas.Clear()
-                        self.lightCheckerTown(self.canvas)
-
+                        self.light_checker_town(self.canvas)
                         self.canvas = self.matrix.SwapOnVSync(self.canvas)
-        #self.bobRoss(team, self.grid)
 
-    def lightTargets(self, piece):
-        # piece.calcTargets(self.grid)
+    def light_targets(self, piece):
         r = piece.team.r
         g = piece.team.g
         b = piece.team.b
-        # light your cell
-        #self.lightCell(self.canvas, piece.row, piece.col, r, g, b)
-
-        targets = piece.getTargets()
+        targets = piece.get_targets()
         for cell in targets:
-            #print("Target: ", cell.row, cell.col)
-            self.lightCell(self.canvas, cell.row, cell.col, r, g, b)
+            self.light_cell(self.canvas, cell.row, cell.col, r, g, b)
 
-    def initializeGameBoard(self):
-        # create pieces in each team
-        # TEAM R
-        # create pawns for teamR
-        for col in range(0, 8):
-            self.grid[1][col] = Pawn(1, col, self.teamR)
-        # create bishop for teamR
-        self.grid[0][2] = Bishop(0, 2, self.teamR)
-        self.grid[0][5] = Bishop(0, 5, self.teamR)
-        # create rook for teamR
-        self.grid[0][0] = Rook(0, 0, self.teamR)
-        self.grid[0][7] = Rook(0, 7, self.teamR)
-        self.grid[0][1] = Knight(0, 1, self.teamR)
-        self.grid[0][6] = Knight(0, 6, self.teamR)
-        self.grid[0][3] = Queen(0, 3, self.teamR)
-        self.grid[0][4] = King(0, 4, self.teamR)
+    def initialize_game_board(self):
+        for col in range(8):
+            self.grid[1][col] = Pawn(1, col, self.team_r)
+        self.grid[0][2] = Bishop(0, 2, self.team_r)
+        self.grid[0][5] = Bishop(0, 5, self.team_r)
+        self.grid[0][0] = Rook(0, 0, self.team_r)
+        self.grid[0][7] = Rook(0, 7, self.team_r)
+        self.grid[0][1] = Knight(0, 1, self.team_r)
+        self.grid[0][6] = Knight(0, 6, self.team_r)
+        self.grid[0][3] = Queen(0, 3, self.team_r)
+        self.grid[0][4] = King(0, 4, self.team_r)
 
-        # TEAM L
-        # create pawns for teamL
-        for col in range(0, 8):
-            self.grid[6][col] = Pawn(6, col, self.teamL)
-        # create bishop for teamL
-        self.grid[7][2] = Bishop(7, 2, self.teamL)
-        self.grid[7][5] = Bishop(7, 5, self.teamL)
-        # create rook for teamL
-        self.grid[7][0] = Rook(7, 0, self.teamL)
-        self.grid[7][7] = Rook(7, 7, self.teamL)
-        self.grid[7][1] = Knight(7, 1, self.teamL)
-        self.grid[7][6] = Knight(7, 6, self.teamL)
-        self.grid[7][3] = Queen(7, 3, self.teamL)
-        self.grid[7][4] = King(7, 4, self.teamL)
+        for col in range(8):
+            self.grid[6][col] = Pawn(6, col, self.team_l)
+        self.grid[7][2] = Bishop(7, 2, self.team_l)
+        self.grid[7][5] = Bishop(7, 5, self.team_l)
+        self.grid[7][0] = Rook(7, 0, self.team_l)
+        self.grid[7][7] = Rook(7, 7, self.team_l)
+        self.grid[7][1] = Knight(7, 1, self.team_l)
+        self.grid[7][6] = Knight(7, 6, self.team_l)
+        self.grid[7][3] = Queen(7, 3, self.team_l)
+        self.grid[7][4] = King(7, 4, self.team_l)
 
-    def initializeGameBoard2(self):
-        # PWN UPGRADE
-        # create pieces in each team
-        # TEAM R
-        # create pawns for teamR
-        for col in range(0, 7):
-            self.grid[1][col] = Pawn(1, col, self.teamL)
-            self.grid[1][col].direction=-1
-            self.grid[1][col].startingRow=6
-        for col in range(0, 8):
-            self.grid[6][col] = Pawn(6, col, self.teamR)
-            self.grid[6][col].direction=1
-            self.grid[6][col].startingRow=1
+    def initialize_game_board2(self):
+        for col in range(7):
+            self.grid[1][col] = Pawn(1, col, self.team_r)
+        self.grid[5][7] = Pawn(5, 7, self.team_r)
 
+        for col in range(6):
+            if col == 3:
+                continue
+            self.grid[6][col] = Pawn(6, col, self.team_l)
+        self.grid[3][5] = Bishop(3, 5, self.team_l)
+        self.grid[7][0] = Rook(7, 0, self.team_l)
+        self.grid[7][7] = Rook(7, 7, self.team_l)
+        self.grid[7][1] = Knight(7, 1, self.team_l)
+        self.grid[6][6] = Queen(6, 6, self.team_l)
+        self.grid[7][4] = King(7, 4, self.team_l)
 
-    def initializeGameBoard3(self):
-        # create pieces in each team
-        # TEAM R
-        # create pawns for teamR
-        self.grid[1][0] = Pawn(1, 0, self.teamR)
-        self.grid[2][1] = Pawn(2, 1, self.teamR)
-        self.grid[1][6] = Pawn(1, 6, self.teamR)
-        self.grid[1][7] = Pawn(1, 7, self.teamR)
-        self.grid[5][2] = Pawn(5, 2, self.teamR)
-
-        # create bishop for teamR
-        self.grid[0][2] = Bishop(0, 2, self.teamR)
-        self.grid[4][7] = Bishop(4, 7, self.teamR)
-        # create rook for teamR
-        self.grid[0][7] = Rook(0, 7, self.teamR)
-        self.grid[1][4] = Knight(1, 4, self.teamR)
-        self.grid[2][2] = Queen(2, 2, self.teamR)
-        self.grid[0][5] = King(0, 5, self.teamR)
+    def initialize_game_board3(self):
+        self.grid[1][0] = Pawn(1, 0, self.team_r)
+        self.grid[2][1] = Pawn(2, 1, self.team_r)
+        self.grid[1][6] = Pawn(1, 6, self.team_r)
+        self.grid[1][7] = Pawn(1, 7, self.team_r)
+        self.grid[5][2] = Pawn(5, 2, self.team_r)
+        self.grid[0][2] = Bishop(0, 2, self.team_r)
+        self.grid[4][7] = Bishop(4, 7, self.team_r)
+        self.grid[0][7] = Rook(0, 7, self.team_r)
+        self.grid[1][4] = Knight(1, 4, self.team_r)
+        self.grid[2][2] = Queen(2, 2, self.team_r)
+        self.grid[0][5] = King(0, 5, self.team_r)
         self.grid[0][5].touched = True
 
-        # TEAM L
-        self.grid[5][0] = Pawn(5, 0, self.teamL)
+        self.grid[5][0] = Pawn(5, 0, self.team_l)
         self.grid[5][0].direction = -1
-        self.grid[6][1] = Pawn(6, 1, self.teamL)
-        self.grid[6][2] = Pawn(6, 2, self.teamL)
-        self.grid[5][3] = Pawn(5, 3, self.teamL)
+        self.grid[6][1] = Pawn(6, 1, self.team_l)
+        self.grid[6][2] = Pawn(6, 2, self.team_l)
+        self.grid[5][3] = Pawn(5, 3, self.team_l)
         self.grid[5][3].direction = -1
-        self.grid[6][7] = Pawn(6, 7, self.teamL)
-
-        # create bishop for teamL
-        self.grid[1][5] = Bishop(1, 5, self.teamL)
-
-        # create rook for teamL
-        self.grid[7][0] = Rook(7, 0, self.teamL)
-        self.grid[7][6] = Rook(7, 6, self.teamL)
-
-        self.grid[0][0] = Knight(0, 0, self.teamL)
-
-        self.grid[4][5] = Queen(4, 5, self.teamL)
-        self.grid[6][4] = King(6, 4, self.teamL)
+        self.grid[6][7] = Pawn(6, 7, self.team_l)
+        self.grid[1][5] = Bishop(1, 5, self.team_l)
+        self.grid[7][0] = Rook(7, 0, self.team_l)
+        self.grid[7][6] = Rook(7, 6, self.team_l)
+        self.grid[0][0] = Knight(0, 0, self.team_l)
+        self.grid[4][5] = Queen(4, 5, self.team_l)
+        self.grid[6][4] = King(6, 4, self.team_l)
         self.grid[6][4].touched = True
 
-    def initializeGameBoard4(self):
-        # create pieces in each team
-        # TEAM R
-        # create pawns for teamR
-        self.grid[1][0] = Pawn(1, 0, self.teamR)
-        self.grid[2][1] = Pawn(2, 1, self.teamR)
-        self.grid[1][6] = Pawn(1, 6, self.teamR)
-        self.grid[1][7] = Pawn(1, 7, self.teamR)
-        self.grid[6][1] = Pawn(6, 1, self.teamR)
-
-        # create bishop for teamR
-        self.grid[0][2] = Bishop(0, 2, self.teamR)
-        self.grid[4][7] = Bishop(4, 7, self.teamR)
-        # create rook for teamR
-        self.grid[0][7] = Rook(0, 7, self.teamR)
-        self.grid[1][4] = Knight(1, 4, self.teamR)
-        self.grid[2][2] = Queen(2, 2, self.teamR)
-        self.grid[0][5] = King(0, 5, self.teamR)
+    def initialize_game_board4(self):
+        self.grid[1][0] = Pawn(1, 0, self.team_r)
+        self.grid[2][1] = Pawn(2, 1, self.team_r)
+        self.grid[1][6] = Pawn(1, 6, self.team_r)
+        self.grid[1][7] = Pawn(1, 7, self.team_r)
+        self.grid[6][1] = Pawn(6, 1, self.team_r)
+        self.grid[0][2] = Bishop(0, 2, self.team_r)
+        self.grid[4][7] = Bishop(4, 7, self.team_r)
+        self.grid[0][7] = Rook(0, 7, self.team_r)
+        self.grid[1][4] = Knight(1, 4, self.team_r)
+        self.grid[2][2] = Queen(2, 2, self.team_r)
+        self.grid[0][5] = King(0, 5, self.team_r)
         self.grid[0][5].touched = True
 
-        # TEAM L
-        self.grid[5][0] = Pawn(5, 0, self.teamL)
+        self.grid[5][0] = Pawn(5, 0, self.team_l)
         self.grid[5][0].direction = -1
-        self.grid[6][2] = Pawn(6, 2, self.teamL)
-        self.grid[5][3] = Pawn(5, 3, self.teamL)
+        self.grid[6][2] = Pawn(6, 2, self.team_l)
+        self.grid[5][3] = Pawn(5, 3, self.team_l)
         self.grid[5][3].direction = -1
-        self.grid[6][7] = Pawn(6, 7, self.teamL)
-
-        # create bishop for teamL
-        self.grid[1][5] = Bishop(1, 5, self.teamL)
-
-        # create rook for teamL
-        self.grid[7][0] = Rook(7, 0, self.teamL)
-
-        self.grid[0][0] = Knight(0, 0, self.teamL)
-
-        self.grid[4][5] = Queen(4, 5, self.teamL)
-        self.grid[6][4] = King(6, 4, self.teamL)
+        self.grid[6][7] = Pawn(6, 7, self.team_l)
+        self.grid[1][5] = Bishop(1, 5, self.team_l)
+        self.grid[7][0] = Rook(7, 0, self.team_l)
+        self.grid[0][0] = Knight(0, 0, self.team_l)
+        self.grid[4][5] = Queen(4, 5, self.team_l)
+        self.grid[6][4] = King(6, 4, self.team_l)
         self.grid[6][4].touched = True
 
-    def initializeGameBoard5(self):
-        # create pieces in each team
-        # TEAM R
-        # create pawns for teamR
-
-        self.grid[6][1] = Pawn(6, 1, self.teamR)
+    def initialize_game_board5(self):
+        self.grid[6][1] = Pawn(6, 1, self.team_r)
         self.grid[6][1].direction = 1
-        self.grid[6][1].startingRow = 1
-
-        # create bishop for teamR
-        self.grid[0][5] = King(0, 5, self.teamR)
+        self.grid[6][1].starting_row = 1
+        self.grid[0][5] = King(0, 5, self.team_r)
         self.grid[0][5].touched = True
 
-        # TEAM L
-        self.grid[7][0] = Rook(7, 0, self.teamL)
-
-        self.grid[6][4] = King(6, 4, self.teamL)
+        self.grid[7][0] = Rook(7, 0, self.team_l)
+        self.grid[6][4] = King(6, 4, self.team_l)
         self.grid[6][4].touched = True
 
-    def initializeGameBoard6(self):
-        # create pieces in each team
-        # TEAM R
-        # create pawns for teamR
-
-        self.grid[1][0] = Pawn(1, 0, self.teamR)
+    def initialize_game_board6(self):
+        self.grid[1][0] = Pawn(1, 0, self.team_r)
         self.grid[1][0].direction = 1
-        self.grid[1][0].startingRow = 1
-        self.grid[1][1] = Pawn(1, 1, self.teamR)
+        self.grid[1][0].starting_row = 1
+        self.grid[1][1] = Pawn(1, 1, self.team_r)
         self.grid[1][1].direction = 1
-        self.grid[1][1].startingRow = 1
-        self.grid[1][6] = Pawn(1, 6, self.teamR)
+        self.grid[1][1].starting_row = 1
+        self.grid[1][6] = Pawn(1, 6, self.team_r)
         self.grid[1][6].direction = 1
-        self.grid[1][6].startingRow = 1
-        self.grid[1][7] = Pawn(1, 7, self.teamR)
+        self.grid[1][6].starting_row = 1
+        self.grid[1][7] = Pawn(1, 7, self.team_r)
         self.grid[1][7].direction = 1
-        self.grid[1][7].startingRow = 1
-
-        # create bishop for teamR
-        self.grid[0][3] = King(0, 3, self.teamR)
+        self.grid[1][7].starting_row = 1
+        self.grid[0][3] = King(0, 3, self.team_r)
         self.grid[0][3].touched = True
+        self.grid[0][0] = Rook(0, 0, self.team_r)
+        self.grid[3][4] = Rook(3, 4, self.team_r)
+        self.grid[1][3] = Bishop(1, 3, self.team_r)
 
-        self.grid[0][0] = Rook(0, 0, self.teamR)
-        self.grid[3][4] = Rook(3, 4, self.teamR)
-        self.grid[1][3] = Bishop(1, 3, self.teamR)
-
-        # TEAM L
-        self.grid[6][1] = Pawn(6, 1, self.teamL)
+        self.grid[6][1] = Pawn(6, 1, self.team_l)
         self.grid[6][1].direction = -1
-        self.grid[6][1].startingRow = 6
-        self.grid[5][1] = Pawn(5, 1, self.teamL)
+        self.grid[6][1].starting_row = 6
+        self.grid[5][1] = Pawn(5, 1, self.team_l)
         self.grid[5][1].direction = -1
-        self.grid[5][1].startingRow = 6
+        self.grid[5][1].starting_row = 6
         self.grid[5][1].touched = True
-        self.grid[3][3] = Pawn(3, 3, self.teamL)
+        self.grid[3][3] = Pawn(3, 3, self.team_l)
         self.grid[3][3].direction = -1
-        self.grid[3][3].startingRow = 6
+        self.grid[3][3].starting_row = 6
         self.grid[3][3].touched = True
-        self.grid[5][5] = Pawn(5, 5, self.teamL)
+        self.grid[5][5] = Pawn(5, 5, self.team_l)
         self.grid[5][5].direction = -1
-        self.grid[5][5].startingRow = 6
+        self.grid[5][5].starting_row = 6
         self.grid[5][5].touched = True
-        self.grid[5][6] = Pawn(5, 6, self.teamL)
+        self.grid[5][6] = Pawn(5, 6, self.team_l)
         self.grid[5][6].direction = -1
-        self.grid[5][6].startingRow = 6
+        self.grid[5][6].starting_row = 6
         self.grid[5][6].touched = True
-        self.grid[6][7] = Pawn(6, 7, self.teamL)
+        self.grid[6][7] = Pawn(6, 7, self.team_l)
         self.grid[6][7].direction = -1
-        self.grid[6][7].startingRow = 6
-
-        self.grid[7][0] = Rook(7, 0, self.teamL)
-        self.grid[7][7] = Rook(7, 7, self.teamL)
-        self.grid[7][5] = Bishop(7, 5, self.teamL)
-        self.grid[1][5] = Knight(1, 5, self.teamL)
-
-        self.grid[7][3] = King(7, 3, self.teamL)
+        self.grid[6][7].starting_row = 6
+        self.grid[7][0] = Rook(7, 0, self.team_l)
+        self.grid[7][7] = Rook(7, 7, self.team_l)
+        self.grid[7][5] = Bishop(7, 5, self.team_l)
+        self.grid[1][5] = Knight(1, 5, self.team_l)
+        self.grid[7][3] = King(7, 3, self.team_l)
         self.grid[7][3].touched = True
 
-    def createPlayers(self):
-        if (self.computerPlayerR):
-            self.teamR.setName("Computer")
-            self.teamL.setName("Human")
-        elif (self.computerPlayerL):
-            self.teamL.setName("Computer")
-            self.teamR.setName("Human")
+    def create_players(self):
+        if self.computer_player_r:
+            self.team_r.set_name("Computer")
+            self.team_l.set_name("Human")
+        elif self.computer_player_l:
+            self.team_l.set_name("Computer")
+            self.team_r.set_name("Human")
         else:
-            self.teamL.setName("Player 2")
-            self.teamR.setName("Player 1")
-        # self.teamL.setColor()
+            self.team_l.set_name("Player 2")
+            self.team_r.set_name("Player 1")
 
-    def lightCell(self, canvas, x, y, r, g, b):
-        #print(x, y, r, g, b)
-        for i in range(0, 4):
-            for j in range(0, 4):
+    def light_cell(self, canvas, x, y, r, g, b):
+        for i in range(4):
+            for j in range(4):
                 canvas.SetPixel(x * 4 + i, y * 4 + j, r, g, b)
 
-    def printBoardStates(self, grid=[]):
-        if (grid == []):
+    def print_board_states(self, grid=None):
+        if grid is None:
             grid = self.grid
         for r in range(8):
             print(grid[r])
 
-    def computerMove(self, team, depth=2):
-
-        if(self.bobRoss(team, self.grid)):
+    def computer_move(self, team, depth=2):
+        if self.check_fifty_move_rule(team, self.grid):
             return
 
         check = False
-        checkMate = False
-        kingRow = -1
-        kingCol = -1
-        piecesWithMoves = 0
-        self.checkerBrightness = 255
-
-        # count total targets for this team for stalemate purposes
-        #count = 0;
-        for row in self.grid:
-            for piece in row:
-                if (piece != None):
-                    # increment number of moves
-                    #count += len(piece.getTargets());
-                    if (isinstance(piece, King) and piece.team == team):
-                        check = piece.calcTargets(self.grid)
-                        if (len(piece.getTargets()) > 0):
-                            piecesWithMoves = piecesWithMoves + 1
-                        kingRow = piece.row
-                        kingCol = piece.col
+        king_row = -1
+        king_col = -1
+        pieces_with_moves = 0
+        self.checker_brightness = 255
 
         for row in self.grid:
             for piece in row:
-                if (isinstance(piece, Pawn) and piece.team == team):
-                    piece.enPassantable = False
-                if (piece != None and not isinstance(piece, King)):
-                    piece.calcTargets(self.grid)
-                    if (check):
-                        piece.skyFall(self.grid[kingRow][kingCol])
-                    # print pieces that can be moved
-                    if (len(piece.getTargets()) > 0 and piece.team == team):
-                        piecesWithMoves = piecesWithMoves + 1
+                if piece is not None:
+                    if isinstance(piece, King) and piece.team == team:
+                        check = piece.calc_targets(self.grid)
+                        if len(piece.get_targets()) > 0:
+                            pieces_with_moves += 1
+                        king_row = piece.row
+                        king_col = piece.col
 
-        # check if there are no legal moves
-        if (piecesWithMoves == 0):
-            # stalemate
-            if (not check):
-                self.gameOver = True
-                self.staleMate()
+        for row in self.grid:
+            for piece in row:
+                if isinstance(piece, Pawn) and piece.team == team:
+                    piece.en_passantable = False
+                if piece is not None and not isinstance(piece, King):
+                    piece.calc_targets(self.grid)
+                    if check:
+                        piece.filter_to_king_escape(self.grid[king_row][king_col])
+                    if len(piece.get_targets()) > 0 and piece.team == team:
+                        pieces_with_moves += 1
+
+        if pieces_with_moves == 0:
+            if not check:
+                self.game_over = True
+                self.declare_stalemate()
+                return
+            elif check:
+                self.game_over = True
+                self.declare_victory(team)
                 return
 
-            elif (check):
-                #print("Check mate!")
-                self.gameOver = True
-                self.sethVictory(team)
-                return
+        root = Tree(copy.deepcopy(self.grid), None, None, self.team_r, self.team_l)
+        self.add_nodes(root, team, depth)
 
-        # Create the whole tree recursively
-        root = Tree(copy.deepcopy(self.grid), None,
-                    None, self.teamR, self.teamL)
-        self.addNodes(root, team, depth)
+        computer_player = AI(root, team)
+        best_move = computer_player.alpha_beta_search()
 
-        # Create a new AI object with tree
-        computerPlayer = AI(root, team)
+        print(f"the best move involves moving the piece at square {best_move.old_cell.row}"
+              f"{best_move.old_cell.col} to {best_move.new_cell.row}{best_move.new_cell.col}")
 
-        # Tell the AI to return the best state (node)
-        bestMove = computerPlayer.alpha_beta_search()
-
-        # For now, print out the old/new cell of the
-        print("the best move involves moving the piece at square " + str(bestMove.oldCell.row) +
-              str(bestMove.oldCell.col) + " to " + str(bestMove.newCell.row) + str(bestMove.newCell.col))
-
-        # move piece from bestMove.oldCell to bestMove.newCell
         state = 0
 
         self.canvas.Clear()
-        self.detectMismatch()
-        self.lightCheckerTown(self.canvas)
+        self.detect_mismatch()
+        self.light_checker_town(self.canvas)
         self.canvas = self.matrix.SwapOnVSync(self.canvas)
 
-        if (self.grid[bestMove.newCell.row][bestMove.newCell.col] == None):
-            self.peaceTime += 1
+        if self.grid[best_move.new_cell.row][best_move.new_cell.col] is None:
+            self.peace_time += 1
             while state == 0:
-                self.master.readData()
-
+                self.master.read_data()
                 self.canvas.Clear()
-
-                self.lightCheckerTown(self.canvas)
-                self.lightCell(self.canvas, bestMove.oldCell.row,
-                               bestMove.oldCell.col, team.r, team.g, team.b)
-
+                self.light_checker_town(self.canvas)
+                self.light_cell(self.canvas, best_move.old_cell.row, best_move.old_cell.col,
+                                team.r, team.g, team.b)
                 self.canvas = self.matrix.SwapOnVSync(self.canvas)
-
-                state = self.master.getCellState(
-                    bestMove.oldCell.row, bestMove.oldCell.col)
+                state = self.master.get_cell_state(best_move.old_cell.row, best_move.old_cell.col)
             while state == 1:
-                self.master.readData()
-
+                self.master.read_data()
                 self.canvas.Clear()
-                self.lightCheckerTown(self.canvas)
-                self.lightCell(self.canvas, bestMove.newCell.row,
-                               bestMove.newCell.col, team.r, team.g, team.b)
+                self.light_checker_town(self.canvas)
+                self.light_cell(self.canvas, best_move.new_cell.row, best_move.new_cell.col,
+                                team.r, team.g, team.b)
                 self.canvas = self.matrix.SwapOnVSync(self.canvas)
                 time.sleep(.1)
                 self.canvas.Clear()
-                self.lightCheckerTown(self.canvas)
+                self.light_checker_town(self.canvas)
                 self.canvas = self.matrix.SwapOnVSync(self.canvas)
-
-                state = self.master.getCellState(
-                    bestMove.newCell.row, bestMove.newCell.col)
+                state = self.master.get_cell_state(best_move.new_cell.row, best_move.new_cell.col)
         else:
-            # detect removal of other piece and then move of this guy
-            peaceTime = 0
             state = 0
             while state == 0:
-                self.master.readData()
-
+                self.master.read_data()
                 self.canvas.Clear()
-
-                self.lightCheckerTown(self.canvas)
-                self.lightCell(self.canvas, bestMove.oldCell.row,
-                               bestMove.oldCell.col, team.r, team.g, team.b)
-
+                self.light_checker_town(self.canvas)
+                self.light_cell(self.canvas, best_move.old_cell.row, best_move.old_cell.col,
+                                team.r, team.g, team.b)
                 self.canvas = self.matrix.SwapOnVSync(self.canvas)
-
-                state = self.master.getCellState(
-                    bestMove.oldCell.row, bestMove.oldCell.col)
+                state = self.master.get_cell_state(best_move.old_cell.row, best_move.old_cell.col)
             state = 0
             while state == 0:
-                self.master.readData()
+                self.master.read_data()
                 self.canvas.Clear()
-
-                self.lightCheckerTown(self.canvas)
-                self.lightCell(self.canvas, bestMove.newCell.row,
-                               bestMove.newCell.col, team.r, team.g, team.b)
-
+                self.light_checker_town(self.canvas)
+                self.light_cell(self.canvas, best_move.new_cell.row, best_move.new_cell.col,
+                                team.r, team.g, team.b)
                 self.canvas = self.matrix.SwapOnVSync(self.canvas)
-
-                state = self.master.getCellState(
-                    bestMove.newCell.row, bestMove.newCell.col)
+                state = self.master.get_cell_state(best_move.new_cell.row, best_move.new_cell.col)
             time.sleep(.1)
             while state == 1:
-                self.master.readData()
-
+                self.master.read_data()
                 self.canvas.Clear()
-                self.lightCheckerTown(self.canvas)
-                self.lightCell(self.canvas, bestMove.newCell.row,
-                               bestMove.newCell.col, team.r, team.g, team.b)
+                self.light_checker_town(self.canvas)
+                self.light_cell(self.canvas, best_move.new_cell.row, best_move.new_cell.col,
+                                team.r, team.g, team.b)
                 self.canvas = self.matrix.SwapOnVSync(self.canvas)
                 time.sleep(.1)
                 self.canvas.Clear()
-                self.lightCheckerTown(self.canvas)
+                self.light_checker_town(self.canvas)
                 self.canvas = self.matrix.SwapOnVSync(self.canvas)
+                state = self.master.get_cell_state(best_move.new_cell.row, best_move.new_cell.col)
 
-                state = self.master.getCellState(
-                    bestMove.newCell.row, bestMove.newCell.col)
+        self.grid[best_move.new_cell.row][best_move.new_cell.col] = (
+            self.grid[best_move.old_cell.row][best_move.old_cell.col])
 
-        self.grid[bestMove.newCell.row][bestMove.newCell.col] = self.grid[bestMove.oldCell.row][bestMove.oldCell.col]
-
-        if (isinstance(self.grid[bestMove.newCell.row][bestMove.newCell.col], Pawn)):
-            self.peaceTime = 0
-            enemy = self.grid[bestMove.newCell.row][bestMove.newCell.col].move(
-                bestMove.newCell.row, bestMove.newCell.col, self.grid)
-            if (enemy != None):
+        if isinstance(self.grid[best_move.new_cell.row][best_move.new_cell.col], Pawn):
+            self.peace_time = 0
+            enemy = self.grid[best_move.new_cell.row][best_move.new_cell.col].move(
+                best_move.new_cell.row, best_move.new_cell.col, self.grid)
+            if enemy is not None:
                 self.grid[enemy.row][enemy.col] = None
-                # print("enPassant!")
-                # make player remove piece
-                state = self.master.getCellState(enemy.row, enemy.col)
+                state = self.master.get_cell_state(enemy.row, enemy.col)
                 while state == 0:
-                    self.master.readData()
+                    self.master.read_data()
                     time.sleep(0.4)
-                    # fade in red
                     for r in range(201):
                         self.canvas.Clear()
-                        self.lightCheckerTown(self.canvas)
-                        self.lightCell(self.canvas, enemy.row,
-                                       enemy.col, 50 + r, 0, 0)
+                        self.light_checker_town(self.canvas)
+                        self.light_cell(self.canvas, enemy.row, enemy.col, 50 + r, 0, 0)
                         self.canvas = self.matrix.SwapOnVSync(self.canvas)
                         time.sleep(0.002)
-
-                    self.master.readData()
+                    self.master.read_data()
                     time.sleep(0.4)
-                    # fade out red
                     for r in range(201):
                         self.canvas.Clear()
-                        self.lightCheckerTown(self.canvas)
-                        self.lightCell(self.canvas, enemy.row,
-                                       enemy.col, 255 - r, 0, 0)
+                        self.light_checker_town(self.canvas)
+                        self.light_cell(self.canvas, enemy.row, enemy.col, 255 - r, 0, 0)
                         self.canvas = self.matrix.SwapOnVSync(self.canvas)
                         time.sleep(0.002)
+                    state = self.master.get_cell_state(enemy.row, enemy.col)
 
-                    state = self.master.getCellState(enemy.row, enemy.col)
-
-        elif (isinstance(self.grid[bestMove.newCell.row][bestMove.newCell.col], King)):
-            rookLocation, rookTarget = self.grid[bestMove.newCell.row][bestMove.newCell.col].move(
-                bestMove.newCell.row, bestMove.newCell.col, self.grid)
-            if (rookLocation != None):
-                # do castling
-                self.grid[rookTarget.row][rookTarget.col] = self.grid[rookLocation.row][rookLocation.col]
-                self.grid[rookLocation.row][rookLocation.col] = None
-                self.grid[rookTarget.row][rookTarget.col].move(
-                    rookTarget.row, rookTarget.col, self.grid)
+        elif isinstance(self.grid[best_move.new_cell.row][best_move.new_cell.col], King):
+            rook_location, rook_target = self.grid[best_move.new_cell.row][best_move.new_cell.col].move(
+                best_move.new_cell.row, best_move.new_cell.col, self.grid)
+            if rook_location is not None:
+                self.grid[rook_target.row][rook_target.col] = (
+                    self.grid[rook_location.row][rook_location.col])
+                self.grid[rook_location.row][rook_location.col] = None
+                self.grid[rook_target.row][rook_target.col].move(
+                    rook_target.row, rook_target.col, self.grid)
         else:
-            self.grid[bestMove.newCell.row][bestMove.newCell.col].move(
-                bestMove.newCell.row, bestMove.newCell.col, self.grid)
+            self.grid[best_move.new_cell.row][best_move.new_cell.col].move(
+                best_move.new_cell.row, best_move.new_cell.col, self.grid)
 
-        self.grid[bestMove.oldCell.row][bestMove.oldCell.col] = None
+        self.grid[best_move.old_cell.row][best_move.old_cell.col] = None
 
         self.canvas.Clear()
-        self.lightCheckerTown(self.canvas)
+        self.light_checker_town(self.canvas)
         self.canvas = self.matrix.SwapOnVSync(self.canvas)
 
-
-#                input("press enter when ready to continue")
-
-
-    def drawBoard(self, boardState):
+    def draw_board(self, board_state):
         self.canvas.Clear()
-        self.checkerBrightness = self.checkerBrightness + self.checkerBrightnessDir
-        if (self.checkerBrightness <= 0):
-            self.checkerBrightnessDir = self.checkerBrightnessDir * -1
-            self.checkerBrightness = 0
-        elif (self.checkerBrightness >= 255):
-            self.checkerBrightnessDir = self.checkerBrightnessDir * -1
-            self.checkerBrightness = 255
+        self.checker_brightness += self.checker_brightness_dir
+        if self.checker_brightness <= 0:
+            self.checker_brightness_dir *= -1
+            self.checker_brightness = 0
+        elif self.checker_brightness >= 255:
+            self.checker_brightness_dir *= -1
+            self.checker_brightness = 255
 
-        for row in boardState:
+        for row in board_state:
             for piece in row:
-                if (piece != None):
-                    self.lightCell(self.canvas, piece.row, piece.col,
-                                   piece.team.r, piece.team.g, piece.team.b)
+                if piece is not None:
+                    self.light_cell(self.canvas, piece.row, piece.col,
+                                    piece.team.r, piece.team.g, piece.team.b)
 
-        self.chooseLightCheckerTown()
-
+        self.choose_light_checker_town()
         self.canvas = self.matrix.SwapOnVSync(self.canvas)
 
-    def colorPicker(self):
+    def color_picker(self):
         self.canvas.Clear()
 
-        for i in range(0, 8):
-            # colorpicker
-            self.lightCell(
-                self.canvas, 2, i, self.teamArray[i].r, self.teamArray[i].g, self.teamArray[i].b)
-            # colorpicker
-            self.lightCell(
-                self.canvas, 5, i, self.teamArray[i].r, self.teamArray[i].g, self.teamArray[i].b)
+        for i in range(8):
+            self.light_cell(self.canvas, 2, i,
+                            self.team_array[i].r, self.team_array[i].g, self.team_array[i].b)
+            self.light_cell(self.canvas, 5, i,
+                            self.team_array[i].r, self.team_array[i].g, self.team_array[i].b)
 
-        team1Found = False
-        team2Found = False
-        shutDownKey1 = False
-        shutDownKey2 = False
-        restartKey1 = False
-        restartKey2 = False
+        team1_found = False
+        team2_found = False
+        shut_down_key1 = False
+        shut_down_key2 = False
+        restart_key1 = False
+        restart_key2 = False
 
         self.canvas = self.matrix.SwapOnVSync(self.canvas)
 
-        while not (team1Found and team2Found):
-            team1Found = False
-            team2Found = False
-            shutDownKey1 = False
-            shutDownKey2 = False
-            restartKey1 = False
-            restartKey2 = False
-            self.master.readData()
-            for i in range(0, 8):
-                if (self.master.getCellState(2, i) == 0):
-                    team1Found = True
-                    self.teamR.r = self.teamArray[i].r
-                    self.teamR.g = self.teamArray[i].g
-                    self.teamR.b = self.teamArray[i].b
-                if (self.master.getCellState(5, i) == 0):
-                    team2Found = True
-                    self.teamL.r = self.teamArray[i].r
-                    self.teamL.g = self.teamArray[i].g
-                    self.teamL.b = self.teamArray[i].b
-            for i in range(0, 8):
-                if (self.master.getCellState(3, i) == 0):
-                    shutDownKey1 = True
-                    if (i == 7):
-                        restartKey1 = True
-                if (self.master.getCellState(4, i) == 0):
-                    shutDownKey2 = True
-                    if (i == 7):
-                        restartKey2 = True
+        while not (team1_found and team2_found):
+            team1_found = False
+            team2_found = False
+            shut_down_key1 = False
+            shut_down_key2 = False
+            restart_key1 = False
+            restart_key2 = False
+            self.master.read_data()
+            for i in range(8):
+                if self.master.get_cell_state(2, i) == 0:
+                    team1_found = True
+                    self.team_r.r = self.team_array[i].r
+                    self.team_r.g = self.team_array[i].g
+                    self.team_r.b = self.team_array[i].b
+                if self.master.get_cell_state(5, i) == 0:
+                    team2_found = True
+                    self.team_l.r = self.team_array[i].r
+                    self.team_l.g = self.team_array[i].g
+                    self.team_l.b = self.team_array[i].b
+            for i in range(8):
+                if self.master.get_cell_state(3, i) == 0:
+                    shut_down_key1 = True
+                    if i == 7:
+                        restart_key1 = True
+                if self.master.get_cell_state(4, i) == 0:
+                    shut_down_key2 = True
+                    if i == 7:
+                        restart_key2 = True
 
-            if (shutDownKey1 and shutDownKey2):
+            if shut_down_key1 and shut_down_key2:
                 self.canvas.Clear()
-
-                for i in range(0, 12):
+                for i in range(12):
                     self.canvas.Clear()
                     for j in range(i, 32 - i):
-                        # color these rows
-                        for k in range(0, 32):
+                        for k in range(32):
                             self.canvas.SetPixel(j, k, 255, 0, 0)
                     self.canvas = self.matrix.SwapOnVSync(self.canvas)
-                    # sleep here
                     time.sleep(0.035 * np.exp(-1 / 16 * (i - 12)))
-
-                for i in range(0, 16):
+                for i in range(16):
                     self.canvas.Clear()
                     for j in range(i, 32 - i):
-                        # color these rows
                         for k in range(12, 20):
                             self.canvas.SetPixel(k, j, 255, 0, 0)
                     self.canvas = self.matrix.SwapOnVSync(self.canvas)
-                    # sleep here
                     time.sleep(0.025 * np.exp(-1 / 16 * (i - 16)))
                 self.canvas.Clear()
                 self.canvas = self.matrix.SwapOnVSync(self.canvas)
-                if (restartKey1 and restartKey2):
+                if restart_key1 and restart_key2:
                     os.system("sudo reboot now")
                     while True:
                         time.sleep(1)
@@ -1097,289 +875,242 @@ class Board(SampleBase):
                     while True:
                         time.sleep(1)
             self.canvas.Clear()
-            if (team1Found and team2Found):
-                for i in range(0, 8):
-                    if (self.master.getCellState(2, i) == 0):
-                        self.lightCell(
-                            self.canvas, 2, i, self.teamArray[i].r, self.teamArray[i].g, self.teamArray[i].b)
-                    if (self.master.getCellState(5, i) == 0):
-                        self.lightCell(
-                            self.canvas, 5, i, self.teamArray[i].r, self.teamArray[i].g, self.teamArray[i].b)
+            if team1_found and team2_found:
+                for i in range(8):
+                    if self.master.get_cell_state(2, i) == 0:
+                        self.light_cell(self.canvas, 2, i,
+                                        self.team_array[i].r, self.team_array[i].g, self.team_array[i].b)
+                    if self.master.get_cell_state(5, i) == 0:
+                        self.light_cell(self.canvas, 5, i,
+                                        self.team_array[i].r, self.team_array[i].g, self.team_array[i].b)
                 self.canvas = self.matrix.SwapOnVSync(self.canvas)
                 time.sleep(2)
-            elif (team1Found):
-                for i in range(0, 8):
-                    if (self.master.getCellState(2, i) == 0):
-                        self.lightCell(
-                            self.canvas, 2, i, self.teamArray[i].r, self.teamArray[i].g, self.teamArray[i].b)
-                for i in range(0, 8):
-                    # colorpicker
-                    self.lightCell(
-                        self.canvas, 5, i, self.teamArray[i].r, self.teamArray[i].g, self.teamArray[i].b)
+            elif team1_found:
+                for i in range(8):
+                    if self.master.get_cell_state(2, i) == 0:
+                        self.light_cell(self.canvas, 2, i,
+                                        self.team_array[i].r, self.team_array[i].g, self.team_array[i].b)
+                for i in range(8):
+                    self.light_cell(self.canvas, 5, i,
+                                    self.team_array[i].r, self.team_array[i].g, self.team_array[i].b)
                 self.canvas = self.matrix.SwapOnVSync(self.canvas)
-            elif (team2Found):
-                for i in range(0, 8):
-                    if (self.master.getCellState(5, i) == 0):
-                        self.lightCell(
-                            self.canvas, 5, i, self.teamArray[i].r, self.teamArray[i].g, self.teamArray[i].b)
-                for i in range(0, 8):
-                    # colorpicker
-                    self.lightCell(
-                        self.canvas, 2, i, self.teamArray[i].r, self.teamArray[i].g, self.teamArray[i].b)
+            elif team2_found:
+                for i in range(8):
+                    if self.master.get_cell_state(5, i) == 0:
+                        self.light_cell(self.canvas, 5, i,
+                                        self.team_array[i].r, self.team_array[i].g, self.team_array[i].b)
+                for i in range(8):
+                    self.light_cell(self.canvas, 2, i,
+                                    self.team_array[i].r, self.team_array[i].g, self.team_array[i].b)
                 self.canvas = self.matrix.SwapOnVSync(self.canvas)
             else:
-                for i in range(0, 8):
-                    # colorpicker
-                    self.lightCell(
-                        self.canvas, 2, i, self.teamArray[i].r, self.teamArray[i].g, self.teamArray[i].b)
-                    # colorpicker
-                    self.lightCell(
-                        self.canvas, 5, i, self.teamArray[i].r, self.teamArray[i].g, self.teamArray[i].b)
+                for i in range(8):
+                    self.light_cell(self.canvas, 2, i,
+                                    self.team_array[i].r, self.team_array[i].g, self.team_array[i].b)
+                    self.light_cell(self.canvas, 5, i,
+                                    self.team_array[i].r, self.team_array[i].g, self.team_array[i].b)
                 self.canvas = self.matrix.SwapOnVSync(self.canvas)
-        self.teamR.r = self.teamR.r + 1
+        self.team_r.r = self.team_r.r + 1
 
-    def warGames(self):
+    def war_games(self):
         self.canvas.Clear()
         print("The only winning move is not to play")
 
-        team1Decided = False
-        team2Decided = False
+        team1_decided = False
+        team2_decided = False
 
         think = 0
-        thinkL = 0
-        thinkR = 0
+        think_l = 0
+        think_r = 0
 
         while True:
-            team1Decided = False
-            team2Decided = False
-            self.master.readData()
+            team1_decided = False
+            team2_decided = False
+            self.master.read_data()
 
-            for i in range(0, 8):
-                if (i < 4):
-                    if (self.master.getCellState(3, i) == 0 and not team1Decided):
-                        team1Decided = True
-                        self.computerPlayerR = False
-                    if (self.master.getCellState(4, i) == 0 and not team2Decided):
-                        team2Decided = True
-                        self.computerPlayerL = True
+            for i in range(8):
+                if i < 4:
+                    if self.master.get_cell_state(3, i) == 0 and not team1_decided:
+                        team1_decided = True
+                        self.computer_player_r = False
+                    if self.master.get_cell_state(4, i) == 0 and not team2_decided:
+                        team2_decided = True
+                        self.computer_player_l = True
                 else:
-                    if (self.master.getCellState(3, i) == 0 and not team1Decided):
-                        team1Decided = True
-                        self.computerPlayerR = True
-                    if (self.master.getCellState(4, i) == 0 and not team2Decided):
-                        team2Decided = True
-                        self.computerPlayerL = False
-                if (team1Decided and team2Decided):
+                    if self.master.get_cell_state(3, i) == 0 and not team1_decided:
+                        team1_decided = True
+                        self.computer_player_r = True
+                    if self.master.get_cell_state(4, i) == 0 and not team2_decided:
+                        team2_decided = True
+                        self.computer_player_l = False
+                if team1_decided and team2_decided:
                     break
 
-            # light teamR's squares
-            if (team1Decided):
-                if (self.computerPlayerR):
-                    for i in range(0, 8):
-                        if (i == (7 - thinkR)):
-                            self.lightCell(
-                                self.canvas, 3, 7 - thinkR, self.teamR.r, self.teamR.g, self.teamR.b)
+            if team1_decided:
+                if self.computer_player_r:
+                    for i in range(8):
+                        if i == 7 - think_r:
+                            self.light_cell(self.canvas, 3, 7 - think_r,
+                                            self.team_r.r, self.team_r.g, self.team_r.b)
                         else:
-                            self.lightCell(self.canvas, 3, i, 255, 255, 255)
+                            self.light_cell(self.canvas, 3, i, 255, 255, 255)
                 else:
-                    for i in range(0, 8):
-                        self.lightCell(self.canvas, 3, i,
-                                       self.teamR.r, self.teamR.g, self.teamR.b)
+                    for i in range(8):
+                        self.light_cell(self.canvas, 3, i, self.team_r.r, self.team_r.g, self.team_r.b)
             else:
-                for i in range(0, 8):
-                    if (i < 4):
-                        self.lightCell(self.canvas, 3, i,
-                                       self.teamR.r, self.teamR.g, self.teamR.b)
+                for i in range(8):
+                    if i < 4:
+                        self.light_cell(self.canvas, 3, i, self.team_r.r, self.team_r.g, self.team_r.b)
                     else:
-                        if (i == (7 - think)):
-                            self.lightCell(self.canvas, 3, 7 - think,
-                                           self.teamR.r, self.teamR.g, self.teamR.b)
+                        if i == 7 - think:
+                            self.light_cell(self.canvas, 3, 7 - think,
+                                            self.team_r.r, self.team_r.g, self.team_r.b)
                         else:
-                            self.lightCell(self.canvas, 3, i, 255, 255, 255)
+                            self.light_cell(self.canvas, 3, i, 255, 255, 255)
 
-            # light teamL's squares
-            if (team2Decided):
-                if (self.computerPlayerL):
-                    for i in range(0, 8):
-                        if (i == thinkL):
-                            self.lightCell(
-                                self.canvas, 4, thinkL, self.teamL.r, self.teamL.g, self.teamL.b)
+            if team2_decided:
+                if self.computer_player_l:
+                    for i in range(8):
+                        if i == think_l:
+                            self.light_cell(self.canvas, 4, think_l,
+                                            self.team_l.r, self.team_l.g, self.team_l.b)
                         else:
-                            self.lightCell(self.canvas, 4, i, 255, 255, 255)
+                            self.light_cell(self.canvas, 4, i, 255, 255, 255)
                 else:
-                    for i in range(0, 8):
-                        self.lightCell(self.canvas, 4, i,
-                                       self.teamL.r, self.teamL.g, self.teamL.b)
+                    for i in range(8):
+                        self.light_cell(self.canvas, 4, i, self.team_l.r, self.team_l.g, self.team_l.b)
             else:
-                for i in range(0, 8):
-                    if (i < 4):
-                        if (i == think):
-                            self.lightCell(
-                                self.canvas, 4, think, self.teamL.r, self.teamL.g, self.teamL.b)
+                for i in range(8):
+                    if i < 4:
+                        if i == think:
+                            self.light_cell(self.canvas, 4, think,
+                                            self.team_l.r, self.team_l.g, self.team_l.b)
                         else:
-                            self.lightCell(self.canvas, 4, i, 255, 255, 255)
+                            self.light_cell(self.canvas, 4, i, 255, 255, 255)
                     else:
-                        self.lightCell(self.canvas, 4, i,
-                                       self.teamL.r, self.teamL.g, self.teamL.b)
+                        self.light_cell(self.canvas, 4, i, self.team_l.r, self.team_l.g, self.team_l.b)
 
             self.canvas = self.matrix.SwapOnVSync(self.canvas)
-
             self.canvas.Clear()
-
             time.sleep(0.2)
 
             think = (think + 1) % 4
-            thinkL = (thinkL + 1) % 8
-            thinkR = (thinkR + 1) % 8
+            think_l = (think_l + 1) % 8
+            think_r = (think_r + 1) % 8
 
-            if (team1Decided and team2Decided):
+            if team1_decided and team2_decided:
                 break
 
-    def addNodes(self, currentNode, team, depth=2):
-        #print ("depth remaining: " + str(depth))
-        currentNode = currentNode
-        # if the depth is 0, we've reached the "bottom" of the tree (as far as we initially told it to go)
-        if (depth == 0):
+    def add_nodes(self, current_node, team, depth=2):
+        if depth == 0:
             return
-        teamKing = None
+        team_king = None
         check = False
-        for piece in self.getTeamPieces(team, currentNode.boardState):
-            if (isinstance(piece, King)):
-                teamKing = piece
-                check = teamKing.calcTargets(currentNode.boardState)
+        for piece in self.get_team_pieces(team, current_node.board_state):
+            if isinstance(piece, King):
+                team_king = piece
+                check = team_king.calc_targets(current_node.board_state)
                 if check:
                     print("KING IS IN CHECK")
 
-        # change how the pieces are grabbed
-        for piece in self.getTeamPieces(team, currentNode.boardState):
-            # TODO Parameter for this guy?
-            #print("found a piece")
-            piece.calcTargets(currentNode.boardState)
-            if check:
-                if not isinstance(piece, King):
-                    piece.skyFall(teamKing)
+        for piece in self.get_team_pieces(team, current_node.board_state):
+            piece.calc_targets(current_node.board_state)
+            if check and not isinstance(piece, King):
+                piece.filter_to_king_escape(team_king)
             for target in piece.targets:
-                newBoard = copy.deepcopy(currentNode.boardState)
-                newPiece = newBoard[piece.row][piece.col]
-                # If it is, make the move and add the child to the current node
-                newBoard[target.row][target.col] = newPiece
-                newPiece.move(target.row, target.col, newBoard)
-                newBoard[piece.row][piece.col] = None
+                new_board = copy.deepcopy(current_node.board_state)
+                new_piece = new_board[piece.row][piece.col]
+                new_board[target.row][target.col] = new_piece
+                new_piece.move(target.row, target.col, new_board)
+                new_board[piece.row][piece.col] = None
 
-                # TODO comment this out once boardstates was complete
-                self.drawBoard(newBoard)
-                # self.printBoardStates(newBoard)
-                currentNode.addChild(Tree(newBoard, Cell(piece.row, piece.col), Cell(
-                    target.row, target.col), self.teamR, self.teamL))
+                self.draw_board(new_board)
+                current_node.add_child(Tree(
+                    new_board,
+                    Cell(piece.row, piece.col),
+                    Cell(target.row, target.col),
+                    self.team_r,
+                    self.team_l,
+                ))
 
-        # Once all children for this node are found, go another level deep
-        print("done adding children for depth " + str(depth) +
-              "! boards created = " + str(len(currentNode.children)))
+        print(f"done adding children for depth {depth}! boards created = {len(current_node.children)}")
 
-        if (depth == 0):
-            return
-
-        if (team == self.teamL):
-            team = self.teamR
+        if team == self.team_l:
+            team = self.team_r
         else:
-            team = self.teamL
+            team = self.team_l
 
-        for child in currentNode.children:
-            self.addNodes(child, team, depth - 1)
+        for child in current_node.children:
+            self.add_nodes(child, team, depth - 1)
 
-    def checkNewGame(self):
-        self.master.readData()
-        sum = [0, 0, 0, 0, 0, 0, 0, 0]
+    def check_new_game(self):
+        self.master.read_data()
+        row_counts = [0] * 8
         total = 0
-        for i in range(0, 8):
-            for j in range(0, 8):
-                sum[i] = sum[i] + (self.master.getCellState(i, j) + 1) % 2
-                total = total + (self.master.getCellState(i, j) + 1) % 2
-        if (total == 0):
+        for i in range(8):
+            for j in range(8):
+                row_counts[i] += (self.master.get_cell_state(i, j) + 1) % 2
+                total += (self.master.get_cell_state(i, j) + 1) % 2
+        if total == 0:
             return True
-        elif (sum[0] == 8 and sum[1] == 8 and sum[6] == 8 and sum[7] == 8):
+        elif row_counts[0] == 8 and row_counts[1] == 8 and row_counts[6] == 8 and row_counts[7] == 8:
             return True
         else:
             return False
 
-    def bobRoss(self, team, tron):
-        print(self.peaceTime)
-        if (self.peaceTime >= 50):
-            self.gameOver = True
-            self.staleMate()
+    def check_fifty_move_rule(self, team, board_state):
+        print(self.peace_time)
+        if self.peace_time >= 50:
+            self.game_over = True
+            self.declare_stalemate()
             return True
         else:
-            if (team == self.teamL):
-                #print("using left, length of days:", len(self.daysLeftSinceInjury), "length double:", len(self.doubleLeftJeopardy))
-                return self.bobRossJr(team, tron, self.daysLeftSinceInjury, self.doubleLeftJeopardy)
+            if team == self.team_l:
+                return self.check_threefold_repetition(
+                    team, board_state,
+                    self.days_left_since_injury, self.double_left_jeopardy)
             else:
-                #print("using right, length of days:", len(self.daysRightSinceInjury), "length double:", len(self.doubleRightJeopardy))
-                return self.bobRossJr(team, tron, self.daysRightSinceInjury, self.doubleRightJeopardy)
+                return self.check_threefold_repetition(
+                    team, board_state,
+                    self.days_right_since_injury, self.double_right_jeopardy)
 
-    def bobRossJr(self, team, tron, daysSinceInjury, doubleJeopardy):
-        if (self.peaceTime == 0):
-            daysSinceInjury.clear()
-            doubleJeopardy.clear()
-            daysSinceInjury.append(copy.deepcopy(tron))
-            #print("clearing and adding")
-            #print("length: ", len(daysSinceInjury))
-            #print("using left, length of days:", len(self.daysLeftSinceInjury), "length double:", len(self.doubleLeftJeopardy))
-            #print("using right, length of days:", len(self.daysRightSinceInjury), "length double:", len(self.doubleRightJeopardy))
-
+    def check_threefold_repetition(self, team, board_state, days_since_injury, double_jeopardy):
+        if self.peace_time == 0:
+            days_since_injury.clear()
+            double_jeopardy.clear()
+            days_since_injury.append(copy.deepcopy(board_state))
         else:
-            secondMatch = False
-            #print("setting seconddMatch to false")
-            #print (len(doubleJeopardy))
-            for state in doubleJeopardy:
-                #print("going through a state")
-                secondMatch = True
-                for row in range(0, 8):
-                    # print("row")
-                    for col in range(0, 8):
-                        # print("col")
-                        # print(type(state[row][col]))
-                        # print(type(tron[row][col]))
-                        if (not(type(state[row][col]) is type(tron[row][col]))):
-                            # print("problem")
-                            secondMatch = False
+            second_match = False
+            for state in double_jeopardy:
+                second_match = True
+                for row in range(8):
+                    for col in range(8):
+                        if not type(state[row][col]) is type(board_state[row][col]):
+                            second_match = False
                             break
-                    if (not secondMatch):
+                    if not second_match:
                         break
-                if (secondMatch):
+                if second_match:
                     break
-            if (secondMatch):
-                self.gameOver = True
-                self.staleMate()
+            if second_match:
+                self.game_over = True
+                self.declare_stalemate()
                 return True
             else:
-                #print("not a second dmatch")
-                firstMatch = False
-                #print (len(daysSinceInjury))
-                for state in daysSinceInjury:
-                    #print("new state")
-                    firstMatch = True
-                    for row in range(0, 8):
-                        #print ("row")
-                        for col in range(0, 8):
-                            #print ("col")
-                            # print(type(state[row][col]))
-                            # print(type(tron[row][col]))
-                            if (not(type(state[row][col]) is type(tron[row][col]))):
-                                # print("problem")
-                                firstMatch = False
-                                #print ("break 1")
+                first_match = False
+                for state in days_since_injury:
+                    first_match = True
+                    for row in range(8):
+                        for col in range(8):
+                            if not type(state[row][col]) is type(board_state[row][col]):
+                                first_match = False
                                 break
-                        if (not firstMatch):
-                            #print ("break 2")
+                        if not first_match:
                             break
-                    if (firstMatch):
-                        #print("counter break")
+                    if first_match:
                         break
-                if (firstMatch):
-                    doubleJeopardy.append(copy.deepcopy(tron))
-                    #print("double state")
+                if first_match:
+                    double_jeopardy.append(copy.deepcopy(board_state))
                 else:
-                    #print("adding to singles")
-                    daysSinceInjury.append(copy.deepcopy(tron))
-                    #print("length: ", len(daysSinceInjury))
+                    days_since_injury.append(copy.deepcopy(board_state))
         return False

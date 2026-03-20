@@ -1,8 +1,3 @@
-# Master Class - Controls the arduinos and receives data
-# Useful methods:
-# readData - reads data from Arduinos and updates gridStates (0 activated 1 not)
-# getCellState - get the state of a specific cell args: row, col
-
 import smbus
 import time
 
@@ -11,8 +6,6 @@ class Master:
 
     bus = smbus.SMBus(1)
 
-    # Define arduino addresses
-    # MUST MATCH ON ARDUINO SIDE
     rowA = 0x04
     rowB = 0x05
     rowC = 0x06
@@ -22,73 +15,64 @@ class Master:
     rowG = 0x0a
     rowH = 0x0b
 
-    gridStates = [1] * 8
+    grid_states = [1] * 8
 
     def __init__(self):
-        # populate states
         for i in range(8):
-            self.gridStates[i] = [1] * 8
-
+            self.grid_states[i] = [1] * 8
         self.initialize()
 
     def initialize(self):
-        # loop through and compare every cell to gridStates
-        self.fillRowData(self.rowA, 0)
-        self.fillRowData(self.rowB, 1)
-        self.fillRowData(self.rowC, 2)
-        self.fillRowData(self.rowD, 3)
-        self.fillRowData(self.rowE, 4)
-        self.fillRowData(self.rowF, 5)
-        self.fillRowData(self.rowG, 6)
-        self.fillRowData(self.rowH, 7)
+        self.fill_row_data(self.rowA, 0)
+        self.fill_row_data(self.rowB, 1)
+        self.fill_row_data(self.rowC, 2)
+        self.fill_row_data(self.rowD, 3)
+        self.fill_row_data(self.rowE, 4)
+        self.fill_row_data(self.rowF, 5)
+        self.fill_row_data(self.rowG, 6)
+        self.fill_row_data(self.rowH, 7)
+        self.print_board_states()
 
-        self.printBoardStates()
-
-    def fillRowData(self, row, rowNum):
-        self.writeToRow(row, 42)
+    def fill_row_data(self, row, row_num):
+        self.write_to_row(row, 42)
         time.sleep(0.01)
-        val = self.readFromRow(row)
-        self.updateRowStates(rowNum, val)
+        val = self.read_from_row(row)
+        self.update_row_states(row_num, val)
 
-    def getCellState(self, row, col):
-        return self.gridStates[row][col]
+    def get_cell_state(self, row, col):
+        return self.grid_states[row][col]
 
-    def printBoardStates(self):
+    def print_board_states(self):
         for r in range(8):
-            print(self.gridStates[r])
+            print(self.grid_states[r])
 
-    def updateRowStates(self, row, colStates):
+    def update_row_states(self, row, col_states):
         change = False
         for i in range(7, -1, -1):
-            #            print(colStates)
-            if (colStates - 2**i >= 0):
-                colStates = colStates - 2**i
-                # check if change
-                if (self.gridStates[row][i] != 1):
-                    self.gridStates[row][i] = 1
+            if col_states - 2**i >= 0:
+                col_states = col_states - 2**i
+                if self.grid_states[row][i] != 1:
+                    self.grid_states[row][i] = 1
                     change = True
             else:
-                if (self.gridStates[row][i] != 0):
-                    self.gridStates[row][i] = 0
+                if self.grid_states[row][i] != 0:
+                    self.grid_states[row][i] = 0
                     change = True
-        if (change == True):
+        if change:
             print("Board Changed: ")
-            self.printBoardStates()
+            self.print_board_states()
 
-    # get all occupied cells
-    def readData(self):
-        self.fillRowData(self.rowA, 0)
-        self.fillRowData(self.rowB, 1)
-        self.fillRowData(self.rowC, 2)
-        self.fillRowData(self.rowD, 3)
-        self.fillRowData(self.rowE, 4)
-        self.fillRowData(self.rowF, 5)
-        self.fillRowData(self.rowG, 6)
-        self.fillRowData(self.rowH, 7)
-       #print("Send data")
+    def read_data(self):
+        self.fill_row_data(self.rowA, 0)
+        self.fill_row_data(self.rowB, 1)
+        self.fill_row_data(self.rowC, 2)
+        self.fill_row_data(self.rowD, 3)
+        self.fill_row_data(self.rowE, 4)
+        self.fill_row_data(self.rowF, 5)
+        self.fill_row_data(self.rowG, 6)
+        self.fill_row_data(self.rowH, 7)
 
-    def writeToRow(self, address, value):
-        # handle i/o error
+    def write_to_row(self, address, value):
         handled = False
         while not handled:
             try:
@@ -97,11 +81,9 @@ class Master:
             except IOError:
                 handled = False
                 time.sleep(0.5)
-
         return -1
 
-    def readFromRow(self, address):
-        # handle i/o error
+    def read_from_row(self, address):
         handled = False
         while not handled:
             try:
@@ -110,13 +92,4 @@ class Master:
             except IOError:
                 handled = False
                 time.sleep(0.5)
-
         return number
-
-# Test master class
-#master = Master()
-
-# while True:
-    # loop through and detect changes
-#    master.readData()
-#    time.sleep(0.5)

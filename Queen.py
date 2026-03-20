@@ -1,44 +1,37 @@
-# child class of Piece that represents a Queen
 from Piece import Piece
 from Cell import Cell
 
 
 class Queen(Piece):
-    def bladeRunner(self, checkerTown, dir1, dir2, row, col):
-        if (row + dir1 >= 0 and row + dir1 <= 7 and col + dir2 >= 0 and col + dir2 <= 7):
-            if (checkerTown[row + dir1][col + dir2] == None):
-                self.targets.append(Cell(row + dir1, col + dir2))
-                self.bladeRunner(checkerTown, dir1, dir2,
-                                 row + dir1, col + dir2)
-            elif (checkerTown[row + dir1][col + dir2].team != self.team):
-                self.targets.append(Cell(row + dir1, col + dir2))
+    def _slide(self, board, dr, dc, row, col):
+        if 0 <= row + dr <= 7 and 0 <= col + dc <= 7:
+            if board[row + dr][col + dc] is None:
+                self.targets.append(Cell(row + dr, col + dc))
+                self._slide(board, dr, dc, row + dr, col + dc)
+            elif board[row + dr][col + dc].team != self.team:
+                self.targets.append(Cell(row + dr, col + dc))
 
-    def calcTargets(self, checkerTown):
+    def calc_targets(self, board):
         self.targets = []
-        # Run a recurssive function in all directions
-        self.bladeRunner(checkerTown, 1, 1, self.row, self.col)
-        self.bladeRunner(checkerTown, -1, 1, self.row, self.col)
-        self.bladeRunner(checkerTown, 1, -1, self.row, self.col)
-        self.bladeRunner(checkerTown, -1, -1, self.row, self.col)
-        self.bladeRunner(checkerTown, 1, 0, self.row, self.col)
-        self.bladeRunner(checkerTown, -1, 0, self.row, self.col)
-        self.bladeRunner(checkerTown, 0, 1, self.row, self.col)
-        self.bladeRunner(checkerTown, 0, -1, self.row, self.col)
+        self._slide(board, 1, 1, self.row, self.col)
+        self._slide(board, -1, 1, self.row, self.col)
+        self._slide(board, 1, -1, self.row, self.col)
+        self._slide(board, -1, -1, self.row, self.col)
+        self._slide(board, 1, 0, self.row, self.col)
+        self._slide(board, -1, 0, self.row, self.col)
+        self._slide(board, 0, 1, self.row, self.col)
+        self._slide(board, 0, -1, self.row, self.col)
+        if self.critical:
+            super().filter_to_pin_ray()
 
-        # if critical, check calculated targets against criticalTargets and only keep cells that appear on both
-        if (self.critical):
-            super().criticalMan()
-
-    def getValue(self, board):
+    def get_value(self, board):
         total = 49
-        self.calcTargets(board)
+        self.calc_targets(board)
         for cell in self.targets:
-            total = total + 1
-            if ((cell.row == 3 or cell.row == 4) and (cell.col == 3 or cell.col == 4)):
-                total = total + 1
-
+            total += 1
+            if (cell.row == 3 or cell.row == 4) and (cell.col == 3 or cell.col == 4):
+                total += 1
         return total
 
-# Overwrite default print with special Queen print
-    def printPiece(self):
+    def print_piece(self):
         print("Queen at", self.row, ",", self.col)

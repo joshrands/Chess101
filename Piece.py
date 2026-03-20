@@ -3,8 +3,6 @@ from Cell import Cell
 
 
 class Piece:
-    # team?
-
     def __init__(self, row, col, team):
         self.row = row
         self.col = col
@@ -12,56 +10,51 @@ class Piece:
         self.team = team
         self.touched = False
         self.critical = False
-        self.criticalTargets = []
+        self.critical_targets = []
 
-    # abstract method calcTargets
-    def calcTargets(self, checkerTown):
+    def calc_targets(self, board):
         raise NotImplementedError()
 
-    def getValue(self, board):
+    def get_value(self, board):
         raise NotImplementedError()
 
-    # abstract method move
-    def move(self, newRow, newCol, checkerTown):
-        # calculate new targets
-        self.row = newRow
-        self.col = newCol
+    def move(self, new_row, new_col, board):
+        self.row = new_row
+        self.col = new_col
         self.touched = True
 
-    def Kingsman(self, checkerTown, currentRow, currentCol, dir1, dir2):
-        if (currentRow >= 0 and currentRow < 8 and currentCol >= 0 and currentCol < 8):
-            nextLoc = False
-            if (currentRow + dir1 >= 0 and currentRow + dir1 < 8 and currentCol + dir2 >= 0 and currentCol + dir2 < 8):
-                nextLoc = True
-            if (checkerTown[currentRow][currentCol] != None):
-                if (checkerTown[currentRow][currentCol].team != self.team):
-                    return currentRow, currentCol
+    def _ray_cast(self, board, current_row, current_col, dr, dc):
+        if 0 <= current_row < 8 and 0 <= current_col < 8:
+            next_loc = (
+                0 <= current_row + dr < 8 and 0 <= current_col + dc < 8
+            )
+            if board[current_row][current_col] is not None:
+                if board[current_row][current_col].team != self.team:
+                    return current_row, current_col
                 else:
                     return -1, -1
-            elif nextLoc:
-                return self.Kingsman(checkerTown, currentRow + dir1, currentCol + dir2, dir1, dir2)
+            elif next_loc:
+                return self._ray_cast(board, current_row + dr, current_col + dc, dr, dc)
         return -1, -1
 
-    def criticalMan(self):
-        newTargets = []
-        for criticalCell in self.criticalTargets:
+    def filter_to_pin_ray(self):
+        new_targets = []
+        for critical_cell in self.critical_targets:
             for cell in self.targets:
-                if (criticalCell.row == cell.row and criticalCell.col == cell.col):
-                    newTargets.append(cell)
+                if critical_cell.row == cell.row and critical_cell.col == cell.col:
+                    new_targets.append(cell)
+        self.targets = new_targets
 
-        self.targets = newTargets
-
-    def skyFall(self, king):
-        # refactor the targets because the king is in check and only godSaveTheKing spaces should appear as targets
-        newTargets = []
+    def filter_to_king_escape(self, king):
+        new_targets = []
         for target in self.targets:
-            for savingTarget in king.godSaveTheKing:
-                if (target.row == savingTarget.row and target.col == savingTarget.col):
-                    newTargets.append(target)
-        self.targets = newTargets
+            for saving_target in king.king_escape_cells:
+                if target.row == saving_target.row and target.col == saving_target.col:
+                    new_targets.append(target)
+        self.targets = new_targets
 
-    def printPiece(self, board):
+    def print_piece(self, board):
         print("Piece at", self.row, ",", self.col)
 
-    def getTargets(self):
+    def get_targets(self):
         return self.targets

@@ -3,48 +3,35 @@ from Piece import Piece
 import copy
 from King import King
 
-# Basic tree structure for holding the score/children of each node
 
-
-class Tree(object):
-    def __init__(self, boardState, oldCell, newCell, teamR, teamL):
+class Tree:
+    def __init__(self, board_state, old_cell, new_cell, team_r, team_l):
         self.children = []
-        self.boardState = boardState
+        self.board_state = board_state
+        self.old_cell = old_cell
+        self.new_cell = new_cell
+        self.team_r = Team(team_r.r, team_r.g, team_r.b)
+        self.team_l = Team(team_l.r, team_l.g, team_l.b)
 
-        # Instead of tracking the piece that's moving, just track the cells and handle it appropriately further up
-        self.oldCell = oldCell
-        self.newCell = newCell
-        #white is right
-        self.teamR = Team(teamR.r, teamR.g, teamR.b)
-        self.teamL = Team(teamL.r, teamL.g, teamL.b)
-
-    def addChild(self, child):
+    def add_child(self, child):
         self.children.append(child)
 
-    def getBoardState(self):
-        return self.boardState
+    def get_board_state(self):
+        return self.board_state
 
-    # Heuristic function, for now this will work until the tree is fully made
-    def getUtility(self, team):
-        whiteCount = 0
-        blackCount = 0
-        for r in range(0, 8):
-            for piece in self.boardState[r]:
-                if (piece == None):
+    def get_utility(self, team):
+        white_count = 0
+        black_count = 0
+        for r in range(8):
+            for piece in self.board_state[r]:
+                if piece is None:
                     continue
-                elif (piece.team.r == self.teamR.r):
-                    whiteCount += piece.getValue(self.boardState)
+                elif piece.team.r == self.team_r.r:
+                    white_count += piece.get_value(self.board_state)
                 else:
-                    blackCount += piece.getValue(self.boardState)
+                    black_count += piece.get_value(self.board_state)
 
-        #print("White piece value is " + str(whiteCount))
-        #print("Black piece value is " + str(blackCount))
-
-        total = whiteCount - blackCount
-        if (team.r == self.teamL.r):
+        total = white_count - black_count
+        if team.r == self.team_l.r:
             total = -total
-       #    will be used for testing once we integrate AI into actual game
-       #    print("Blacks move")
-#        input("press enter to continue.. the value of this board is " + str(total))
-
         return total

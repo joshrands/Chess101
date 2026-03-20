@@ -48,7 +48,7 @@ class TestTeam:
 
     def test_set_name(self):
         t = Team(0, 0, 0)
-        t.setName("Alice")
+        t.set_name("Alice")
         assert t.name == "Alice"
 
     def test_two_teams_are_independent(self):
@@ -86,7 +86,7 @@ class TestPieceBase:
 
     def test_piece_critical_targets_empty_on_init(self):
         r = self._rook()
-        assert r.criticalTargets == []
+        assert r.critical_targets == []
 
     # ── move() ──
 
@@ -105,25 +105,24 @@ class TestPieceBase:
         r.move(3, 4, board)
         assert r.touched is True
 
-    # ── getTargets() ──
+    # ── get_targets() ──
 
     def test_get_targets_returns_targets_list(self):
         r = self._rook()
-        assert r.getTargets() is r.targets
+        assert r.get_targets() is r.targets
 
-    # ── skyFall() ──
+    # ── filter_to_king_escape() ──
 
-    def test_skyfall_keeps_targets_in_god_save_the_king(self):
+    def test_skyfall_keeps_targets_in_king_escape_cells(self):
         team = Team(64, 180, 232)
         rook = self._rook(4, 0, team)
         rook.targets = [Cell(4, 1), Cell(4, 2), Cell(4, 3)]
 
-        # Build a mock king whose godSaveTheKing overlaps partially
         from King import King
         king = King(4, 7, team)
-        king.godSaveTheKing = [Cell(4, 2), Cell(4, 3)]
+        king.king_escape_cells = [Cell(4, 2), Cell(4, 3)]
 
-        rook.skyFall(king)
+        rook.filter_to_king_escape(king)
         assert len(rook.targets) == 2
         cols = {c.col for c in rook.targets}
         assert cols == {2, 3}
@@ -135,29 +134,29 @@ class TestPieceBase:
 
         from King import King
         king = King(0, 7, team)
-        king.godSaveTheKing = [Cell(3, 3)]
+        king.king_escape_cells = [Cell(3, 3)]
 
-        rook.skyFall(king)
+        rook.filter_to_king_escape(king)
         assert rook.targets == []
 
-    # ── criticalMan() ──
+    # ── filter_to_pin_ray() ──
 
     def test_critical_man_intersects_targets_with_critical_targets(self):
         rook = self._rook()
         rook.targets = [Cell(0, 1), Cell(0, 2), Cell(0, 3)]
-        rook.criticalTargets = [Cell(0, 2), Cell(0, 5)]
-        rook.criticalMan()
+        rook.critical_targets = [Cell(0, 2), Cell(0, 5)]
+        rook.filter_to_pin_ray()
         assert len(rook.targets) == 1
         assert rook.targets[0].col == 2
 
     def test_critical_man_empty_when_no_overlap(self):
         rook = self._rook()
         rook.targets = [Cell(0, 1), Cell(0, 2)]
-        rook.criticalTargets = [Cell(5, 5)]
-        rook.criticalMan()
+        rook.critical_targets = [Cell(5, 5)]
+        rook.filter_to_pin_ray()
         assert rook.targets == []
 
-    # ── Kingsman() ──
+    # ── _ray_cast() ──
 
     def test_kingsman_finds_enemy_piece(self):
         team_r = Team(64, 180, 232)
@@ -167,8 +166,8 @@ class TestPieceBase:
         board = [[None] * 8 for _ in range(8)]
         board[3][3] = rook
         board[3][6] = enemy
-        # Kingsman looks in dir (0,1) starting from (3,4)
-        row, col = rook.Kingsman(board, 3, 4, 0, 1)
+        # _ray_cast looks in dir (0,1) starting from (3,4)
+        row, col = rook._ray_cast(board, 3, 4, 0, 1)
         assert row == 3
         assert col == 6
 
@@ -179,7 +178,7 @@ class TestPieceBase:
         board = [[None] * 8 for _ in range(8)]
         board[3][3] = rook
         board[3][5] = ally
-        row, col = rook.Kingsman(board, 3, 4, 0, 1)
+        row, col = rook._ray_cast(board, 3, 4, 0, 1)
         assert row == -1
         assert col == -1
 
@@ -188,6 +187,6 @@ class TestPieceBase:
         rook = Rook(3, 3, team_r)
         board = [[None] * 8 for _ in range(8)]
         board[3][3] = rook
-        row, col = rook.Kingsman(board, 3, 4, 0, 1)
+        row, col = rook._ray_cast(board, 3, 4, 0, 1)
         assert row == -1
         assert col == -1

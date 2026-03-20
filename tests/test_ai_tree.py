@@ -1,7 +1,7 @@
 """
 test_ai_tree.py — tests for Tree (utility calculation) and AI (alpha-beta).
 
-Tree.getUtility has a known red-channel-only team comparison bug.
+Tree.get_utility has a known red-channel-only team comparison bug.
 AI.alpha_beta_search is tested with manually constructed tree nodes so no
 Board hardware is needed.
 """
@@ -38,11 +38,11 @@ class TestTree:
         board[0][0] = Rook(0, 0, tr)
         t = Tree(board, Cell(0, 0), Cell(1, 0), tr, tl)
         # LOCK-IN: Tree stores the board reference directly — no deep copy.
-        assert t.getBoardState() is board
-        assert isinstance(t.getBoardState()[0][0], Rook)
+        assert t.get_board_state() is board
+        assert isinstance(t.get_board_state()[0][0], Rook)
 
     def test_board_state_is_same_reference(self):
-        # LOCK-IN: Tree.__init__ does NOT deep-copy boardState.
+        # LOCK-IN: Tree.__init__ does NOT deep-copy board_state.
         # Mutating the original board DOES affect the tree's stored state.
         tr, tl = self._teams()
         board = empty_board()
@@ -50,23 +50,23 @@ class TestTree:
         board[0][0] = rook
         t = Tree(board, Cell(0, 0), Cell(1, 0), tr, tl)
         board[0][0] = None  # mutate original
-        assert t.getBoardState()[0][0] is None  # tree sees the mutation
+        assert t.get_board_state()[0][0] is None  # tree sees the mutation
 
     def test_copies_teams_by_value(self):
         tr, tl = self._teams()
         board = empty_board()
         t = Tree(board, None, None, tr, tl)
-        assert t.teamR is not tr
-        assert t.teamL is not tl
-        assert t.teamR.r == tr.r
-        assert t.teamL.r == tl.r
+        assert t.team_r is not tr
+        assert t.team_l is not tl
+        assert t.team_r.r == tr.r
+        assert t.team_l.r == tl.r
 
     def test_add_child_appends(self):
         tr, tl = self._teams()
         board = empty_board()
         parent = Tree(board, None, None, tr, tl)
         child = Tree(board, Cell(0, 0), Cell(1, 0), tr, tl)
-        parent.addChild(child)
+        parent.add_child(child)
         assert len(parent.children) == 1
         assert parent.children[0] is child
 
@@ -74,29 +74,29 @@ class TestTree:
         tr, tl = self._teams()
         board = empty_board()
         t = Tree(board, None, None, tr, tl)
-        assert t.getBoardState() is t.boardState
+        assert t.get_board_state() is t.board_state
 
     def test_utility_empty_board_is_zero(self):
         tr, tl = self._teams()
         board = empty_board()
         t = Tree(board, None, None, tr, tl)
-        assert t.getUtility(tr) == 0
+        assert t.get_utility(tr) == 0
 
     def test_utility_teamR_advantage_positive(self):
         tr, tl = self._teams()
         board = empty_board()
         board[0][0] = Rook(0, 0, tr)
         t = Tree(board, None, None, tr, tl)
-        # Only teamR has a piece → utility > 0 from teamR's perspective
-        assert t.getUtility(tr) > 0
+        # Only team_r has a piece → utility > 0 from team_r's perspective
+        assert t.get_utility(tr) > 0
 
     def test_utility_teamL_material_advantage_negative_from_teamR(self):
         tr, tl = self._teams()
         board = empty_board()
         board[0][0] = Rook(0, 0, tl)
         t = Tree(board, None, None, tr, tl)
-        # Only teamL has a piece → utility < 0 from teamR's perspective
-        assert t.getUtility(tr) < 0
+        # Only team_l has a piece → utility < 0 from team_r's perspective
+        assert t.get_utility(tr) < 0
 
     def test_utility_perspective_flip(self):
         tr, tl = self._teams()
@@ -104,14 +104,14 @@ class TestTree:
         board[0][0] = Rook(0, 0, tr)
         board[1][0] = Pawn(1, 0, tl)
         t = Tree(board, None, None, tr, tl)
-        util_r = t.getUtility(tr)
-        util_l = t.getUtility(tl)
+        util_r = t.get_utility(tr)
+        util_l = t.get_utility(tl)
         assert util_r == -util_l
 
     def test_utility_uses_only_red_channel_for_team_id(self):
-        # BUG #2 LOCK-IN: getUtility checks piece.team.r == self.teamR.r.
-        # A piece whose team has the SAME red channel as teamR but different
-        # green/blue is incorrectly counted as a teamR piece.
+        # BUG #2 LOCK-IN: get_utility checks piece.team.r == self.team_r.r.
+        # A piece whose team has the SAME red channel as team_r but different
+        # green/blue is incorrectly counted as a team_r piece.
         team_r_real = Team(100, 0, 0)
         team_r_impostor = Team(100, 200, 50)   # same r=100, different g/b
         team_l = Team(50, 50, 50)
@@ -121,11 +121,11 @@ class TestTree:
         board[0][1] = Rook(0, 1, team_r_impostor)  # different team object!
 
         t = Tree(board, None, None, team_r_real, team_l)
-        utility = t.getUtility(team_r_real)
+        utility = t.get_utility(team_r_real)
 
-        # Both rooks are counted as teamR (r=100 == r=100), so blackCount=0
+        # Both rooks are counted as team_r (r=100 == r=100), so black_count=0
         # and utility = sum of both rook values > 0
-        # If team comparison were correct, one rook would be blackCount,
+        # If team comparison were correct, one rook would be black_count,
         # and utility would be approximately 0 (equal material).
         assert utility > 0
 
@@ -136,7 +136,7 @@ class TestTree:
         board[7][7] = Rook(7, 7, tl)
         t = Tree(board, None, None, tr, tl)
         # Both rooks have same type and position symmetry — utility should be 0
-        assert t.getUtility(tr) == 0
+        assert t.get_utility(tr) == 0
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -167,29 +167,29 @@ class TestAI:
         board = empty_board()
         node = Tree(board, None, None, tr, tl)
         ai = AI(node, tr)
-        assert ai.isTerminal(node) is True
+        assert ai.is_terminal(node) is True
 
     def test_is_terminal_false_when_has_children(self):
         tr, tl = self._teams()
         board = empty_board()
         root = Tree(board, None, None, tr, tl)
         child = Tree(board, Cell(0, 0), Cell(1, 0), tr, tl)
-        root.addChild(child)
+        root.add_child(child)
         ai = AI(root, tr)
-        assert ai.isTerminal(root) is False
+        assert ai.is_terminal(root) is False
 
     def test_get_successors_returns_children(self):
         tr, tl = self._teams()
         board = empty_board()
         root = Tree(board, None, None, tr, tl)
         child = Tree(board, Cell(0, 0), Cell(1, 0), tr, tl)
-        root.addChild(child)
+        root.add_child(child)
         ai = AI(root, tr)
-        assert ai.getSuccessors(root) == [child]
+        assert ai.get_successors(root) == [child]
 
     def test_min_value_terminal_returns_utility(self):
         tr, tl = self._teams()
-        # Leaf with one rook for teamR → utility > 0
+        # Leaf with one rook for team_r → utility > 0
         board = empty_board()
         board[0][0] = Rook(0, 0, tr)
         leaf = Tree(board, Cell(0, 0), Cell(1, 0), tr, tl)
@@ -222,8 +222,8 @@ class TestAI:
 
         root_board = empty_board()
         root = Tree(root_board, None, None, tr, tl)
-        root.addChild(child_a)
-        root.addChild(child_b)
+        root.add_child(child_a)
+        root.add_child(child_b)
 
         ai = AI(root, tr)
         best = ai.alpha_beta_search()
@@ -237,7 +237,7 @@ class TestAI:
         child_board = empty_board()
         child_board[0][0] = Rook(0, 0, tr)
         child = Tree(child_board, Cell(0, 0), Cell(1, 0), tr, tl)
-        root.addChild(child)
+        root.add_child(child)
 
         ai = AI(root, tr)
         best = ai.alpha_beta_search()
@@ -265,17 +265,17 @@ class TestAI:
 
         child_board = empty_board()
         child_1 = Tree(child_board, Cell(1, 0), Cell(2, 0), tr, tl)
-        child_1.addChild(leaf_1a)
-        child_1.addChild(leaf_1b)
+        child_1.add_child(leaf_1a)
+        child_1.add_child(leaf_1b)
 
         leaf_2a = make_leaf(False)  # low
         child_2 = Tree(child_board, Cell(1, 1), Cell(2, 1), tr, tl)
-        child_2.addChild(leaf_2a)
+        child_2.add_child(leaf_2a)
 
         root_board = empty_board()
         root = Tree(root_board, None, None, tr, tl)
-        root.addChild(child_1)
-        root.addChild(child_2)
+        root.add_child(child_1)
+        root.add_child(child_2)
 
         ai = AI(root, tr)
         best = ai.alpha_beta_search()
