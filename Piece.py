@@ -1,8 +1,9 @@
+from abc import ABC, abstractmethod
 from Team import Team
 from Cell import Cell
 
 
-class Piece:
+class Piece(ABC):
     def __init__(self, row, col, team):
         self.row = row
         self.col = col
@@ -12,9 +13,11 @@ class Piece:
         self.critical = False
         self.critical_targets = []
 
+    @abstractmethod
     def calc_targets(self, board):
         raise NotImplementedError()
 
+    @abstractmethod
     def get_value(self, board):
         raise NotImplementedError()
 
