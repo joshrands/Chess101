@@ -59,5 +59,13 @@ class Piece(ABC):
     def print_piece(self, board):
         print("Piece at", self.row, ",", self.col)
 
+    def _slide(self, board, dr, dc, row, col):
+        if 0 <= row + dr <= 7 and 0 <= col + dc <= 7:
+            if board[row + dr][col + dc] is None:
+                self.targets.append(Cell(row + dr, col + dc))
+                self._slide(board, dr, dc, row + dr, col + dc)
+            elif board[row + dr][col + dc].team != self.team:
+                self.targets.append(Cell(row + dr, col + dc))
+
     def get_targets(self):
         return self.targets
