@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from dataclasses import dataclass
 
 
@@ -8,7 +10,7 @@ class Team:
     b: int
     name: str = "Wendy"
 
-    def set_color(self):
+    def set_color(self) -> None:
         self.r = int(input("Enter red: "))
         self.g = int(input("Enter green: "))
         self.b = int(input("Enter blue: "))

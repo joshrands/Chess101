@@ -1,4 +1,6 @@
 #!/usr/bin/env python
+from __future__ import annotations
+
 from samplebase import SampleBase
 from rgbmatrix import RGBMatrix, RGBMatrixOptions
 from Team import Team

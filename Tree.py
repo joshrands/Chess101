@@ -1,25 +1,37 @@
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
 from Team import Team
-from Piece import Piece
-import copy
-from King import King
+from Piece import Piece, BoardGrid
+
+if TYPE_CHECKING:
+    from Cell import Cell
 
 
 class Tree:
-    def __init__(self, board_state, old_cell, new_cell, team_r, team_l):
-        self.children = []
+    def __init__(
+        self,
+        board_state: BoardGrid,
+        old_cell: Cell | None,
+        new_cell: Cell | None,
+        team_r: Team,
+        team_l: Team,
+    ) -> None:
+        self.children: list[Tree] = []
         self.board_state = board_state
         self.old_cell = old_cell
         self.new_cell = new_cell
         self.team_r = Team(team_r.r, team_r.g, team_r.b)
         self.team_l = Team(team_l.r, team_l.g, team_l.b)
 
-    def add_child(self, child):
+    def add_child(self, child: Tree) -> None:
         self.children.append(child)
 
-    def get_board_state(self):
+    def get_board_state(self) -> BoardGrid:
         return self.board_state
 
-    def get_utility(self, team):
+    def get_utility(self, team: Team) -> int:
         white_count = 0
         black_count = 0
         for r in range(8):

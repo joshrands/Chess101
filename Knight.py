@@ -1,4 +1,6 @@
-from Piece import Piece
+from __future__ import annotations
+
+from Piece import Piece, BoardGrid
 from Cell import Cell
 from constants import PieceValue
 
@@ -6,7 +8,7 @@ _KNIGHT_DELTAS = [(-2, -1), (-2, 1), (-1, -2), (-1, 2), (1, -2), (1, 2), (2, -1)
 
 
 class Knight(Piece):
-    def calc_targets(self, board):
+    def calc_targets(self, board: BoardGrid) -> None:
         self.targets = []
         for dr, dc in _KNIGHT_DELTAS:
             r, c = self.row + dr, self.col + dc
@@ -17,7 +19,7 @@ class Knight(Piece):
         if self.critical:
             super().filter_to_pin_ray()
 
-    def get_value(self, board):
+    def get_value(self, board: BoardGrid) -> int:
         total = PieceValue.KNIGHT
         self.calc_targets(board)
         for cell in self.targets:
@@ -26,5 +28,5 @@ class Knight(Piece):
                 total += 1
         return total
 
-    def print_piece(self):
+    def print_piece(self) -> None:
         print("Knight at", self.row, ",", self.col)

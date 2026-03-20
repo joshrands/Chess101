@@ -1,14 +1,16 @@
-from Piece import Piece
+from __future__ import annotations
+
+from Piece import Piece, BoardGrid
 from Cell import Cell
 from Queen import Queen
 from constants import PieceValue
 
 
 class Pawn(Piece):
-    def __init__(self, row, col, team):
+    def __init__(self, row: int, col: int, team) -> None:
         self.row = row
         self.col = col
-        self.targets = []
+        self.targets: list[Cell] = []
         self.team = team
         self.starting_row = row
         self.starting_col = col
@@ -16,12 +18,12 @@ class Pawn(Piece):
             self.direction = -1
         else:
             self.direction = 1
-        self.en_passantable = False
-        self.en_passant_loc = None
-        self.critical = False
-        self.critical_targets = []
+        self.en_passantable: bool = False
+        self.en_passant_loc: Cell | None = None
+        self.critical: bool = False
+        self.critical_targets: list[Cell] = []
 
-    def calc_targets(self, board):
+    def calc_targets(self, board: BoardGrid) -> None:
         self.en_passant_loc = None
         self.targets = []
         if self.row != 0 and self.row != 7:
@@ -58,7 +60,7 @@ class Pawn(Piece):
         if self.critical:
             super().filter_to_pin_ray()
 
-    def get_value(self, board):
+    def get_value(self, board: BoardGrid) -> int:
         self.calc_targets(board)
         total = PieceValue.PAWN
         total = total + len(self.targets)
@@ -68,7 +70,7 @@ class Pawn(Piece):
                 total += 1
         return total
 
-    def filter_to_king_escape(self, king):
+    def filter_to_king_escape(self, king) -> None:
         new_targets = []
         for target in self.targets:
             for saving_target in king.king_escape_cells:
@@ -78,7 +80,7 @@ class Pawn(Piece):
             new_targets.append(Cell(self.en_passant_loc.row, self.en_passant_loc.col))
         self.targets = new_targets
 
-    def move(self, new_row, new_col, board):
+    def move(self, new_row: int, new_col: int, board: BoardGrid) -> Cell | None:
         old_row = self.row
         old_col = self.col
         self.row = new_row
@@ -96,5 +98,5 @@ class Pawn(Piece):
         else:
             return None
 
-    def print_piece(self):
+    def print_piece(self) -> None:
         print("Pawn at", self.row, ",", self.col)

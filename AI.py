@@ -1,12 +1,20 @@
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
 from Tree import Tree
+from Team import Team
+
+if TYPE_CHECKING:
+    pass
 
 
 class AI:
-    def __init__(self, game_tree, team):
+    def __init__(self, game_tree: Tree, team: Team) -> None:
         self.game_tree = game_tree
         self.team = team
 
-    def alpha_beta_search(self):
+    def alpha_beta_search(self) -> Tree:
         infinity = float('inf')
         best_val = -infinity
         beta = infinity
@@ -22,7 +30,7 @@ class AI:
         print(f"AlphaBeta:  This piece should be moved to: {best_state.new_cell.row}{best_state.new_cell.col}")
         return best_state
 
-    def max_value(self, node, alpha, beta):
+    def max_value(self, node: Tree, alpha: float, beta: float) -> float:
         if self.is_terminal(node):
             return node.get_utility(self.team)
         infinity = float('inf')
@@ -34,7 +42,7 @@ class AI:
             alpha = max(alpha, value)
         return value
 
-    def min_value(self, node, alpha, beta):
+    def min_value(self, node: Tree, alpha: float, beta: float) -> float:
         if self.is_terminal(node):
             return node.get_utility(self.team)
         infinity = float('inf')
@@ -46,12 +54,12 @@ class AI:
             beta = min(beta, value)
         return value
 
-    def get_successors(self, node):
+    def get_successors(self, node: Tree) -> list[Tree]:
         if node is None:
             raise ValueError("node must not be None")
         return node.children
 
-    def is_terminal(self, node):
+    def is_terminal(self, node: Tree) -> bool:
         if node is None:
             raise ValueError("node must not be None")
         return len(node.children) == 0

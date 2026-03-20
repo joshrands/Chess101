@@ -1,10 +1,12 @@
-from Piece import Piece
+from __future__ import annotations
+
+from Piece import Piece, BoardGrid
 from Cell import Cell
 from constants import PieceValue
 
 
 class Bishop(Piece):
-    def calc_targets(self, board):
+    def calc_targets(self, board: BoardGrid) -> None:
         self.targets = []
         self._slide(board, 1, 1, self.row, self.col)
         self._slide(board, -1, 1, self.row, self.col)
@@ -13,7 +15,7 @@ class Bishop(Piece):
         if self.critical:
             super().filter_to_pin_ray()
 
-    def get_value(self, board):
+    def get_value(self, board: BoardGrid) -> int:
         total = PieceValue.BISHOP
         self.calc_targets(board)
         for cell in self.targets:
@@ -22,5 +24,5 @@ class Bishop(Piece):
                 total += 1
         return total
 
-    def print_piece(self):
+    def print_piece(self) -> None:
         print("Bishop at", self.row, ",", self.col)

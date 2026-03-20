@@ -1,4 +1,6 @@
-from Piece import Piece
+from __future__ import annotations
+
+from Piece import Piece, BoardGrid
 from Cell import Cell
 from Rook import Rook
 from Bishop import Bishop
@@ -11,27 +13,27 @@ from constants import PieceValue
 
 class King(Piece):
 
-    def __init__(self, row, col, team):
+    def __init__(self, row: int, col: int, team: Team) -> None:
         self.row = row
         self.col = col
-        self.targets = []
+        self.targets: list[Cell] = []
         self.team = team
         if self.row == 7:
             self.direction = -1
         else:
             self.direction = 1
-        self.touched = False
-        self.critical = False
-        self.king_escape_cells = []
+        self.touched: bool = False
+        self.critical: bool = False
+        self.king_escape_cells: list[Cell] = []
 
-    def _walk(self, board, dr, dc, row, col):
+    def _walk(self, board: BoardGrid, dr: int, dc: int, row: int, col: int) -> None:
         if 0 <= row + dr <= 7 and 0 <= col + dc <= 7:
             if board[row + dr][col + dc] is None:
                 self.targets.append(Cell(row + dr, col + dc))
             elif board[row + dr][col + dc].team != self.team:
                 self.targets.append(Cell(row + dr, col + dc))
 
-    def calc_targets(self, board):
+    def calc_targets(self, board: BoardGrid) -> bool:
         self.targets = []
         self._walk(board, 1, 1, self.row, self.col)
         self._walk(board, -1, 1, self.row, self.col)
@@ -107,13 +109,13 @@ class King(Piece):
 
         return in_check
 
-    def get_value(self, board):
+    def get_value(self, board: BoardGrid) -> int:
         value = PieceValue.KING
         if self.find_attacker(board):
             value = 0
         return value
 
-    def move(self, new_row, new_col, board):
+    def move(self, new_row: int, new_col: int, board: BoardGrid) -> tuple[Cell | None, Cell | None]:
         old_row = self.row
         old_col = self.col
         self.row = new_row
@@ -126,7 +128,7 @@ class King(Piece):
         else:
             return None, None
 
-    def find_attacker(self, board):
+    def find_attacker(self, board: BoardGrid) -> tuple[int, int]:
         for row in board:
             for piece in row:
                 if piece is not None and piece.team == self.team:
@@ -193,7 +195,14 @@ class King(Piece):
 
         return -1, -1
 
-    def _scan_ray(self, board, current_row, current_col, dr, dc):
+    def _scan_ray(
+        self,
+        board: BoardGrid,
+        current_row: int,
+        current_col: int,
+        dr: int,
+        dc: int,
+    ) -> tuple[int, int, int, int]:
         next_loc = (
             0 <= current_row + dr < 8 and 0 <= current_col + dc < 8
         )
@@ -211,23 +220,32 @@ class King(Piece):
                 return e_row, e_col, s_row, s_col
         return -1, -1, -1, -1
 
-    def _check_knight(self, board, dr, dc, row, col):
+    def _check_knight(
+        self,
+        board: BoardGrid,
+        dr: int,
+        dc: int,
+        row: int,
+        col: int,
+    ) -> tuple[int, int]:
         if 0 <= row + dr <= 7 and 0 <= col + dc <= 7:
             if (isinstance(board[row + dr][col + dc], Knight)
                     and board[row + dr][col + dc].team != self.team):
                 return row + dr, col + dc
         return -1, -1
 
-    def build_check_escape_path(self, enemy_row, enemy_col):
+    def build_check_escape_path(self, enemy_row: int, enemy_col: int) -> list[Cell]:
         dr, dc = self.determine_direction_from_enemy_towards_king(enemy_row, enemy_col)
-        save_the_king = []
+        save_the_king: list[Cell] = []
         while not (enemy_row == self.row and enemy_col == self.col):
             save_the_king.append(Cell(enemy_row, enemy_col))
             enemy_row = enemy_row + dr
             enemy_col = enemy_col + dc
         return save_the_king
 
-    def determine_direction_from_enemy_towards_king(self, enemy_row, enemy_col):
+    def determine_direction_from_enemy_towards_king(
+        self, enemy_row: int, enemy_col: int
+    ) -> tuple[float, float]:
         if enemy_row == self.row:
             return 0, -1 * (enemy_col - self.col) / abs(enemy_col - self.col)
         elif enemy_col == self.col:
@@ -238,5 +256,5 @@ class King(Piece):
                 -1 * (enemy_col - self.col) / abs(enemy_col - self.col),
             )
 
-    def print_piece(self):
+    def print_piece(self) -> None:
         print("King at", self.row, ",", self.col)
