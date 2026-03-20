@@ -1,2 +1,14 @@
+<<<<<<< HEAD
 __pycache__/*
 logs/*
+=======
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+*.egg-info/
+dist/
+build/
+.mypy_cache/
+.claude/
+>>>>>>> Add behavior lock-in test suite (188 tests)
