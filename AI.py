@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from typing import TYPE_CHECKING
 
 from Tree import Tree
@@ -7,6 +8,8 @@ from Team import Team
 
 if TYPE_CHECKING:
     pass
+
+logger = logging.getLogger(__name__)
 
 
 class AI:
@@ -26,8 +29,8 @@ class AI:
             if value > best_val:
                 best_val = value
                 best_state = state
-        print(f"AlphaBeta:  Best Piece to move is located at: {best_state.old_cell.row}{best_state.old_cell.col}")
-        print(f"AlphaBeta:  This piece should be moved to: {best_state.new_cell.row}{best_state.new_cell.col}")
+        logger.debug("AlphaBeta:  Best Piece to move is located at: %s%s", best_state.old_cell.row, best_state.old_cell.col)
+        logger.debug("AlphaBeta:  This piece should be moved to: %s%s", best_state.new_cell.row, best_state.new_cell.col)
         return best_state
 
     def max_value(self, node: Tree, alpha: float, beta: float) -> float:

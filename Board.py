@@ -1,7 +1,11 @@
 #!/usr/bin/env python
 from __future__ import annotations
 
+import logging
+
 from samplebase import SampleBase
+
+logger = logging.getLogger(__name__)
 from rgbmatrix import RGBMatrix, RGBMatrixOptions
 from Team import Team
 from Pawn import Pawn
@@ -59,7 +63,7 @@ class Board(SampleBase):
 
     # RUN GAME
     def run(self, skip_setup=False, init_num=""):
-        print("Running game...")
+        logger.info("Running game...")
         self.canvas = self.matrix.CreateFrameCanvas()
 
         if not skip_setup:
@@ -339,7 +343,7 @@ class Board(SampleBase):
         move = False
         row = 0
         col = 0
-        print(f"Player: {team.name}'s move.")
+        logger.info("Player: %s's move.", team.name)
 
         while not move:
             self.canvas.Clear()
@@ -671,8 +675,9 @@ class Board(SampleBase):
         computer_player = AI(root, team)
         best_move = computer_player.alpha_beta_search()
 
-        print(f"the best move involves moving the piece at square {best_move.old_cell.row}"
-              f"{best_move.old_cell.col} to {best_move.new_cell.row}{best_move.new_cell.col}")
+        logger.debug("the best move involves moving the piece at square %s%s to %s%s",
+                     best_move.old_cell.row, best_move.old_cell.col,
+                     best_move.new_cell.row, best_move.new_cell.col)
 
         state = 0
 
@@ -916,7 +921,7 @@ class Board(SampleBase):
 
     def war_games(self):
         self.canvas.Clear()
-        print("The only winning move is not to play")
+        logger.info("The only winning move is not to play")
 
         team1_decided = False
         team2_decided = False
@@ -1035,7 +1040,7 @@ class Board(SampleBase):
                     self.team_l,
                 ))
 
-        print(f"done adding children for depth {depth}! boards created = {len(current_node.children)}")
+        logger.debug("done adding children for depth %s! boards created = %s", depth, len(current_node.children))
 
         if team == self.team_l:
             team = self.team_r
@@ -1061,7 +1066,7 @@ class Board(SampleBase):
             return False
 
     def check_fifty_move_rule(self, team, board_state):
-        print(self.peace_time)
+        logger.debug("peace_time=%s", self.peace_time)
         if self.peace_time >= 50:
             self.game_over = True
             self.declare_stalemate()

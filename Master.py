@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+import logging
 import smbus
 import time
+
+logger = logging.getLogger(__name__)
 
 
 class Master:
@@ -46,7 +49,7 @@ class Master:
 
     def print_board_states(self) -> None:
         for r in range(8):
-            print(self.grid_states[r])
+            logger.debug("%s", self.grid_states[r])
 
     def update_row_states(self, row: int, col_states: int) -> None:
         change = False
@@ -61,7 +64,7 @@ class Master:
                     self.grid_states[row][i] = 0
                     change = True
         if change:
-            print("Board Changed: ")
+            logger.info("Board Changed: ")
             self.print_board_states()
 
     def read_data(self) -> None:
@@ -82,6 +85,7 @@ class Master:
                 handled = True
             except IOError:
                 handled = False
+                logger.warning("I/O error... handling...")
                 time.sleep(0.5)
         return -1
 
@@ -93,5 +97,6 @@ class Master:
                 handled = True
             except IOError:
                 handled = False
+                logger.warning("I/O error... handling...")
                 time.sleep(0.5)
         return number
