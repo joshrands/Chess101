@@ -1,4 +1,7 @@
+from dataclasses import dataclass
+
+
+@dataclass(frozen=True)
 class Cell:
-    def __init__(self, row=0, col=0):
-        self.row = row
-        self.col = col
+    row: int = 0
+    col: int = 0
