@@ -398,47 +398,7 @@ class Board(SampleBase):
                             else:
                                 self.peace_time += 1
                             self.grid[target_row][target_col] = self.grid[row][col]
-                            if isinstance(self.grid[target_row][target_col], Pawn):
-                                self.peace_time = 0
-                                enemy = self.grid[target_row][target_col].move(
-                                    target_row, target_col, self.grid)
-                                if enemy is not None:
-                                    self.grid[enemy.row][enemy.col] = None
-                                    state = self.master.get_cell_state(enemy.row, enemy.col)
-                                    while state == 0:
-                                        self.master.read_data()
-                                        time.sleep(0.4)
-                                        for r in range(201):
-                                            self.canvas.Clear()
-                                            self.light_checker_town(self.canvas)
-                                            self.light_cell(
-                                                self.canvas, enemy.row, enemy.col, 50 + r, 0, 0)
-                                            self.canvas = self.matrix.SwapOnVSync(self.canvas)
-                                            time.sleep(0.002)
-                                        self.master.read_data()
-                                        time.sleep(0.4)
-                                        for r in range(201):
-                                            self.canvas.Clear()
-                                            self.light_checker_town(self.canvas)
-                                            self.light_cell(
-                                                self.canvas, enemy.row, enemy.col, 255 - r, 0, 0)
-                                            self.canvas = self.matrix.SwapOnVSync(self.canvas)
-                                            time.sleep(0.002)
-                                        state = self.master.get_cell_state(enemy.row, enemy.col)
-                            elif isinstance(self.grid[target_row][target_col], King):
-                                rook_location, rook_target = self.grid[target_row][target_col].move(
-                                    target_row, target_col, self.grid)
-                                if rook_location is not None:
-                                    self.grid[rook_target.row][rook_target.col] = (
-                                        self.grid[rook_location.row][rook_location.col])
-                                    self.grid[rook_location.row][rook_location.col] = None
-                                    self.grid[rook_target.row][rook_target.col].move(
-                                        rook_target.row, rook_target.col, self.grid)
-                            else:
-                                self.grid[target_row][target_col].move(
-                                    target_row, target_col, self.grid)
-
-                            self.grid[row][col] = None
+                            self._apply_move(row, col, target_row, target_col)
 
                     if not valid_move:
                         logger.debug("Invalid target.")
@@ -744,11 +704,23 @@ class Board(SampleBase):
 
         self.grid[best_move.new_cell.row][best_move.new_cell.col] = (
             self.grid[best_move.old_cell.row][best_move.old_cell.col])
+        self._apply_move(best_move.old_cell.row, best_move.old_cell.col,
+                         best_move.new_cell.row, best_move.new_cell.col)
 
-        if isinstance(self.grid[best_move.new_cell.row][best_move.new_cell.col], Pawn):
+        self.canvas.Clear()
+        self.light_checker_town(self.canvas)
+        self.canvas = self.matrix.SwapOnVSync(self.canvas)
+
+    def _apply_move(self, old_row, old_col, target_row, target_col):
+        """Dispatch piece movement after grid[target] = grid[old] is set.
+
+        Handles Pawn (en passant + LED animation), King (castling), and
+        standard pieces. Resets peace_time for pawn moves. Clears old square.
+        """
+        piece = self.grid[target_row][target_col]
+        if isinstance(piece, Pawn):
             self.peace_time = 0
-            enemy = self.grid[best_move.new_cell.row][best_move.new_cell.col].move(
-                best_move.new_cell.row, best_move.new_cell.col, self.grid)
+            enemy = piece.move(target_row, target_col, self.grid)
             if enemy is not None:
                 self.grid[enemy.row][enemy.col] = None
                 state = self.master.get_cell_state(enemy.row, enemy.col)
@@ -770,10 +742,8 @@ class Board(SampleBase):
                         self.canvas = self.matrix.SwapOnVSync(self.canvas)
                         time.sleep(0.002)
                     state = self.master.get_cell_state(enemy.row, enemy.col)
-
-        elif isinstance(self.grid[best_move.new_cell.row][best_move.new_cell.col], King):
-            rook_location, rook_target = self.grid[best_move.new_cell.row][best_move.new_cell.col].move(
-                best_move.new_cell.row, best_move.new_cell.col, self.grid)
+        elif isinstance(piece, King):
+            rook_location, rook_target = piece.move(target_row, target_col, self.grid)
             if rook_location is not None:
                 self.grid[rook_target.row][rook_target.col] = (
                     self.grid[rook_location.row][rook_location.col])
@@ -781,14 +751,8 @@ class Board(SampleBase):
                 self.grid[rook_target.row][rook_target.col].move(
                     rook_target.row, rook_target.col, self.grid)
         else:
-            self.grid[best_move.new_cell.row][best_move.new_cell.col].move(
-                best_move.new_cell.row, best_move.new_cell.col, self.grid)
-
-        self.grid[best_move.old_cell.row][best_move.old_cell.col] = None
-
-        self.canvas.Clear()
-        self.light_checker_town(self.canvas)
-        self.canvas = self.matrix.SwapOnVSync(self.canvas)
+            piece.move(target_row, target_col, self.grid)
+        self.grid[old_row][old_col] = None
 
     def draw_board(self, board_state):
         self.canvas.Clear()
