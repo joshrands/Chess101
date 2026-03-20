@@ -1,5 +1,6 @@
 from Piece import Piece
 from Cell import Cell
+from constants import PieceValue
 
 
 class Bishop(Piece):
@@ -21,7 +22,7 @@ class Bishop(Piece):
             super().filter_to_pin_ray()
 
     def get_value(self, board):
-        total = 15
+        total = PieceValue.BISHOP
         self.calc_targets(board)
         for cell in self.targets:
             total += 1

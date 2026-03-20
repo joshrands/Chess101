@@ -1,6 +1,7 @@
 from Piece import Piece
 from Cell import Cell
 from Queen import Queen
+from constants import PieceValue
 
 
 class Pawn(Piece):
@@ -59,7 +60,7 @@ class Pawn(Piece):
 
     def get_value(self, board):
         self.calc_targets(board)
-        total = 5
+        total = PieceValue.PAWN
         total = total + len(self.targets)
         for cell in self.targets:
             total += 1

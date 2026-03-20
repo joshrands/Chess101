@@ -1,5 +1,6 @@
 from Piece import Piece
 from Cell import Cell
+from constants import PieceValue
 
 
 class Rook(Piece):
@@ -21,7 +22,7 @@ class Rook(Piece):
             super().filter_to_pin_ray()
 
     def get_value(self, board):
-        total = 27
+        total = PieceValue.ROOK
         self.calc_targets(board)
         for cell in self.targets:
             total += 1

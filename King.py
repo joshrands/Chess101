@@ -6,6 +6,7 @@ from Knight import Knight
 from Pawn import Pawn
 from Queen import Queen
 from Team import Team
+from constants import PieceValue
 
 
 class King(Piece):
@@ -107,7 +108,7 @@ class King(Piece):
         return in_check
 
     def get_value(self, board):
-        value = 1000
+        value = PieceValue.KING
         if self.find_attacker(board):
             value = 0
         return value

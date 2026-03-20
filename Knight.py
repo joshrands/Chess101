@@ -1,5 +1,6 @@
 from Piece import Piece
 from Cell import Cell
+from constants import PieceValue
 
 
 class Knight(Piece):
@@ -24,7 +25,7 @@ class Knight(Piece):
             super().filter_to_pin_ray()
 
     def get_value(self, board):
-        total = 13
+        total = PieceValue.KNIGHT
         self.calc_targets(board)
         for cell in self.targets:
             total += 1
