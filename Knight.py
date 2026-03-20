@@ -2,25 +2,18 @@ from Piece import Piece
 from Cell import Cell
 from constants import PieceValue
 
+_KNIGHT_DELTAS = [(-2, -1), (-2, 1), (-1, -2), (-1, 2), (1, -2), (1, 2), (2, -1), (2, 1)]
+
 
 class Knight(Piece):
-    def _add_jump_target(self, board, dr, dc, row, col):
-        if 0 <= row + dr <= 7 and 0 <= col + dc <= 7:
-            if board[row + dr][col + dc] is None:
-                self.targets.append(Cell(row + dr, col + dc))
-            elif board[row + dr][col + dc].team != self.team:
-                self.targets.append(Cell(row + dr, col + dc))
-
     def calc_targets(self, board):
         self.targets = []
-        self._add_jump_target(board, 2, 1, self.row, self.col)
-        self._add_jump_target(board, 2, -1, self.row, self.col)
-        self._add_jump_target(board, -2, 1, self.row, self.col)
-        self._add_jump_target(board, -2, -1, self.row, self.col)
-        self._add_jump_target(board, 1, 2, self.row, self.col)
-        self._add_jump_target(board, 1, -2, self.row, self.col)
-        self._add_jump_target(board, -1, 2, self.row, self.col)
-        self._add_jump_target(board, -1, -2, self.row, self.col)
+        for dr, dc in _KNIGHT_DELTAS:
+            r, c = self.row + dr, self.col + dc
+            if 0 <= r <= 7 and 0 <= c <= 7:
+                occupant = board[r][c]
+                if occupant is None or occupant.team != self.team:
+                    self.targets.append(Cell(r, c))
         if self.critical:
             super().filter_to_pin_ray()
 
