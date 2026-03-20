@@ -18,6 +18,7 @@ import time
 from Cell import Cell
 import random
 from Master import Master
+from hardware.sensor import BoardSensor
 from Tree import Tree
 from AI import AI
 import copy
@@ -28,13 +29,13 @@ import numpy as np
 
 class Board(SampleBase):
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, sensor: BoardSensor | None = None, **kwargs):
         super(Board, self).__init__(*args, **kwargs)
 
         self.team_r = Team(64, 180, 232)
         self.team_l = Team(255, 140, 0)
         self.grid = []
-        self.master = Master()
+        self.master: BoardSensor = sensor if sensor is not None else Master()
         self.computer_player_r = False
         self.computer_player_l = False
 

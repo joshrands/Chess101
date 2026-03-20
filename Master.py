@@ -4,10 +4,12 @@ import logging
 import smbus
 import time
 
+from hardware.sensor import BoardSensor
+
 logger = logging.getLogger(__name__)
 
 
-class Master:
+class Master(BoardSensor):
 
     ROW_ADDRESSES = [0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b]
     WRITE_TRIGGER = 42
