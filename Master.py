@@ -9,37 +9,21 @@ logger = logging.getLogger(__name__)
 
 class Master:
 
-    bus = smbus.SMBus(1)
-
-    rowA = 0x04
-    rowB = 0x05
-    rowC = 0x06
-    rowD = 0x07
-    rowE = 0x08
-    rowF = 0x09
-    rowG = 0x0a
-    rowH = 0x0b
-
-    grid_states: list[list[int]] = [1] * 8
+    ROW_ADDRESSES = [0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b]
+    WRITE_TRIGGER = 42
 
     def __init__(self) -> None:
-        for i in range(8):
-            self.grid_states[i] = [1] * 8
+        self.bus = smbus.SMBus(1)
+        self.grid_states: list[list[int]] = [[0] * 8 for _ in range(8)]
         self.initialize()
 
     def initialize(self) -> None:
-        self.fill_row_data(self.rowA, 0)
-        self.fill_row_data(self.rowB, 1)
-        self.fill_row_data(self.rowC, 2)
-        self.fill_row_data(self.rowD, 3)
-        self.fill_row_data(self.rowE, 4)
-        self.fill_row_data(self.rowF, 5)
-        self.fill_row_data(self.rowG, 6)
-        self.fill_row_data(self.rowH, 7)
+        for i, addr in enumerate(self.ROW_ADDRESSES):
+            self.fill_row_data(addr, i)
         self.print_board_states()
 
     def fill_row_data(self, row: int, row_num: int) -> None:
-        self.write_to_row(row, 42)
+        self.write_to_row(row, self.WRITE_TRIGGER)
         time.sleep(0.01)
         val = self.read_from_row(row)
         self.update_row_states(row_num, val)
@@ -68,14 +52,8 @@ class Master:
             self.print_board_states()
 
     def read_data(self) -> None:
-        self.fill_row_data(self.rowA, 0)
-        self.fill_row_data(self.rowB, 1)
-        self.fill_row_data(self.rowC, 2)
-        self.fill_row_data(self.rowD, 3)
-        self.fill_row_data(self.rowE, 4)
-        self.fill_row_data(self.rowF, 5)
-        self.fill_row_data(self.rowG, 6)
-        self.fill_row_data(self.rowH, 7)
+        for i, addr in enumerate(self.ROW_ADDRESSES):
+            self.fill_row_data(addr, i)
 
     def write_to_row(self, address: int, value: int) -> int:
         handled = False
