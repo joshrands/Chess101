@@ -114,6 +114,7 @@ class Phase(Enum):
         GAME_OVER: The game has ended (checkmate, stalemate, or draw).
     """
 
+    NAME_ENTRY = auto()
     LOBBY = auto()
     COLOR_PICK = auto()
     WAR_GAMES = auto()
@@ -165,10 +166,17 @@ class GameRunner:
         root_logger.setLevel(logging.DEBUG)
         root_logger.addHandler(self._panel_handler)
         root_logger.addHandler(_console)
+        # Suppress noisy third-party DEBUG logs
+        for _noisy in ("websockets", "asyncio"):
+            logging.getLogger(_noisy).setLevel(logging.WARNING)
         # Panel fonts — populated by _init_board after pygame.init()
         self._pfont_sm: Optional[pygame.font.Font] = None
         self._pfont_md: Optional[pygame.font.Font] = None
         self._pfont_lg: Optional[pygame.font.Font] = None
+        self._pfont_xl: Optional[pygame.font.Font] = None
+        self._pfont_entry: Optional[pygame.font.Font] = None
+        # Player name — persists across resets (not in _reset)
+        self._player_name: str = ""
         self._reset()
 
     def _reset(self) -> None:
@@ -253,6 +261,9 @@ class GameRunner:
         self._pfont_sm = pygame.font.SysFont("monospace", 13)
         self._pfont_md = pygame.font.SysFont("monospace", 15)
         self._pfont_lg = pygame.font.SysFont("monospace", 18, bold=True)
+        # Name-entry screen fonts
+        self._pfont_xl    = pygame.font.SysFont("monospace", 36, bold=True)
+        self._pfont_entry = pygame.font.SysFont("monospace", 52, bold=True)
 
     # ── Internal narrowing helpers ─────────────────────────────────────────────
 
@@ -563,6 +574,39 @@ class GameRunner:
         self._begin_turn(self._current_team)
 
     # ── Rendering ──────────────────────────────────────────────────────────────
+
+    def _render_name_entry(self) -> None:
+        """Render the name-entry screen onto the board canvas area."""
+        b = self._b
+        b.canvas.Clear()
+        b.matrix.blit_to_screen()   # fills board area with black
+        screen = b.matrix._screen
+        if screen is None or self._pfont_xl is None or self._pfont_entry is None:
+            return
+        cx = _BOARD_W // 2
+        h  = 32 * _SCALE
+
+        title_surf = self._pfont_xl.render("Enter your name", True, (185, 192, 210))
+        screen.blit(title_surf, title_surf.get_rect(center=(cx, h // 3)))
+
+        cursor = "|" if (pygame.time.get_ticks() // 530) % 2 else " "
+        name_surf = self._pfont_entry.render(self._player_name + cursor, True, (255, 255, 255))
+        screen.blit(name_surf, name_surf.get_rect(center=(cx, h // 2)))
+
+        if self._pfont_sm:
+            hint_surf = self._pfont_sm.render("Press Enter to continue", True, (95, 103, 125))
+            screen.blit(hint_surf, hint_surf.get_rect(center=(cx, h * 2 // 3)))
+
+    def _handle_name_entry(self, event: pygame.event.Event) -> None:
+        """Handle keyboard input in the NAME_ENTRY phase."""
+        if event.type != pygame.KEYDOWN:
+            return
+        if event.key in (pygame.K_RETURN, pygame.K_KP_ENTER):
+            self.phase = Phase.COLOR_PICK
+        elif event.key == pygame.K_BACKSPACE:
+            self._player_name = self._player_name[:-1]
+        elif event.unicode and event.unicode.isprintable() and len(self._player_name) < 20:
+            self._player_name += event.unicode
 
     def _render_lobby(self) -> None:
         """Render the lobby menu onto the LED canvas.
@@ -1102,7 +1146,9 @@ class GameRunner:
         Args:
             event: The Pygame event to dispatch.
         """
-        if self.phase == Phase.LOBBY:
+        if self.phase == Phase.NAME_ENTRY:
+            self._handle_name_entry(event)
+        elif self.phase == Phase.LOBBY:
             self._handle_lobby(event)
         elif self.phase == Phase.COLOR_PICK:
             self._handle_color_pick(event)
@@ -1207,7 +1253,13 @@ class GameRunner:
         b = self._b
 
         # ── Phase-specific status ─────────────────────────────────────────────
-        if self.phase == Phase.LOBBY:
+        if self.phase == Phase.NAME_ENTRY:
+            text("Type your name, then", pfont_sm, _P_DIM)
+            text("press Enter to connect.", pfont_sm, _P_DIM)
+            if self._player_name:
+                text(f"Name: {self._player_name}", pfont_md, _P_TEXT)
+
+        elif self.phase == Phase.LOBBY:
             for i, opt in enumerate(_LOBBY_OPTIONS):
                 prefix = "> " if i == self._lobby_selected else "  "
                 col = _LOBBY_COLORS[i]
@@ -1325,7 +1377,9 @@ class GameRunner:
         Calls the appropriate ``_render_*`` method for the active phase,
         then draws the side panel and flips the Pygame display buffer.
         """
-        if self.phase == Phase.LOBBY:
+        if self.phase == Phase.NAME_ENTRY:
+            self._render_name_entry()
+        elif self.phase == Phase.LOBBY:
             self._render_lobby()
         elif self.phase == Phase.COLOR_PICK:
             self._render_color_pick()

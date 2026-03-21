@@ -122,6 +122,18 @@ class NetworkedGameRunner(GameRunner):
 
         # Call parent AFTER setting our attrs so _reset() can reference them
         super().__init__(skip_lobby=True)
+        # Show name-entry screen first so the player can edit their default name
+        self._player_name = player_name
+        self.phase = Phase.NAME_ENTRY
+
+    # ── Name entry ─────────────────────────────────────────────────────────────
+
+    def _handle_name_entry(self, event: "pygame.event.Event") -> None:
+        """On Enter, start networking then advance to COLOR_PICK."""
+        prev_phase = self.phase
+        super()._handle_name_entry(event)
+        if prev_phase == Phase.NAME_ENTRY and self.phase == Phase.COLOR_PICK:
+            self._start_network()
 
     # ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -371,7 +383,6 @@ class NetworkedGameRunner(GameRunner):
         status = msg.get("status", "ok")
         if status == "ok":
             self._waiting_for_ack = False
-            logger.debug("move_ack ok seq=%d", msg.get("seq", -1))
         elif status == "desync":
             logger.warning("Desync reported by peer at seq=%d — sending board_sync", msg.get("seq", -1))
             self._send_board_sync()
@@ -607,6 +618,7 @@ class NetworkedGameRunner(GameRunner):
                         self._pending_send_move = {
                             "fr": fr, "fc": fc, "tr": tr, "tc": tc,
                             "piece": type(self._selected_piece).__name__,
+                            "captured": type(pre_capture).__name__ if pre_capture else None,
                             "flags": flags,
                         }
                         break
@@ -635,8 +647,38 @@ class NetworkedGameRunner(GameRunner):
             )
             self._net_send(msg)
             self._waiting_for_ack = True
-            logger.debug("Sent move seq=%d %d%d→%d%d", self._net_seq, pm["fr"], pm["fc"], pm["tr"], pm["tc"])
+            self._log_move(
+                "You", pm["piece"],
+                pm["fr"], pm["fc"], pm["tr"], pm["tc"],
+                pm.get("captured"),
+                promoted_to=pm["flags"].promoted_to,
+            )
         super()._next_turn()
+
+    # ── Update ────────────────────────────────────────────────────────────────
+
+    # ── Move logging ──────────────────────────────────────────────────────────
+
+    _COLS = "abcdefgh"
+
+    def _cell_str(self, row: int, col: int) -> str:
+        return f"{self._COLS[col]}{8 - row}"
+
+    def _log_move(
+        self,
+        who: str,
+        piece_name: str,
+        fr: int, fc: int,
+        tr: int, tc: int,
+        captured: Optional[str],
+        promoted_to: Optional[str] = None,
+    ) -> None:
+        line = f"[{who}] {piece_name} {self._cell_str(fr, fc)}→{self._cell_str(tr, tc)}"
+        if captured:
+            line += f"  ×{captured}"
+        if promoted_to:
+            line += f"  ={promoted_to}"
+        logger.info(line)
 
     # ── Update ────────────────────────────────────────────────────────────────
 
@@ -644,6 +686,16 @@ class NetworkedGameRunner(GameRunner):
         """Drain incoming messages and apply remote moves when it's their turn."""
         self._drain_incoming()
         self._check_keepalive()
+
+        # Update window title to reflect whose turn it is
+        if self.phase == Phase.PLAYING and self._peer_name:
+            if self._peer_disconnected:
+                caption = f"Chess101 — {self._peer_name} disconnected"
+            elif self._is_my_turn():
+                caption = "Chess101 — Your turn"
+            else:
+                caption = f"Chess101 — {self._peer_name}'s turn"
+            pygame.display.set_caption(caption)
 
         # Apply a pending remote move when it's the opponent's turn
         if (self.phase == Phase.PLAYING
@@ -678,6 +730,9 @@ class NetworkedGameRunner(GameRunner):
         if b.grid[fr][fc] is None:
             logger.warning("Remote move from empty square %d%d", fr, fc)
             return
+
+        moving_name = type(b.grid[fr][fc]).__name__
+        captured_name = type(b.grid[tr][tc]).__name__ if b.grid[tr][tc] else None
 
         # Update peace_time before moving (capture detection)
         flags = MoveFlags.from_dict(msg.get("flags", {}))
@@ -729,6 +784,13 @@ class NetworkedGameRunner(GameRunner):
 
         if status == "desync":
             self._net_send({"type": "board_sync_request"})
+
+        self._log_move(
+            self._peer_name or "Them", moving_name,
+            fr, fc, tr, tc,
+            captured_name,
+            promoted_to=flags.promoted_to if flags.is_promotion else None,
+        )
 
         # Advance turn (this side becomes the next player)
         self._next_turn()
@@ -787,35 +849,21 @@ class NetworkedGameRunner(GameRunner):
             text(f"Pi setup  R:{r_done}  L:{l_done}", pfont_sm, _P_DIM)
 
     def _pre_flip(self) -> None:
-        """Apply board overlay before the single display flip each frame.
-
-        Bright board  = it is your turn.
-        Light dim     = waiting for the opponent's move.
-        Heavy dim     = opponent disconnected.
-        """
-        if self.phase != Phase.PLAYING:
+        """Apply disconnect overlay before the display flip."""
+        if self.phase != Phase.PLAYING or not self._peer_disconnected:
             return
         b = self._b
         screen = b.matrix._screen
         if screen is None:
             return
-
-        if self._peer_disconnected:
-            alpha = 140   # heavy: disconnected
-        elif self._role != NetworkRole.SPECTATOR and not self._is_my_turn():
-            alpha = 70    # light: waiting for opponent
-        else:
-            return        # board stays bright — it is your turn
-
         overlay = pygame.Surface((_BOARD_W, 32 * _SCALE), pygame.SRCALPHA)
-        overlay.fill((0, 0, 0, alpha))
+        overlay.fill((0, 0, 0, 140))
         screen.blit(overlay, (0, 0))
 
     # ── run() ─────────────────────────────────────────────────────────────────
 
     def run(self) -> None:
-        """Start the network connection, then hand off to the parent Pygame loop."""
-        self._start_network()
+        """Show name entry, then (on Enter) start networking and run the Pygame loop."""
         super().run()
         self._stop_network()
 

@@ -91,7 +91,7 @@ if __name__ == "__main__":
         NetworkedGameRunner(
             role=NetworkRole.HOST,
             port=args.port,
-            player_name="Host",
+            player_name="Mark B",
         ).run()
     elif args.join is not None:
         from simulator.networked_runner import NetworkedGameRunner, NetworkRole
@@ -105,7 +105,7 @@ if __name__ == "__main__":
             role=NetworkRole.GUEST,
             host_ip=host_ip,
             port=args.port,
-            player_name="Guest",
+            player_name="Wendy F",
         ).run()
     elif args.spectate:
         from simulator.networked_runner import NetworkedGameRunner, NetworkRole
