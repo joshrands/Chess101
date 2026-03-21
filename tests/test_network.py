@@ -404,3 +404,241 @@ class TestTransport:
 
         client.stop()
         server.stop()
+
+
+# ── NetworkedBoard (Phase 2) ──────────────────────────────────────────────────
+
+
+class _FakeNet:
+    """Minimal stand-in for GameServer / GameClient used in NetworkedBoard tests."""
+
+    def __init__(self):
+        self.sent: list[dict] = []
+        self._handler = None
+
+    def send(self, msg: dict) -> None:
+        self.sent.append(msg)
+
+    def set_message_handler(self, cb) -> None:
+        self._handler = cb
+
+    def inject(self, msg: dict) -> None:
+        """Simulate an incoming message arriving from the peer."""
+        if self._handler:
+            self._handler(msg)
+
+
+def _make_networked_board(local_team_key: str = "r") -> "NetworkedBoard":
+    """Instantiate a NetworkedBoard with a fake transport (no real sockets)."""
+    from game.networked_board import NetworkedBoard
+    net = _FakeNet()
+    board = NetworkedBoard(net=net, local_team_key=local_team_key)
+    board.initialize_game_board()
+    return board
+
+
+class TestNetworkedBoardOnLocalMove:
+    """_on_local_move hook: builds flags, sends a move msg, waits for ack."""
+
+    def _simulate_local_move(self, board, fr, fc, tr, tc, pre_capture=None):
+        """Replicate the grid state that exists when _on_local_move fires."""
+        board.grid[tr][tc] = board.grid[fr][fc]
+        board.grid[fr][fc] = None
+        return pre_capture
+
+    def test_sends_move_message_on_pawn_advance(self, teams):
+        """After a local pawn move, a move message is queued for the peer."""
+        board = _make_networked_board("r")
+        net = board._net
+
+        # Pre-inject ack so _on_local_move's polling loop exits immediately.
+        net.inject({"type": "move_ack", "seq": 1, "status": "ok"})
+
+        # Replicate do_turn grid state: piece moved to (2,0), (1,0) cleared
+        self._simulate_local_move(board, 1, 0, 2, 0)
+        board._on_local_move(1, 0, 2, 0, None)
+
+        assert any(m["type"] == "move" for m in net.sent), \
+            "Expected a move message to be sent"
+        move_msg = next(m for m in net.sent if m["type"] == "move")
+        assert move_msg["from_row"] == 1
+        assert move_msg["from_col"] == 0
+        assert move_msg["to_row"]   == 2
+        assert move_msg["to_col"]   == 0
+        assert move_msg["piece"]    == "Pawn"
+
+    def test_move_flags_capture(self, teams):
+        """is_capture is set when pre_capture is not None."""
+        board = _make_networked_board("r")
+        net = board._net
+        net.inject({"type": "move_ack", "seq": 1, "status": "ok"})
+
+        team_r, team_l = teams
+        captured_pawn = Pawn(3, 4, team_l)
+        board.grid[2][4] = Pawn(2, 4, board.team_r)
+        self._simulate_local_move(board, 2, 4, 3, 4)
+        board._on_local_move(2, 4, 3, 4, captured_pawn)
+
+        move_msg = next(m for m in net.sent if m["type"] == "move")
+        assert move_msg["flags"]["is_capture"] is True
+
+    def test_move_ack_timeout_sets_game_over(self, teams):
+        """If no move_ack arrives within timeout, game_over is set."""
+        import threading
+        board = _make_networked_board("r")
+        self._simulate_local_move(board, 1, 0, 2, 0)
+
+        finished = threading.Event()
+
+        def _call_hook():
+            import game.networked_board as _nb
+            orig = _nb._ACK_TIMEOUT_S
+            _nb._ACK_TIMEOUT_S = 0.1
+            try:
+                board._on_local_move(1, 0, 2, 0, None)
+            finally:
+                _nb._ACK_TIMEOUT_S = orig
+            finished.set()
+
+        t = threading.Thread(target=_call_hook, daemon=True)
+        t.start()
+        finished.wait(timeout=2.0)
+        assert board.game_over is True
+
+
+class TestNetworkedBoardApplyRemoteMove:
+    """_apply_remote_move correctly updates the grid and sends move_ack."""
+
+    def test_applies_move_to_grid(self, teams):
+        """Remote move updates grid[tr][tc] and clears grid[fr][fc]."""
+        board = _make_networked_board("r")
+        net = board._net
+        team_r, team_l = teams
+
+        # team_l pawn at (6,0) → (5,0) (standard pawn push)
+        piece_before = board.grid[6][0]
+        assert piece_before is not None
+
+        msg = build_move_msg(1, 6, 0, 5, 0, "Pawn",
+                             MoveFlags(), board_hash(board.grid, 0, "l", board.team_r))
+        board._apply_remote_move(msg)
+
+        assert board.grid[5][0] is not None, "Piece should be at (5,0)"
+        assert board.grid[6][0] is None,     "Source square should be empty"
+
+    def test_sends_move_ack(self, teams):
+        """After applying a remote move, a move_ack is sent back."""
+        board = _make_networked_board("r")
+        net = board._net
+
+        h = board_hash(board.grid, 0, "l", board.team_r)
+        msg = build_move_msg(1, 6, 0, 5, 0, "Pawn", MoveFlags(), h)
+        board._apply_remote_move(msg)
+
+        assert any(m["type"] == "move_ack" for m in net.sent)
+
+    def test_desync_sends_board_sync_request(self, teams):
+        """Hash mismatch after remote move → board_sync_request sent."""
+        board = _make_networked_board("r")
+        net = board._net
+
+        # Deliberately wrong hash
+        msg = build_move_msg(1, 6, 0, 5, 0, "Pawn", MoveFlags(), "wrong" * 13)
+        board._apply_remote_move(msg)
+
+        types = [m["type"] for m in net.sent]
+        assert "move_ack" in types
+        ack = next(m for m in net.sent if m["type"] == "move_ack")
+        assert ack["status"] == "desync"
+        assert "board_sync_request" in types
+
+
+class TestNetworkedBoardOnGameOver:
+    """_on_game_over sends a game_event message to the peer."""
+
+    def test_sends_checkmate_event(self, teams):
+        board = _make_networked_board("r")
+        net = board._net
+        board._on_game_over("checkmate", board.team_l)
+        assert any(
+            m["type"] == "game_event" and m["event"] == "checkmate"
+            for m in net.sent
+        )
+
+    def test_sends_stalemate_event(self, teams):
+        board = _make_networked_board("r")
+        net = board._net
+        board._on_game_over("stalemate", board.team_r)
+        assert any(
+            m["type"] == "game_event" and m["event"] == "stalemate"
+            for m in net.sent
+        )
+
+
+class TestNetworkedBoardRemoteGameEvent:
+    """Receiving game_event sets game_over."""
+
+    def test_checkmate_sets_game_over(self, teams):
+        board = _make_networked_board("r")
+        net = board._net
+        net.inject({"type": "game_event", "event": "checkmate", "losing_team_key": "r"})
+        board._drain_incoming()
+        assert board.game_over is True
+
+    def test_stalemate_sets_game_over(self, teams):
+        board = _make_networked_board("r")
+        net = board._net
+        net.inject({"type": "game_event", "event": "stalemate", "losing_team_key": "l"})
+        board._drain_incoming()
+        assert board.game_over is True
+
+
+class TestNetworkedBoardWaitForRemoteMove:
+    """_wait_for_remote_move sets game_over on timeout."""
+
+    def test_timeout_sets_game_over(self):
+        import game.networked_board as _nb
+        board = _make_networked_board("r")
+        orig = _nb._REMOTE_TIMEOUT_S
+        _nb._REMOTE_TIMEOUT_S = 0.1
+        try:
+            board._wait_for_remote_move(timeout=0.1)
+        finally:
+            _nb._REMOTE_TIMEOUT_S = orig
+        assert board.game_over is True
+
+    def test_applies_move_when_available(self):
+        """If a move is already queued, _wait_for_remote_move applies it immediately."""
+        board = _make_networked_board("r")
+        h = board_hash(board.grid, 0, "l", board.team_r)
+        board._pending_remote_move = build_move_msg(1, 6, 0, 5, 0, "Pawn", MoveFlags(), h)
+        board._wait_for_remote_move()
+        # Move was applied — source should be empty
+        assert board.grid[6][0] is None
+
+
+class TestMdns:
+    """Smoke tests for mDNS advertiser and listener (zeroconf may not be installed)."""
+
+    def test_advertiser_start_stop_no_crash(self):
+        """MdnsAdvertiser.start/stop should not raise even if zeroconf missing."""
+        from network.mdns import MdnsAdvertiser
+        adv = MdnsAdvertiser(host_name="TestHost", port=65198)
+        adv.start()   # no-op if zeroconf not installed
+        adv.stop()
+
+    def test_listener_start_stop_no_crash(self):
+        """MdnsListener.start/stop should not raise even if zeroconf missing."""
+        from network.mdns import MdnsListener
+        listener = MdnsListener()
+        listener.start()
+        listener.stop()
+
+    def test_discovered_game_fields(self):
+        """DiscoveredMdnsGame has the expected fields."""
+        from network.mdns import DiscoveredMdnsGame
+        g = DiscoveredMdnsGame(name="Alice", host_ip="10.0.0.1", port=65101)
+        assert g.name    == "Alice"
+        assert g.host_ip == "10.0.0.1"
+        assert g.port    == 65101
+        assert g.state   == "lobby"

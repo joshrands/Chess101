@@ -1,0 +1,512 @@
+"""NetworkedBoard — Board subclass for Pi-hosted networked games.
+
+Wraps the existing physical-board game loop with WebSocket transport so a
+Raspberry Pi can play against a Mac simulator (or another Pi) over LAN.
+
+Role assignments
+~~~~~~~~~~~~~~~~
+- HOST  → controls ``team_r`` (rows 0–1, back rank at the top of the board).
+- GUEST → controls ``team_l`` (rows 6–7).
+
+Setup flow (Sim-as-UI, Option B from the design doc)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+1. Pi starts its WebSocket server and waits.
+2. The connecting simulator sends ``hello``.
+3. Pi responds with ``game_setup`` (``mode: "physical_host"``).
+4. Sim drives COLOR_PICK and WAR_GAMES for *both* teams, sending
+   ``color_chosen`` and ``war_games_choice`` messages for each.
+5. Pi (HOST) collects all four messages and sends ``game_start``.
+6. Pi runs ``interactive_setup`` for both teams (physical reed-switch
+   detection).  Progress is reported via ``setup_status`` messages.
+7. Sim signals ``setup_complete`` when its side is ready.
+8. Pi waits for ``setup_complete`` from the Sim, then starts the game loop.
+
+Turn loop
+~~~~~~~~~
+- Local team's turn  → ``do_turn()`` (existing physical logic) plus the
+  ``_on_local_move`` hook, which sends the move and waits for ``move_ack``.
+- Remote team's turn → ``_wait_for_remote_move()`` blocks until a ``move``
+  message arrives, applies it, and sends ``move_ack`` back.
+"""
+from __future__ import annotations
+
+import collections
+import copy
+import logging
+import threading
+import time
+from typing import TYPE_CHECKING, Optional
+
+from game.board import Board
+from network.protocol import (
+    MoveFlags,
+    board_hash,
+    build_move_msg,
+    encode_grid,
+)
+from pieces.king import King
+from pieces.pawn import Pawn
+
+if TYPE_CHECKING:
+    from network.client import GameClient
+    from network.server import GameServer
+
+logger = logging.getLogger(__name__)
+
+_ACK_TIMEOUT_S    = 30.0   # seconds to wait for move_ack before declaring disconnect
+_REMOTE_TIMEOUT_S = 300.0  # 5 minutes for the opponent to move before timeout
+_SETUP_TIMEOUT_S  = 300.0  # 5 minutes for physical setup before timeout
+
+
+class NetworkedBoard(Board):
+    """Board subclass that transmits moves over a WebSocket connection.
+
+    Args:
+        net: An active ``GameServer`` or ``GameClient`` instance.
+        local_team_key: ``"r"`` if this Pi is HOST (team_r), ``"l"`` if GUEST
+            (team_l).
+    """
+
+    def __init__(
+        self,
+        net: "GameServer | GameClient",
+        local_team_key: str = "r",
+        *args,
+        **kwargs,
+    ) -> None:
+        # Store network attrs before super().__init__ so Board.__init__ can
+        # access them if needed.
+        self._net = net
+        self._local_team_key = local_team_key
+
+        self._net_lock = threading.Lock()
+        self._incoming: collections.deque = collections.deque()
+
+        # Events used to synchronise the blocking run() flow.
+        self._config_received  = threading.Event()
+        self._game_start_evt   = threading.Event()
+        self._remote_setup_evt = threading.Event()
+        self._move_ack_evt     = threading.Event()
+
+        # Config received from Sim-as-UI
+        self._remote_team_r_color_idx: Optional[int] = None
+        self._remote_team_l_color_idx: Optional[int] = None
+        self._remote_team_r_is_ai: Optional[bool]    = None
+        self._remote_team_l_is_ai: Optional[bool]    = None
+
+        # Move protocol
+        self._net_seq = 0
+        self._pending_remote_move: Optional[dict] = None
+        self._last_move_ack_status: str = "ok"
+
+        # Peer info
+        self._peer_name: Optional[str] = None
+
+        super().__init__(*args, **kwargs)
+        self._net.set_message_handler(self._on_network_message)
+
+    # ── Helpers ────────────────────────────────────────────────────────────────
+
+    def _net_send(self, msg: dict) -> None:
+        """Send over the active connection (thread-safe)."""
+        self._net.send(msg)
+
+    def _local_team(self):
+        return self.team_r if self._local_team_key == "r" else self.team_l
+
+    def _remote_team(self):
+        return self.team_l if self._local_team_key == "r" else self.team_r
+
+    # ── Network message handling ───────────────────────────────────────────────
+
+    def _on_network_message(self, msg: dict) -> None:
+        """Called from network daemon thread — queue for main-thread processing."""
+        with self._net_lock:
+            self._incoming.append(msg)
+
+    def _drain_incoming(self) -> None:
+        """Process all queued messages on the calling (main) thread."""
+        with self._net_lock:
+            batch = list(self._incoming)
+            self._incoming.clear()
+        for msg in batch:
+            self._dispatch(msg)
+
+    def _dispatch(self, msg: dict) -> None:
+        handlers = {
+            "hello":            self._on_hello,
+            "color_chosen":     self._on_color_chosen,
+            "war_games_choice": self._on_war_games_choice,
+            "game_start":       self._on_game_start,
+            "move":             self._on_remote_move,
+            "move_ack":         self._on_move_ack,
+            "setup_complete":   self._on_remote_setup_complete,
+            "board_sync_request": self._on_board_sync_request,
+            "board_sync":       self._on_board_sync,
+            "game_event":       self._on_game_event,
+            "ping":             self._on_ping,
+        }
+        handler = handlers.get(msg.get("type", ""))
+        if handler:
+            handler(msg)
+        else:
+            logger.debug("Unknown message type: %r", msg.get("type"))
+
+    # ── Connection callbacks (called from network thread) ─────────────────────
+
+    def on_connected(self) -> None:
+        """Peer connected — send hello and (if HOST) send game_setup."""
+        self._peer_name = None
+        self._net_send({
+            "type": "hello",
+            "version": "1",
+            "player_name": "Pi",
+        })
+        logger.info("Peer connected — sent hello")
+
+    def on_disconnected(self) -> None:
+        """Peer disconnected."""
+        logger.warning("Peer disconnected")
+        with self._net_lock:
+            self._incoming.append({"type": "_peer_lost"})
+
+    # ── Message handlers ───────────────────────────────────────────────────────
+
+    def _on_hello(self, msg: dict) -> None:
+        self._peer_name = msg.get("player_name", "Opponent")
+        logger.info("Hello from %r", self._peer_name)
+        if self._local_team_key == "r":
+            # Pi is HOST — send game_setup with physical_host mode
+            self._net_send({
+                "type": "game_setup",
+                "version": "1",
+                "host_name": "Pi",
+                "guest_name": self._peer_name,
+                "mode": "physical_host",
+            })
+            logger.info("Sent game_setup (physical_host mode)")
+
+    def _on_color_chosen(self, msg: dict) -> None:
+        team_key   = msg.get("team_key")
+        color_idx  = msg.get("color_idx")
+        if color_idx is None or team_key is None:
+            return
+        t = self.team_array[color_idx]
+        if team_key == "r":
+            self.team_r.r, self.team_r.g, self.team_r.b = t.r, t.g, t.b
+            self.team_r.name = t.name
+            self._remote_team_r_color_idx = color_idx
+        else:
+            self.team_l.r, self.team_l.g, self.team_l.b = t.r, t.g, t.b
+            self.team_l.name = t.name
+            self._remote_team_l_color_idx = color_idx
+        logger.info("Color chosen: team=%s idx=%d", team_key, color_idx)
+        self._check_config_complete()
+
+    def _on_war_games_choice(self, msg: dict) -> None:
+        team_key = msg.get("team_key")
+        is_ai    = msg.get("is_ai", False)
+        if team_key == "r":
+            self.computer_player_r = is_ai
+            self._remote_team_r_is_ai = is_ai
+        else:
+            self.computer_player_l = is_ai
+            self._remote_team_l_is_ai = is_ai
+        logger.info("War games choice: team=%s ai=%s", team_key, is_ai)
+        self._check_config_complete()
+
+    def _check_config_complete(self) -> None:
+        """Signal _config_received once all four setup messages have arrived."""
+        if (
+            self._remote_team_r_color_idx is not None
+            and self._remote_team_l_color_idx is not None
+            and self._remote_team_r_is_ai    is not None
+            and self._remote_team_l_is_ai    is not None
+        ):
+            # Apply BUG-02 lock-in: mirrors local-play behaviour
+            self.team_r.r += 1
+            self._config_received.set()
+            logger.info("Configuration complete — ready for interactive_setup")
+
+    def _on_game_start(self, msg: dict) -> None:
+        """GUEST receives game_start from HOST (unusual in physical_host mode,
+        but Pi as GUEST would receive this from a Sim HOST)."""
+        logger.info("Received game_start")
+        self._game_start_evt.set()
+
+    def _on_remote_move(self, msg: dict) -> None:
+        self._pending_remote_move = msg
+
+    def _on_move_ack(self, msg: dict) -> None:
+        self._last_move_ack_status = msg.get("status", "ok")
+        self._move_ack_evt.set()
+        if self._last_move_ack_status == "desync":
+            logger.warning("Desync at seq=%d — sending board_sync", msg.get("seq", -1))
+            self._send_board_sync()
+
+    def _on_remote_setup_complete(self, msg: dict) -> None:
+        logger.info("Remote setup complete")
+        self._remote_setup_evt.set()
+
+    def _on_board_sync(self, msg: dict) -> None:
+        from network.protocol import decode_grid
+        logger.warning("Applying board_sync from peer")
+        decoded = decode_grid(msg["grid"], self.team_r, self.team_l)
+        for r in range(8):
+            for c in range(8):
+                self.grid[r][c] = decoded[r][c]
+        self.peace_time = msg.get("peace_time", self.peace_time)
+
+    def _on_game_event(self, msg: dict) -> None:
+        event = msg.get("event")
+        logger.info("Remote game_event: %s", event)
+        if event in ("checkmate", "stalemate"):
+            self.game_over = True
+
+    def _on_ping(self, msg: dict) -> None:
+        self._net_send({"type": "pong", "seq": msg.get("seq", 0)})
+
+    def _on_board_sync_request(self, msg: dict) -> None:
+        logger.warning("Board sync requested by peer")
+        self._send_board_sync()
+
+    def _send_board_sync(self) -> None:
+        team_key = "r" if self._local_team_key == "r" else "l"
+        self._net_send({
+            "type": "board_sync",
+            "grid": encode_grid(self.grid, self.team_r),
+            "peace_time": self.peace_time,
+            "current_team_key": team_key,
+        })
+
+    # ── _on_local_move hook (called by Board.do_turn after each physical move) ─
+
+    def _on_local_move(self, fr: int, fc: int, tr: int, tc: int, pre_capture) -> None:
+        """Build MoveFlags, send move message, wait for move_ack."""
+        piece = self.grid[tr][tc]  # grid[tr][tc] = moving piece after do_turn assignment
+        if piece is None:
+            return
+        flags = self._build_move_flags(piece, fr, fc, tr, tc, pre_capture)
+
+        self._net_seq += 1
+        team_key = "r" if piece.team.r == self.team_r.r else "l"
+        h = board_hash(self.grid, self.peace_time, team_key, self.team_r)
+        msg = build_move_msg(self._net_seq, fr, fc, tr, tc,
+                             type(piece).__name__, flags, h)
+        self._net_send(msg)
+        logger.info("Sent move seq=%d %d%d→%d%d", self._net_seq, fr, fc, tr, tc)
+
+        # Wait for ack
+        self._move_ack_evt.clear()
+        deadline = time.time() + _ACK_TIMEOUT_S
+        while not self._move_ack_evt.is_set() and time.time() < deadline:
+            self._drain_incoming()
+            time.sleep(0.05)
+        if not self._move_ack_evt.is_set():
+            logger.error("move_ack timeout — treating as disconnect")
+            self.game_over = True
+
+    def _on_game_over(self, event: str, losing_team) -> None:
+        """Notify peer of checkmate or stalemate."""
+        losing_key = "r" if losing_team.r == self.team_r.r else "l"
+        self._net_send({
+            "type": "game_event",
+            "event": event,
+            "losing_team_key": losing_key,
+        })
+        logger.info("Sent game_event: %s (losing=%s)", event, losing_key)
+
+    # ── MoveFlags builder ──────────────────────────────────────────────────────
+
+    def _build_move_flags(self, piece, fr, fc, tr, tc, pre_capture) -> MoveFlags:
+        is_capture    = pre_capture is not None
+        is_en_passant = False
+        captured_at   = None
+        is_castling   = False
+        rook_from     = None
+        rook_to       = None
+        is_promotion  = False
+
+        if isinstance(piece, Pawn):
+            if abs(tc - fc) == 1 and pre_capture is None:
+                is_en_passant = True
+                captured_at   = (tr - piece.direction, tc)
+            if (piece.starting_row + 6) % 12 == tr:
+                is_promotion = True
+        elif isinstance(piece, King):
+            if fr == tr and abs(tc - fc) == 2:
+                is_castling = True
+                if tc == fc - 2:
+                    rook_from = (fr, fc - 4)
+                    rook_to   = (fr, fc - 1)
+                else:
+                    rook_from = (fr, fc + 3)
+                    rook_to   = (fr, fc + 1)
+
+        return MoveFlags(
+            is_capture=is_capture,
+            is_en_passant=is_en_passant,
+            is_castling=is_castling,
+            is_promotion=is_promotion,
+            captured_at=captured_at,
+            rook_from=rook_from,
+            rook_to=rook_to,
+        )
+
+    # ── Remote move application ────────────────────────────────────────────────
+
+    def _wait_for_remote_move(self, timeout: float = _REMOTE_TIMEOUT_S) -> None:
+        """Block until a remote move arrives or the timeout expires.
+
+        Sets ``self.game_over = True`` on timeout.
+        """
+        deadline = time.time() + timeout
+        while not self.game_over and time.time() < deadline:
+            self._drain_incoming()
+            if self._pending_remote_move is not None:
+                msg = self._pending_remote_move
+                self._pending_remote_move = None
+                self._apply_remote_move(msg)
+                return
+            time.sleep(0.05)
+
+        if not self.game_over:
+            logger.error("Timeout waiting for remote move — game over")
+            self.game_over = True
+
+    def _apply_remote_move(self, msg: dict) -> None:
+        """Apply an incoming move message to the local grid and LED matrix."""
+        fr = msg["from_row"]
+        fc = msg["from_col"]
+        tr = msg["to_row"]
+        tc = msg["to_col"]
+
+        if self.grid[fr][fc] is None:
+            logger.warning("Remote move from empty square %d,%d", fr, fc)
+            return
+
+        flags = MoveFlags.from_dict(msg.get("flags", {}))
+        piece = self.grid[fr][fc]
+        if flags.is_capture or isinstance(piece, Pawn):
+            self.peace_time = 0
+        else:
+            self.peace_time += 1
+
+        self.grid[tr][tc] = self.grid[fr][fc]
+        self._apply_move(fr, fc, tr, tc)
+
+        # Briefly highlight the opponent's move
+        self._show_remote_move(fr, fc, tr, tc, piece)
+
+        # Verify hash
+        team_key   = "r" if piece.team.r == self.team_r.r else "l"
+        h          = board_hash(self.grid, self.peace_time, team_key, self.team_r)
+        remote_h   = msg.get("board_hash", "")
+        status     = "ok" if h == remote_h else "desync"
+        self._net_send({"type": "move_ack", "seq": msg.get("seq", 0), "status": status})
+        if status == "desync":
+            self._net_send({"type": "board_sync_request"})
+            logger.warning("Hash mismatch after remote move — requested board_sync")
+
+    def _show_remote_move(self, fr, fc, tr, tc, piece) -> None:
+        """Flash the source and destination cells on the LED matrix."""
+        if not hasattr(self, "canvas"):
+            return
+        import time as _time
+        for _ in range(15):
+            self.canvas.Clear()
+            self.light_checker_town(self.canvas)
+            self.light_cell(self.canvas, fr, fc, 80, 80, 80)
+            self.light_cell(self.canvas, tr, tc, piece.team.r, piece.team.g, piece.team.b)
+            self.canvas = self.matrix.SwapOnVSync(self.canvas)
+            _time.sleep(0.12)
+
+    # ── run() override ─────────────────────────────────────────────────────────
+
+    def run(self) -> None:
+        """Override Board.run() with the networked game lifecycle.
+
+        Skips ``color_picker`` and ``war_games`` (handled by Sim-as-UI).
+        Waits for configuration from the Sim, runs ``interactive_setup``,
+        then enters the alternating turn loop.
+        """
+        self.canvas = self.matrix.CreateFrameCanvas()
+        logger.info("NetworkedBoard: waiting for configuration from Sim...")
+
+        # ── Wait for Sim-as-UI to send color + war_games choices ──
+        if self._local_team_key == "r":
+            # Pi is HOST: wait for Sim to send all 4 config messages
+            if not self._config_received.wait(timeout=_SETUP_TIMEOUT_S):
+                logger.error("Timed out waiting for config from Sim")
+                return
+        else:
+            # Pi is GUEST: wait for game_start from HOST Sim
+            if not self._game_start_evt.wait(timeout=_SETUP_TIMEOUT_S):
+                logger.error("Timed out waiting for game_start")
+                return
+
+        # When Pi is HOST, send game_start after config is ready
+        if self._local_team_key == "r":
+            self._net_send({"type": "game_start"})
+            logger.info("Sent game_start — starting physical setup")
+
+        # ── Physical piece placement ───────────────────────────────
+        self.canvas.Clear()
+        self.canvas = self.matrix.SwapOnVSync(self.canvas)
+
+        self.interactive_setup(self.team_r)
+        self._net_send({"type": "setup_status", "team_key": "r", "status": "complete"})
+
+        self.interactive_setup(self.team_l)
+        self._net_send({"type": "setup_status", "team_key": "l", "status": "complete"})
+
+        logger.info("Physical setup complete — waiting for Sim side...")
+
+        # ── Wait for Sim side to finish setup ─────────────────────
+        deadline = time.time() + _SETUP_TIMEOUT_S
+        while not self._remote_setup_evt.is_set() and time.time() < deadline:
+            self._drain_incoming()
+            time.sleep(0.1)
+        if not self._remote_setup_evt.is_set():
+            logger.error("Timed out waiting for remote setup_complete")
+            return
+
+        # ── Start game ────────────────────────────────────────────
+        self.canvas.Clear()
+        temp = self.matrix.SwapOnVSync(self.canvas)
+        temp.Clear()
+        self.light_checker_town(temp)
+        self.canvas = self.matrix.SwapOnVSync(temp)
+
+        self.initialize_game_board()
+
+        local_team  = self._local_team()
+        remote_team = self._remote_team()
+
+        logger.info(
+            "Game started — local=%s (%s)  remote=%s",
+            local_team.name, self._local_team_key, remote_team.name,
+        )
+
+        while not self.game_over:
+            self.canvas.Clear()
+            self.light_checker_town(self.canvas)
+            self.canvas = self.matrix.SwapOnVSync(self.canvas)
+            self.canvas.Clear()
+
+            # team_r turn
+            self._do_turn_networked(self.team_r)
+            if self.game_over:
+                break
+
+            # team_l turn
+            self._do_turn_networked(self.team_l)
+            self.canvas = self.matrix.SwapOnVSync(self.canvas)
+
+    def _do_turn_networked(self, team) -> None:
+        """Route to local physical turn or remote wait based on team ownership."""
+        local_team = self._local_team()
+        if team.r == local_team.r:
+            self.do_turn(team)   # triggers _on_local_move hook when move made
+        else:
+            self._wait_for_remote_move()

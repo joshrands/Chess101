@@ -499,10 +499,12 @@ class Board(SampleBase):
         if pieces_with_moves == 0:
             if not check:
                 self.game_over = True
+                self._on_game_over("stalemate", team)
                 self.stale_mate()
                 return
             elif check:
                 self.game_over = True
+                self._on_game_over("checkmate", team)
                 self.seth_victory(team)
                 return
 
@@ -561,12 +563,14 @@ class Board(SampleBase):
                     for cell in self.grid[row][col].get_targets():
                         if cell.row == target_row and cell.col == target_col:
                             valid_move = True
-                            if self.grid[target_row][target_col] is not None:
+                            pre_capture = self.grid[target_row][target_col]
+                            if pre_capture is not None:
                                 self.peace_time = 0
                             else:
                                 self.peace_time += 1
                             self.grid[target_row][target_col] = self.grid[row][col]
                             self._apply_move(row, col, target_row, target_col)
+                            self._on_local_move(row, col, target_row, target_col, pre_capture)
 
                     if not valid_move:
                         logger.debug("Invalid target.")
@@ -953,6 +957,31 @@ class Board(SampleBase):
         self.canvas.Clear()
         self.light_checker_town(self.canvas)
         self.canvas = self.matrix.SwapOnVSync(self.canvas)
+
+    def _on_local_move(self, fr: int, fc: int, tr: int, tc: int, pre_capture) -> None:
+        """Hook called after each local human move is applied.
+
+        No-op in the base class.  Override in subclasses (e.g. NetworkedBoard)
+        to transmit the move over a network connection.
+
+        Args:
+            fr: From-row of the moving piece.
+            fc: From-col of the moving piece.
+            tr: To-row of the destination.
+            tc: To-col of the destination.
+            pre_capture: Whatever occupied grid[tr][tc] before the move
+                (None if the destination was empty).
+        """
+
+    def _on_game_over(self, event: str, losing_team) -> None:
+        """Hook called when do_turn detects checkmate or stalemate.
+
+        No-op in the base class.  Override in subclasses to notify a peer.
+
+        Args:
+            event: ``"checkmate"`` or ``"stalemate"``.
+            losing_team: The Team that has no legal moves.
+        """
 
     def _apply_move(self, old_row, old_col, target_row, target_col):
         """Dispatch piece movement after grid[target] = grid[old] is set.

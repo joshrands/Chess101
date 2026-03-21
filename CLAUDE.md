@@ -41,9 +41,16 @@ python3 -m venv .venv
 
 **Raspberry Pi (requires sudo for LED matrix access):**
 ```bash
+# Local game (no network)
 sudo python3 GameManager.py
 sudo python3 GameManager.py --led-rows=32 --led-cols=32 --led-chain=4
-sudo python3 GameManager.py --led-gpio-mapping=adafruit-hat
+
+# Networked: Pi hosts (team_r), Sim joins and drives setup UI
+sudo python3 GameManager.py --host
+sudo python3 GameManager.py --host --port 65200
+
+# Networked: Pi joins a Sim host (team_l)
+sudo python3 GameManager.py --join 192.168.1.42
 ```
 
 ## Running Tests
@@ -105,16 +112,22 @@ Chess101/
 ├── ui/
 │   └── renderer.py         # light_cell() — paints one 8×8 LED block per board cell
 │
-├── network/                # Phase 1 multiplayer — LAN WebSocket transport
+├── game/
+│   ├── board.py            # Board — adds _on_local_move + _on_game_over hooks
+│   ├── networked_board.py  # NetworkedBoard(Board) — Pi-side networked game (Phase 2)
+│   └── rules.py
+│
+├── network/                # LAN multiplayer — WebSocket transport + discovery
 │   ├── __init__.py
 │   ├── protocol.py         # MoveFlags, encode_grid, decode_grid, board_hash, build_move_msg
 │   ├── server.py           # GameServer — asyncio WebSocket server in daemon thread
 │   ├── client.py           # GameClient — asyncio WebSocket client in daemon thread
-│   └── discovery.py        # BeaconBroadcaster + BeaconListener — UDP LAN discovery
+│   ├── discovery.py        # BeaconBroadcaster + BeaconListener — UDP LAN discovery
+│   └── mdns.py             # MdnsAdvertiser + MdnsListener — mDNS/DNS-SD via zeroconf
 │
 ├── simulator/
 │   ├── app.py              # GameRunner: Pygame event loop, phase state machine + Lobby
-│   ├── networked_runner.py # NetworkedGameRunner: multiplayer extension of GameRunner
+│   ├── networked_runner.py # NetworkedGameRunner: multiplayer + SPECTATOR + physical_host
 │   ├── fake_rgbmatrix.py   # FakeFrameCanvas / FakeRGBMatrix backed by pygame.Surface
 │   └── sensor.py           # SimSensor(BoardSensor) — click-driven, no I2C
 │
@@ -139,7 +152,7 @@ Chess101/
 
 ### Entry Points
 
-- **`GameManager.py`** — Pi entry point. Loops `Board().process()` indefinitely. Catches SIGINT/SIGTERM for graceful shutdown after the current game.
+- **`GameManager.py`** — Pi entry point. Supports `--host` / `--join IP` / `--port`. Without flags, loops `Board().process()` indefinitely. With network flags, instantiates `NetworkedBoard` (wraps a `GameServer` or `GameClient`), runs one networked game, then loops. Catches SIGINT/SIGTERM for graceful shutdown.
 - **`run_simulator.py`** — Mac entry point. Injects `FakeRGBMatrix` and a stub `smbus` into `sys.modules` before importing game code. Parses CLI flags (`--local`, `--host`, `--join`, `--spectate`, `--port`) and launches `GameRunner` (local) or `NetworkedGameRunner` (networked).
 
 ### Game Controller (`game/board.py`)
@@ -175,23 +188,39 @@ Pass `skip_lobby=True` (or `--local` CLI flag) to start directly at COLOR_PICK. 
 
 `NetworkedGameRunner(GameRunner)` adds WebSocket multiplayer on top of `GameRunner`. The asyncio event loop runs in a daemon thread; the Pygame loop stays on the main thread. Thread-safe communication via an `_incoming` deque (network → main) and `send()` queues (main → network).
 
-**Roles**: `NetworkRole.HOST` (binds server, broadcasts UDP beacon), `NetworkRole.GUEST` / `NetworkRole.SPECTATOR` (connect to host IP).
+**Roles**: `NetworkRole.HOST` (binds server, broadcasts UDP beacon), `NetworkRole.GUEST` (connect to host IP), `NetworkRole.SPECTATOR` (receive-only; `_is_my_turn()` always False).
 
 **Message flow**:
-1. Connect → `hello` (both sides exchange version + name)
-2. HOST sends `game_setup` → both advance to COLOR_PICK
+1. Connect → `hello` (includes `role` field; version check)
+2. HOST sends `game_setup` → both advance to COLOR_PICK. If peer is a spectator, HOST sends `board_sync` instead. If mode is `"physical_host"` (Pi HOST), Sim GUEST picks both rows.
 3. COLOR_PICK: each side clicks their row, sends `color_chosen`; both advance on receipt
 4. WAR_GAMES: each side sends `war_games_choice`; HOST sends `game_start` when both received
-5. PLAYING: moves sent as `move` + `board_hash`; receiver sends `move_ack` (ok / desync); on desync, `board_sync_request` / `board_sync` recovery
+5. PLAYING: moves sent as `move` + `board_hash`; receiver sends `move_ack` (ok / desync); on desync, `board_sync_request` / `board_sync` recovery. Remote game_event (checkmate/stalemate from Pi) sets GAME_OVER.
 6. Keepalive: `ping` every 10 s; no `pong` in 30 s → disconnect overlay shown
 
+**Physical-host mode** (`_is_physical_host_mode`): Pi sends `game_setup` with `mode: "physical_host"`. Sim (GUEST) then picks colours and Human/AI for *both* teams (rows 2 and 5 in COLOR_PICK; rows 3 and 4 in WAR_GAMES). Pi receives `color_chosen` and `war_games_choice` for both teams via `NetworkedBoard`, then sends `game_start`. Pi runs physical `interactive_setup`, sending `setup_status` as pieces are placed. Sim shows setup progress and sends `setup_complete` immediately after `game_start`.
+
 **Thread safety**: all inbound messages are queued in `_incoming` and drained on the main thread in `_update()`. Outbound messages use `asyncio.run_coroutine_threadsafe` to the daemon loop.
+
+### Pi NetworkedBoard (`game/networked_board.py`)
+
+`NetworkedBoard(Board)` is the Pi-side counterpart to `NetworkedGameRunner`. It takes a `GameServer` or `GameClient` plus a `local_team_key` ("r" for HOST, "l" for GUEST).
+
+**Key methods**:
+- `run()` — overrides `Board.run()`. Skips `color_picker` / `war_games` (handled by Sim-as-UI). Waits for config (`color_chosen` × 2 + `war_games_choice` × 2), sends `game_start`, runs `interactive_setup`, waits for `setup_complete`, then enters the alternating turn loop.
+- `_do_turn_networked(team)` — if local team, calls `do_turn()` (which fires `_on_local_move`); otherwise calls `_wait_for_remote_move()`.
+- `_on_local_move(fr, fc, tr, tc, pre_capture)` — hook called by `Board.do_turn` after each physical move. Builds `MoveFlags`, sends `move` message, waits for `move_ack`.
+- `_wait_for_remote_move()` — polls `_incoming` until a `move` message arrives or timeout (5 min). Sets `game_over = True` on timeout.
+- `_on_game_over(event, losing_team)` — hook called by `Board.do_turn` on checkmate/stalemate. Sends `game_event` to peer.
+
+**Hook extension points in `Board`**: `_on_local_move` and `_on_game_over` are no-op methods on the base `Board` class, called at the right moments in `do_turn`. `NetworkedBoard` overrides both.
 
 ### Network Layer (`network/`)
 
 - **`protocol.py`** — `MoveFlags` (en passant, castling, promotion flags), `encode_grid` / `decode_grid` (JSON-serialisable 8×8 grid), `board_hash` (SHA-256 of canonical piece string for desync detection), `build_move_msg`.
 - **`server.py`** / **`client.py`** — `GameServer` / `GameClient`: asyncio WebSocket transport in daemon threads. Both expose `send(msg: dict)` and `set_message_handler(cb)`.
 - **`discovery.py`** — `BeaconBroadcaster` sends a UDP broadcast every 2 s on port 65102. `BeaconListener` receives beacons, maintains a `games` dict, and prunes stale entries after 10 s.
+- **`mdns.py`** — `MdnsAdvertiser` registers a `_chess101._tcp.local.` mDNS service (via `zeroconf`). `MdnsListener` browses for services, maintaining `listener.games: dict[str, DiscoveredMdnsGame]`. Both degrade gracefully if `zeroconf` is not installed.
 
 ### Hardware Interface
 

@@ -106,8 +106,19 @@ class NetworkedGameRunner(GameRunner):
         self._last_ping_s: float = 0.0
         self._last_pong_s: float = time.time()
 
-        # HOST controls team_r (key "r"), GUEST controls team_l (key "l")
-        self._local_team_key = "r" if role == NetworkRole.HOST else "l"
+        # HOST controls team_r (key "r"), GUEST controls team_l (key "l"),
+        # SPECTATOR has no team so _is_my_turn() always returns False.
+        self._local_team_key = (
+            "r" if role == NetworkRole.HOST else
+            "spectator" if role == NetworkRole.SPECTATOR else
+            "l"
+        )
+
+        # Physical-host mode: Pi is HOST and Sim drives setup for both teams.
+        self._is_physical_host_mode = False
+        # Pi physical setup progress (populated by setup_status messages).
+        self._physical_setup_r_complete = False
+        self._physical_setup_l_complete = False
 
         # Call parent AFTER setting our attrs so _reset() can reference them
         super().__init__(skip_lobby=True)
@@ -151,6 +162,7 @@ class NetworkedGameRunner(GameRunner):
             "board_sync_request": self._on_board_sync_request,
             "board_sync":        self._on_board_sync,
             "game_event":        self._on_game_event,
+            "setup_status":      self._on_setup_status,
             "ping":              self._on_ping,
             "pong":              self._on_pong,
             "error":             self._on_error,
@@ -181,8 +193,9 @@ class NetworkedGameRunner(GameRunner):
             "type": "hello",
             "version": _PROTOCOL_VERSION,
             "player_name": self._player_name,
+            "role": self._role.name.lower(),
         })
-        logger.info("Connected to peer — sent hello")
+        logger.info("Connected to peer — sent hello (role=%s)", self._role.name)
 
     def _on_disconnected(self) -> None:
         """Peer disconnected — queue disconnect event."""
@@ -198,23 +211,51 @@ class NetworkedGameRunner(GameRunner):
             self._net_send({"type": "error", "code": "version_mismatch"})
             return
         self._peer_name = msg.get("player_name", "Opponent")
-        logger.info("Hello from %r", self._peer_name)
+        peer_role       = msg.get("role", "guest")
+        logger.info("Hello from %r (role=%s)", self._peer_name, peer_role)
 
         if self._role == NetworkRole.HOST:
-            # HOST drives setup
-            self._net_send({
-                "type": "game_setup",
-                "version": _PROTOCOL_VERSION,
-                "host_name": self._player_name,
-                "guest_name": self._peer_name,
-            })
-            self.phase = Phase.COLOR_PICK
-            logger.info("Sent game_setup — advancing to COLOR_PICK")
+            if peer_role == "spectator":
+                # Send spectator a view of the current board state
+                self._net_send({
+                    "type": "game_setup",
+                    "version": _PROTOCOL_VERSION,
+                    "host_name": self._player_name,
+                    "guest_name": self._peer_name,
+                    "mode": "spectator_view",
+                })
+                if self.phase == Phase.PLAYING:
+                    self._send_board_sync()
+                logger.info("Sent game_setup (spectator_view)")
+            else:
+                self._net_send({
+                    "type": "game_setup",
+                    "version": _PROTOCOL_VERSION,
+                    "host_name": self._player_name,
+                    "guest_name": self._peer_name,
+                })
+                self.phase = Phase.COLOR_PICK
+                logger.info("Sent game_setup — advancing to COLOR_PICK")
 
     def _on_game_setup(self, msg: dict) -> None:
-        """GUEST receives game_setup → advance to COLOR_PICK."""
-        logger.info("Received game_setup from host")
-        self.phase = Phase.COLOR_PICK
+        """GUEST or SPECTATOR receives game_setup."""
+        mode = msg.get("mode", "")
+        logger.info("Received game_setup (mode=%r)", mode)
+
+        if mode == "spectator_view":
+            # Spectator: skip setup phases, go straight to PLAYING.
+            # Board sync will arrive separately and populate the grid.
+            self._b.initialize_game_board()
+            self._current_team = self._b.team_r
+            self.phase = Phase.PLAYING
+            logger.info("Spectator: waiting for board_sync to sync position")
+        elif mode == "physical_host":
+            # Pi is the physical host; Sim drives setup for BOTH teams.
+            self._is_physical_host_mode = True
+            self.phase = Phase.COLOR_PICK
+            logger.info("Physical-host mode: Sim will choose colors for both teams")
+        else:
+            self.phase = Phase.COLOR_PICK
 
     def _on_color_chosen(self, msg: dict) -> None:
         """Remote side picked a team color."""
@@ -271,6 +312,22 @@ class NetworkedGameRunner(GameRunner):
         """GUEST receives game_start → begin the game."""
         logger.info("Received game_start")
         self._start_game()
+        # In physical_host mode the Pi still needs to do interactive_setup;
+        # send our own setup_complete immediately (Sim board is auto-placed).
+        if self._is_physical_host_mode:
+            self._net_send({"type": "setup_complete"})
+            logger.info("Physical-host: sent setup_complete (Sim board auto-placed)")
+
+    def _on_setup_status(self, msg: dict) -> None:
+        """Pi sends setup_status messages as physical pieces are placed."""
+        team_key = msg.get("team_key", "")
+        status   = msg.get("status", "")
+        if team_key == "r" and status == "complete":
+            self._physical_setup_r_complete = True
+            logger.info("Physical setup: Pi team_r placement complete")
+        elif team_key == "l" and status == "complete":
+            self._physical_setup_l_complete = True
+            logger.info("Physical setup: Pi team_l placement complete")
 
     def _on_remote_move(self, msg: dict) -> None:
         """Inbound move from opponent — queue for main thread application."""
@@ -307,6 +364,13 @@ class NetworkedGameRunner(GameRunner):
     def _on_game_event(self, msg: dict) -> None:
         event_type = msg.get("event")
         logger.info("Remote game_event: %s", event_type)
+        if event_type == "checkmate":
+            losing_key = msg.get("losing_team_key", "")
+            b = self._b
+            losing_team = b.team_r if losing_key == "r" else b.team_l
+            self._declare_victory(losing_team)
+        elif event_type == "stalemate":
+            self.stale_mate()
 
     def _on_ping(self, msg: dict) -> None:
         self._net_send({"type": "pong", "seq": msg.get("seq", 0)})
@@ -399,7 +463,8 @@ class NetworkedGameRunner(GameRunner):
         row, col = cell
         b = self._b
 
-        # HOST controls row 2 (team_r); GUEST controls row 5 (team_l)
+        # HOST controls row 2 (team_r); GUEST controls row 5 (team_l).
+        # In physical_host mode the GUEST (Sim) picks BOTH rows on behalf of Pi.
         if self._local_team_key == "r" and row == 2:
             self._selected_r_idx = col
             t = b.team_array[col]
@@ -420,6 +485,16 @@ class NetworkedGameRunner(GameRunner):
             logger.info("Sent color_chosen l idx=%d", col)
             self._check_color_complete()
 
+        elif self._is_physical_host_mode and self._local_team_key == "l" and row == 2:
+            # Physical-host mode: Sim GUEST picks row 2 on Pi's behalf
+            self._selected_r_idx = col
+            t = b.team_array[col]
+            b.team_r.r, b.team_r.g, b.team_r.b = t.r, t.g, t.b
+            b.team_r.name = _COLOR_NAMES[col]
+            self._net_send({"type": "color_chosen", "team_key": "r", "color_idx": col})
+            logger.info("Physical-host: sent color_chosen r idx=%d for Pi", col)
+            self._check_color_complete()
+
     # ── Overrides — WAR_GAMES ─────────────────────────────────────────────────
 
     def _handle_war_games(self, event: pygame.event.Event) -> None:
@@ -432,7 +507,8 @@ class NetworkedGameRunner(GameRunner):
         row, col = cell
         b = self._b
 
-        # HOST controls row 3 (team_r); GUEST controls row 4 (team_l)
+        # HOST controls row 3 (team_r); GUEST controls row 4 (team_l).
+        # In physical_host mode the GUEST (Sim) picks BOTH rows on behalf of Pi.
         if self._local_team_key == "r" and row == 3:
             b.computer_player_r = col >= 4
             self._local_war_sent = True
@@ -453,6 +529,17 @@ class NetworkedGameRunner(GameRunner):
                 "is_ai": bool(b.computer_player_l),
             })
             logger.info("Sent war_games_choice l ai=%s", b.computer_player_l)
+            self._check_war_complete()
+
+        elif self._is_physical_host_mode and self._local_team_key == "l" and row == 3:
+            # Physical-host mode: Sim GUEST picks row 3 on Pi's behalf
+            b.computer_player_r = col >= 4
+            self._net_send({
+                "type": "war_games_choice",
+                "team_key": "r",
+                "is_ai": bool(b.computer_player_r),
+            })
+            logger.info("Physical-host: sent war_games_choice r ai=%s for Pi", b.computer_player_r)
             self._check_war_complete()
 
     # ── Overrides — PLAYING ───────────────────────────────────────────────────
@@ -601,8 +688,13 @@ class NetworkedGameRunner(GameRunner):
         from simulator.app import _P_DIM, _P_GOOD, _P_BAD, _P_WARN, _P_TEXT
 
         sep()
-        role_label = self._role.name.capitalize()
-        text(f"Mode    Network ({role_label})", pfont_md, _P_DIM)
+        if self._role == NetworkRole.SPECTATOR:
+            role_label = "Spectating"
+        elif self._is_physical_host_mode:
+            role_label = "Network (Physical-host)"
+        else:
+            role_label = f"Network ({self._role.name.capitalize()})"
+        text(f"Mode    {role_label}", pfont_md, _P_DIM)
 
         if self._peer_name:
             bars = "●" * 4   # static for now; could use ping RTT in future
@@ -615,6 +707,11 @@ class NetworkedGameRunner(GameRunner):
                 text(f"Waiting {remaining}s to reconnect...", pfont_sm, _P_WARN)
         else:
             text("Waiting for opponent...", pfont_sm, _P_DIM)
+
+        if self._is_physical_host_mode:
+            r_done = "✓" if self._physical_setup_r_complete else "…"
+            l_done = "✓" if self._physical_setup_l_complete else "…"
+            text(f"Pi setup  R:{r_done}  L:{l_done}", pfont_sm, _P_DIM)
 
     def _render(self) -> None:
         """Dim the board when the peer has disconnected."""
