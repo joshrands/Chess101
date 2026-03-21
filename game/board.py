@@ -88,31 +88,40 @@ class Board(SampleBase):
         for row in range(8):
             self.grid.append([None, None, None, None, None, None, None, None])
 
-    def run(self):
+    def run(self, skip_setup: bool = False, init_num: str = "") -> None:
         """Execute the full game loop from setup to game-over.
 
         Calls color_picker, war_games, and create_players to configure the
         session, then runs interactive_setup for both teams before entering
         the main alternating turn loop until self.game_over is set.
+
+        Args:
+            skip_setup: If True, skip color_picker / war_games / interactive_setup
+                and jump directly to the board initialisation.  Used by
+                ``samplebase.process(skip_setup=True)`` for quick-start modes.
+            init_num: Suffix appended to ``initialize_game_board`` when calling
+                via ``eval()``.  Empty string selects the standard starting
+                position; ``"2"`` / ``"3"`` select alternate test positions.
         """
         logger.info("Running game...")
         self.canvas = self.matrix.CreateFrameCanvas()
 
-        self.color_picker()
-        self.war_games()
-        self.create_players()
+        if not skip_setup:
+            self.color_picker()
+            self.war_games()
+            self.create_players()
 
-        self.canvas.Clear()
-        temp_canvas = self.matrix.SwapOnVSync(self.canvas)
+            self.canvas.Clear()
+            temp_canvas = self.matrix.SwapOnVSync(self.canvas)
 
-        self.interactive_setup(self.team_r)
-        self.interactive_setup(self.team_l)
+            self.interactive_setup(self.team_r)
+            self.interactive_setup(self.team_l)
 
-        temp_canvas.Clear()
-        self.light_checker_town(temp_canvas)
-        self.canvas = self.matrix.SwapOnVSync(temp_canvas)
+            temp_canvas.Clear()
+            self.light_checker_town(temp_canvas)
+            self.canvas = self.matrix.SwapOnVSync(temp_canvas)
 
-        self.initialize_game_board()
+        eval("self.initialize_game_board{}()".format(init_num))
 
         while not self.game_over:
             self.canvas.Clear()
@@ -150,18 +159,17 @@ class Board(SampleBase):
         row_increment = (end_row - start_row) / 8.0
         col_increment = (end_col - start_col) / 8.0
 
-    def light_checker_town(self, canvas):
-        """Paint the alternating white checker pattern on the given canvas.
+    def light_checker_town(self, canvas, color: tuple[int, int, int] = (255, 255, 255)) -> None:
+        """Paint the alternating checker pattern on the given canvas.
 
-        Lights every dark square of the standard chess checkerboard at full
-        white (255, 255, 255) so players can orient the physical board.
+        Lights every dark square of the standard chess checkerboard in the
+        given colour so players can orient the physical board.
 
         Args:
             canvas: The RGBMatrix frame canvas to draw onto.
+            color: RGB tuple used for the lit squares (default full white).
         """
-        r = 255
-        g = 255
-        b = 255
+        r, g, b = color
         for x in range(4):
             for y in range(4):
                 self.light_cell(canvas, 1 + 2 * x, 2 * y, r, g, b)
@@ -169,22 +177,18 @@ class Board(SampleBase):
             for y in range(4):
                 self.light_cell(canvas, 2 * x, 1 + 2 * y, r, g, b)
 
-    def choose_light_checker_town(self):
+    def choose_light_checker_town(self, color: tuple[int, int, int] = (255, 255, 255)) -> None:
         """Paint the checker pattern at the current pulsing brightness level.
 
-        Uses self.checker_brightness (0–255) rather than full white, producing
-        the breathing animation shown during AI thinking and piece setup.
-        Draws onto self.canvas directly.
+        Scales each channel of *color* by ``checker_brightness / 255``,
+        producing the breathing animation shown during AI thinking and piece
+        setup.  Draws onto self.canvas directly.
+
+        Args:
+            color: Base RGB tuple to scale (default full white).
         """
-        r = self.checker_brightness
-        g = self.checker_brightness
-        b = self.checker_brightness
-        for x in range(4):
-            for y in range(4):
-                self.light_cell(self.canvas, 1 + 2 * x, 2 * y, r, g, b)
-        for x in range(4):
-            for y in range(4):
-                self.light_cell(self.canvas, 2 * x, 1 + 2 * y, r, g, b)
+        r, g, b = map(lambda val: int(val * (self.checker_brightness / 255)), color)
+        self.light_checker_town(self.canvas, color=(r, g, b))
 
     def interactive_setup(self, team):
         """Guide a team through placing all 16 pieces on the physical board.
@@ -228,14 +232,14 @@ class Board(SampleBase):
             True once both teams' physical positions match the software state.
         """
         self.master.read_data()
-        r = 255
-        g = 0
-        b = 0
+        bg_color = (255, 0, 0)    # red checkerboard
+        piece_color = (255, 255, 0)  # yellow mismatched pieces
+        pr, pg, pb = piece_color
         team_r_pieces = self.get_team_pieces(self.team_r)
         team_l_pieces = self.get_team_pieces(self.team_l)
         mismatch = True
         self.canvas.Clear()
-        self.light_checker_town(self.canvas)
+        self.light_checker_town(self.canvas, color=bg_color)
         self.canvas = self.matrix.SwapOnVSync(self.canvas)
 
         while mismatch:
@@ -243,30 +247,12 @@ class Board(SampleBase):
             self.master.read_data()
             time.sleep(0.2)
             self.canvas.Clear()
-            self.light_checker_town(self.canvas)
-            for piece in team_r_pieces:
+            self.light_checker_town(self.canvas, color=bg_color)
+            for piece in team_r_pieces + team_l_pieces:
                 state = self.master.get_cell_state(piece.row, piece.col)
                 if state == CellOccupancy.EMPTY:
                     mismatch = True
-                    self.light_cell(self.canvas, piece.row, piece.col, r, g, b)
-            self.canvas = self.matrix.SwapOnVSync(self.canvas)
-
-        mismatch = True
-        self.canvas.Clear()
-        self.light_checker_town(self.canvas)
-        self.canvas = self.matrix.SwapOnVSync(self.canvas)
-
-        while mismatch:
-            mismatch = False
-            self.master.read_data()
-            self.canvas.Clear()
-            self.light_checker_town(self.canvas)
-            for piece in team_l_pieces:
-                state = self.master.get_cell_state(piece.row, piece.col)
-                if state == CellOccupancy.EMPTY:
-                    mismatch = True
-                    self.light_cell(self.canvas, piece.row, piece.col, r, g, b)
-                    time.sleep(0.01)
+                    self.light_cell(self.canvas, piece.row, piece.col, pr, pg, pb)
             self.canvas = self.matrix.SwapOnVSync(self.canvas)
         return True
 
@@ -508,7 +494,6 @@ class Board(SampleBase):
                 self.seth_victory(team)
                 return
 
-        self.detect_mismatch()
         self.detect_mismatch()
 
         time.sleep(0.25)
@@ -891,7 +876,6 @@ class Board(SampleBase):
         self.canvas.Clear()
         self.light_checker_town(self.canvas)
         self.canvas = self.matrix.SwapOnVSync(self.canvas)
-        self.detect_mismatch()
         self.detect_mismatch()
 
         if self.grid[best_move.new_cell.row][best_move.new_cell.col] is None:

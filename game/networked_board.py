@@ -423,7 +423,7 @@ class NetworkedBoard(Board):
 
     # ── run() override ─────────────────────────────────────────────────────────
 
-    def run(self) -> None:
+    def run(self, skip_setup: bool = False, init_num: str = "") -> None:  # noqa: ARG002
         """Override Board.run() with the networked game lifecycle.
 
         Skips ``color_picker`` and ``war_games`` (handled by Sim-as-UI).
