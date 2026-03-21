@@ -197,6 +197,9 @@ class GameRunner:
         self._king_check_pos: Optional[tuple[int, int]] = None
         self._ai_thinking = False
         self._promoting_pawn: Optional[tuple[int, int]] = None  # (row, col) pending promotion
+        self._promoting_lifted = False       # True once player clicks the pawn to "lift" it
+        self._promoting_index = 0            # current candidate index: 0=Q,1=N,2=B,3=R
+        self._promoting_last_cycle_ms = 0    # timestamp of last auto-cycle
         self._current_team: Optional[Team] = None
         self._ai_thread: Optional[threading.Thread] = None
         self._ai_result: Optional[Tree] = None
@@ -788,33 +791,47 @@ class GameRunner:
                 self._render_promotion_overlay()
 
     def _render_promotion_overlay(self) -> None:
-        """Draw the promotion picker over the board.
+        """Draw the promotion picker overlay.
 
-        Renders four piece-choice squares (Q/N/B/R) on rows 3-4, centre
-        columns, and prints keybinding hints via the window caption.
+        Before the pawn is lifted: blinks the promotion square to prompt the
+        player to click it.  After lifting: cycles through Queen/Knight/Bishop/
+        Rook every 0.8 s (matching the Pi's interaction feel), lighting the
+        current candidate's targets and the promotion square in team colour.
+        Click anywhere to confirm the currently-displayed piece.
         """
         b = self._b
         assert self._promoting_pawn is not None
         assert self._current_team is not None
+        p_row, p_col = self._promoting_pawn
         team = self._current_team
-        candidates: list[tuple[str, type]] = [
-            ("Q", Queen), ("N", Knight), ("B", Bishop), ("R", Rook)
+        _CANDIDATES: list[type[Queen] | type[Knight] | type[Bishop] | type[Rook]] = [
+            Queen, Knight, Bishop, Rook
         ]
-        cols = [2, 3, 4, 5]
-        for (label, cls), col in zip(candidates, cols):
-            # Dim background cell in team colour
-            b.light_cell(b.canvas, 3, col, team.r // 2, team.g // 2, team.b // 2)
-            b.light_cell(b.canvas, 4, col, team.r // 2, team.g // 2, team.b // 2)
-        b.matrix.blit_to_screen()
-        # Draw labels on top via Pygame directly
-        screen = b.matrix._screen
-        font = pygame.font.SysFont("monospace", 28, bold=True)
-        for (label, cls), col in zip(candidates, cols):
-            px = col * _CELL_PX + _CELL_PX // 2
-            py = 3 * _CELL_PX + _CELL_PX // 2
-            surf = font.render(label, True, (255, 255, 255))
-            screen.blit(surf, surf.get_rect(center=(px, py)))
-        pygame.display.set_caption("PROMOTION — press Q N B R to choose")
+        _LABELS = ["Queen", "Knight", "Bishop", "Rook"]
+
+        if not self._promoting_lifted:
+            # Blink the promotion square to tell the player to click it
+            if (pygame.time.get_ticks() // 500) % 2:
+                b.light_cell(b.canvas, p_row, p_col, team.r, team.g, team.b)
+            b.matrix.blit_to_screen()
+            self._draw_piece_overlay()
+            pygame.display.set_caption("PROMOTION — click the pawn to begin")
+        else:
+            # Advance the cycle every 800 ms
+            now = pygame.time.get_ticks()
+            if now - self._promoting_last_cycle_ms >= 800:
+                self._promoting_index = (self._promoting_index + 1) % len(_CANDIDATES)
+                self._promoting_last_cycle_ms = now
+
+            # Show the current candidate's targets and light the promotion square
+            pick = _CANDIDATES[self._promoting_index](p_row, p_col, team)
+            pick.calc_targets(b.grid)
+            b.light_targets(pick)
+            b.light_cell(b.canvas, p_row, p_col, team.r, team.g, team.b)
+            b.matrix.blit_to_screen()
+            self._draw_piece_overlay()
+            label = _LABELS[self._promoting_index]
+            pygame.display.set_caption(f"PROMOTION — {label} (click to confirm)")
 
     def _render_game_over(self) -> None:
         """Render the game-over screen to the LED canvas.
@@ -997,20 +1014,28 @@ class GameRunner:
             self._init_board()
             return
         if self._promoting_pawn is not None:
-            if event.type == pygame.KEYDOWN:
-                _PROMO_MAP: dict[int, type[Queen] | type[Knight] | type[Bishop] | type[Rook]] = {
-                    pygame.K_q: Queen, pygame.K_n: Knight,
-                    pygame.K_b: Bishop, pygame.K_r: Rook,
-                }
-                chosen_cls = _PROMO_MAP.get(event.key)
-                if chosen_cls is not None:
-                    row, col = self._promoting_pawn
-                    pawn = self._b.grid[row][col]
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                cell = self._px_to_cell(*event.pos)
+                p_row, p_col = self._promoting_pawn
+                if not self._promoting_lifted:
+                    # Click the pawn to "lift" it and begin cycling
+                    if cell == (p_row, p_col):
+                        self._promoting_lifted = True
+                        self._promoting_index = 0
+                        self._promoting_last_cycle_ms = pygame.time.get_ticks()
+                else:
+                    # Any click "sets the piece down" and confirms the current choice
+                    _CANDIDATES: list[type[Queen] | type[Knight] | type[Bishop] | type[Rook]] = [
+                        Queen, Knight, Bishop, Rook
+                    ]
+                    chosen_cls = _CANDIDATES[self._promoting_index]
+                    pawn = self._b.grid[p_row][p_col]
                     assert isinstance(pawn, Pawn)
-                    self._b.grid[row][col] = chosen_cls(row, col, pawn.team)
+                    self._b.grid[p_row][p_col] = chosen_cls(p_row, p_col, pawn.team)
                     logger.info("Promoted pawn to %s at (%d,%d)",
-                                chosen_cls.__name__, row, col)
+                                chosen_cls.__name__, p_row, p_col)
                     self._promoting_pawn = None
+                    self._promoting_lifted = False
                     self._next_turn()
             return
         if event.type != pygame.MOUSEBUTTONDOWN:
