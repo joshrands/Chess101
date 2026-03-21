@@ -336,8 +336,8 @@ class TestPawn:
     # ── filter_to_king_escape() override ──
 
     def test_skyfall_preserves_en_passant_loc(self):
-        # BUG #9 LOCK-IN: Pawn.filter_to_king_escape() unconditionally
-        # re-appends en_passant_loc even when it isn't in king_escape_cells.
+        # BUG #9 FIX: Pawn.sky_fall() must NOT add en_passant_loc when the
+        # captured pawn's square is not in god_save_the_king.
         tr, tl = self._teams()
         pawn = Pawn(1, 4, tr)
         pawn.row = 4
@@ -350,13 +350,13 @@ class TestPawn:
         pawn.calc_targets(board)
 
         king = King(0, 4, tr)
-        # king_escape_cells does NOT include the en passant target (5,3)
+        # god_save_the_king does NOT include the captured pawn's square (4,3)
         king.god_save_the_king = [Cell(3, 3)]
 
         pawn.sky_fall(king)
         targets = [(c.row, c.col) for c in pawn.targets]
-        # En passant loc is still in targets despite not being a saving move
-        assert (5, 3) in targets
+        # En passant must not be allowed — it doesn't resolve the check
+        assert (5, 3) not in targets
 
     def test_skyfall_none_en_passant_loc_not_added(self):
         tr, _ = self._teams()

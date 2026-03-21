@@ -256,6 +256,7 @@ class NetworkedGameRunner(GameRunner):
         self._peer_name = msg.get("player_name", "Opponent")
         self._peer_disconnected = False   # clear any stale flag from handshake hiccup
         self._disconnect_time_ms = None
+        self._last_pong_s = time.time()   # reset keepalive clock so NAME_ENTRY wait doesn't trigger timeout
         peer_role = msg.get("role", "guest")
         logger.info("Hello from %r (role=%s)", self._peer_name, peer_role)
 

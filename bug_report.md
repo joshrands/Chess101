@@ -126,16 +126,19 @@ The king's point value is never used in a material exchange because kings are ne
 
 ---
 
-## BUG-09 — `Pawn.filter_to_king_escape()` unconditionally re-appends en passant target
+## BUG-09 — `Pawn.sky_fall()` unconditionally re-appends en passant target (**FIXED**)
 
-**Severity: Medium**
-Three conditions must all be true simultaneously for this to cause an illegal move: (1) the king is in check, (2) an en passant capture is available, and (3) making that en passant capture does *not* resolve the check. Condition 1 and 2 together are already uncommon; condition 3 — where the en passant square is not on the line between the attacker and the king — narrows it further. When the triple confluence does occur, the game silently accepts an illegal move that leaves the king in check.
+**Severity: Medium** — **Fixed in `pieces/pawn.py`**
 
-**File:** `pieces/pawn.py` — `filter_to_king_escape`
+Two failure modes in the original code:
 
-**Symptom:** `en_passant_loc` is appended to the pawn's target list after filtering, with no check that it appears in `king_escape_cells`.
+1. **Pin bypass**: `critical_man()` (inside `calc_targets()`) correctly removed `en_passant_loc` from targets when the pawn was pinned. `sky_fall()` then added it back unconditionally, letting a pinned pawn make an illegal en passant capture that exposed the king to the pinning piece.
 
-**Root cause:** Missing guard: `if en_passant_loc in king_escape_cells`.
+2. **Check-resolution mismatch**: En passant captures the pawn at `(en_passant_loc.row - direction, en_passant_loc.col)`, not at `en_passant_loc` itself. So `en_passant_loc` is never in `god_save_the_king` (which contains the checking piece's square). The original workaround was to append `en_passant_loc` unconditionally — but this was too broad.
+
+**Root cause:** `Pawn.sky_fall()` appended `en_passant_loc` with no check that (a) it survived pin filtering, or (b) the captured pawn's square resolves the check.
+
+**Fix:** Only allow en passant during check when the move survived `critical_man()` (present in `self.targets` before sky_fall filtering) AND the captured pawn's square (`loc.row - self.direction`, `loc.col`) is in `god_save_the_king`.
 
 **Locked-in test:** `tests/test_pieces.py::TestPawnMoveFiltering::test_skyfall_preserves_en_passant_loc`
 

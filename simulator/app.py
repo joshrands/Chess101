@@ -251,19 +251,21 @@ class GameRunner:
         # Not yet decided — need None so WAR_GAMES knows nothing is selected yet
         self._b.computer_player_r = None
         self._b.computer_player_l = None
-        # Font for piece overlay — try fonts with good Unicode chess-symbol coverage
+        # Font for piece overlay and panel UI — try fonts with good Unicode coverage
         font_size = int(_CELL_PX * 0.52)
+        _ui_font_name = None
         for _fname in ("applesymbols", "arial", "dejavusans", None):
             if _fname is None or pygame.font.match_font(_fname):
                 self._font = pygame.font.SysFont(_fname, font_size)
+                _ui_font_name = _fname
                 break
-        # Panel UI fonts
-        self._pfont_sm = pygame.font.SysFont("monospace", 13)
-        self._pfont_md = pygame.font.SysFont("monospace", 15)
-        self._pfont_lg = pygame.font.SysFont("monospace", 18, bold=True)
+        # Panel UI fonts — same font family so →, ●, ✓, … render correctly
+        self._pfont_sm = pygame.font.SysFont(_ui_font_name, 13)
+        self._pfont_md = pygame.font.SysFont(_ui_font_name, 15)
+        self._pfont_lg = pygame.font.SysFont(_ui_font_name, 18, bold=True)
         # Name-entry screen fonts
-        self._pfont_xl    = pygame.font.SysFont("monospace", 36, bold=True)
-        self._pfont_entry = pygame.font.SysFont("monospace", 52, bold=True)
+        self._pfont_xl    = pygame.font.SysFont(_ui_font_name, 36, bold=True)
+        self._pfont_entry = pygame.font.SysFont(_ui_font_name, 52, bold=True)
 
     # ── Internal narrowing helpers ─────────────────────────────────────────────
 

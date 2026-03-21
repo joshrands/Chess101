@@ -134,7 +134,21 @@ class Pawn(Piece):
                 if target.row == saving_target.row and target.col == saving_target.col:
                     new_targets.append(target)
         if self.en_passant_loc is not None:
-            new_targets.append(Cell(self.en_passant_loc.row, self.en_passant_loc.col))
+            loc = self.en_passant_loc
+            # Only allow en passant when in check if:
+            # (1) it was not filtered away by critical_man() — pawn is not pinned off that ray
+            # (2) it actually captures the checking piece — the captured pawn sits at
+            #     (loc.row - direction, loc.col), NOT at loc itself
+            in_pre_targets = any(
+                t.row == loc.row and t.col == loc.col for t in self.targets
+            )
+            captured_row = loc.row - self.direction
+            captures_checker = any(
+                s.row == captured_row and s.col == loc.col
+                for s in king.god_save_the_king
+            )
+            if in_pre_targets and captures_checker:
+                new_targets.append(Cell(loc.row, loc.col))
         self.targets = new_targets
 
     def move(self, new_row: int, new_col: int, board: BoardGrid) -> Cell | None:

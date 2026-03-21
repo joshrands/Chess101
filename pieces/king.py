@@ -234,6 +234,8 @@ class King(Piece):
                 if piece is not None and piece.team == self.team:
                     piece.critical = False
 
+        attacker_row, attacker_col = -1, -1
+
         for i in [-1, 0, 1]:
             for j in [-1, 0, 1]:
                 if i == 0 and j == 0:
@@ -256,12 +258,12 @@ class King(Piece):
                         if isinstance(board[enemy_row][enemy_col], (Rook, Queen)):
                             self.god_save_the_king = self.please_god_save_the_king(
                                 enemy_row, enemy_col)
-                            return enemy_row, enemy_col
+                            attacker_row, attacker_col = enemy_row, enemy_col
                         elif isinstance(board[enemy_row][enemy_col], King):
                             if abs(enemy_row - self.row) + abs(enemy_col - self.col) == 1:
                                 self.god_save_the_king = self.please_god_save_the_king(
                                     enemy_row, enemy_col)
-                                return enemy_row, enemy_col
+                                attacker_row, attacker_col = enemy_row, enemy_col
                 else:
                     if scout_row != -1:
                         if enemy_row != -1:
@@ -276,17 +278,17 @@ class King(Piece):
                         if isinstance(board[enemy_row][enemy_col], (Bishop, Queen)):
                             self.god_save_the_king = self.please_god_save_the_king(
                                 enemy_row, enemy_col)
-                            return enemy_row, enemy_col
+                            attacker_row, attacker_col = enemy_row, enemy_col
                         elif isinstance(board[enemy_row][enemy_col], King):
                             if abs(enemy_row - self.row) + abs(enemy_col - self.col) == 2:
                                 self.god_save_the_king = self.please_god_save_the_king(
                                     enemy_row, enemy_col)
-                                return enemy_row, enemy_col
+                                attacker_row, attacker_col = enemy_row, enemy_col
                         elif isinstance(board[enemy_row][enemy_col], Pawn):
                             if enemy_row - self.row == self.direction:
                                 self.god_save_the_king = self.please_god_save_the_king(
                                     enemy_row, enemy_col)
-                                return enemy_row, enemy_col
+                                attacker_row, attacker_col = enemy_row, enemy_col
 
         row_deltas = [2, 2, -2, -2, 1, 1, -1, -1]
         col_deltas = [1, -1, 1, -1, 2, -2, 2, -2]
@@ -295,9 +297,10 @@ class King(Piece):
                 board, row_deltas[i], col_deltas[i], self.row, self.col)
             if knight_row != -1 and knight_col != -1:
                 self.god_save_the_king = [Cell(knight_row, knight_col)]
-                return knight_row, knight_col
+                attacker_row, attacker_col = knight_row, knight_col
+                break
 
-        return -1, -1
+        return attacker_row, attacker_col
 
     def _i_spy(
         self,
