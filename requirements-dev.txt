@@ -1,0 +1,3 @@
+# Test / dev tooling
+-r requirements.txt
+pytest>=7

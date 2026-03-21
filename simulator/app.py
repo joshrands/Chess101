@@ -1,0 +1,927 @@
+from __future__ import annotations
+
+import collections
+import copy
+import logging
+import random
+import threading
+from enum import Enum, auto
+from typing import Optional
+
+logger = logging.getLogger(__name__)
+
+import pygame
+
+from ai.ai import AI
+from ai.tree import Tree
+from core.cell import Cell
+from core.team import Team
+from game import rules as _rules
+from game.board import Board
+from pieces.bishop import Bishop
+from pieces.king import King
+from pieces.knight import Knight
+from pieces.pawn import Pawn
+from pieces.queen import Queen
+from pieces.rook import Rook
+from simulator.sensor import SimSensor
+
+_SCALE = 30           # each 4-pixel LED cell → 120 px on screen
+_CELL_PX = 4 * _SCALE  # 120
+
+# Color names matching Board.team_array order (indices 0-7)
+_COLOR_NAMES = [
+    "Blue", "Purple", "Yellow", "Pink",
+    "Green", "Orange", "Dark Blue", "Cyan",
+]
+
+# Unicode chess symbols: (team_r symbol, team_l symbol)
+# team_r uses hollow/white glyphs, team_l uses solid/black glyphs so shapes differ
+_PIECE_UNICODE: dict[type, tuple[str, str]] = {
+    Pawn:   ('♙', '♟'),
+    Rook:   ('♖', '♜'),
+    Knight: ('♘', '♞'),
+    Bishop: ('♗', '♝'),
+    Queen:  ('♕', '♛'),
+    King:   ('♔', '♚'),
+}
+
+
+# ── Side-panel layout ─────────────────────────────────────────────────────────
+_BOARD_W  = 32 * _SCALE   # 960 — width of the LED canvas area
+_PANEL_W  = 340           # side panel width
+_WIN_W    = _BOARD_W + _PANEL_W
+
+# Panel colour palette
+_P_BG    = (18,  22,  32)   # background
+_P_SEP   = (45,  50,  68)   # divider lines
+_P_TEXT  = (185, 192, 210)  # normal text
+_P_DIM   = (95,  103, 125)  # labels / secondary text
+_P_GOOD  = (85,  200, 115)  # green  (low peace-time)
+_P_WARN  = (228, 172, 52)   # yellow (caution)
+_P_BAD   = (232, 72,  62)   # red    (check / danger)
+
+# Log-level colours in the panel
+_P_LEVEL = {
+    logging.DEBUG:    (108, 145, 198),
+    logging.INFO:     (152, 206, 152),
+    logging.WARNING:  (228, 168, 58),
+    logging.ERROR:    (228, 72,  62),
+    logging.CRITICAL: (255, 42,  42),
+}
+
+# Short module suffix shown before each log line
+_LOG_SRC = {
+    "simulator.app": "sim",
+    "game.rules":    "rul",
+    "game.board":    "brd",
+}
+
+
+class _PanelLogHandler(logging.Handler):
+    """Captures log records into a deque for display in the side panel."""
+
+    def __init__(self, maxlines: int = 120) -> None:
+        super().__init__()
+        self.records: collections.deque = collections.deque(maxlen=maxlines)
+
+    def emit(self, record: logging.LogRecord) -> None:
+        self.records.append(record)
+
+
+class Phase(Enum):
+    COLOR_PICK = auto()
+    WAR_GAMES = auto()
+    PLAYING = auto()
+    GAME_OVER = auto()
+
+
+class GameRunner:
+    """Game state machine that drives Board's rendering methods via a Pygame loop."""
+
+    # ── Lifecycle ──────────────────────────────────────────────────────────────
+
+    def __init__(self) -> None:
+        self._board: Optional[Board] = None
+        # Panel log handler — created once so it persists across resets
+        self._panel_handler = _PanelLogHandler(maxlines=120)
+        self._panel_handler.setLevel(logging.DEBUG)
+        logging.getLogger().addHandler(self._panel_handler)
+        # Panel fonts — populated by _init_board after pygame.init()
+        self._pfont_sm: Optional[pygame.font.Font] = None
+        self._pfont_md: Optional[pygame.font.Font] = None
+        self._pfont_lg: Optional[pygame.font.Font] = None
+        self._reset()
+
+    def _reset(self) -> None:
+        self.phase = Phase.COLOR_PICK
+
+        # Color-pick transient state
+        self._selected_r_idx: Optional[int] = None
+        self._selected_l_idx: Optional[int] = None
+
+        # Playing transient state
+        self._selected_piece = None
+        self._in_check = False
+        self._king_check_pos: Optional[tuple[int, int]] = None
+        self._ai_thinking = False
+        self._current_team: Optional[Team] = None
+        self._ai_thread: Optional[threading.Thread] = None
+        self._ai_result = None
+        self._ai_display_board = None
+        self._ai_display_lock = threading.Lock()
+
+        # Game-over transient state
+        self._winner_team: Optional[Team] = None
+        self._is_draw = False
+        self._game_over_colors: list[list[tuple]] = []  # cached random inner colors
+        self._last_game_over_ms = 0
+
+        # Duck-type attributes read/written by game/rules.py
+        self.game_over = False
+        self.peace_time = 0
+        self.days_left_since_injury: list = []
+        self.days_right_since_injury: list = []
+        self.double_left_jeopardy: list = []
+        self.double_right_jeopardy: list = []
+
+        # Move counter
+        self._move_count = 0
+
+        # WAR_GAMES animation counters
+        self._think = 0
+        self._think_l = 0
+        self._think_r = 0
+        self._last_think_ms = 0
+
+    def _init_board(self) -> None:
+        """Create a fresh Board with fake hardware wired up (call after pygame.init())."""
+        from simulator.fake_rgbmatrix import FakeRGBMatrix
+
+        self._board = Board(sensor=SimSensor())
+        matrix = FakeRGBMatrix()
+        matrix._screen = pygame.display.get_surface()
+        self._board.matrix = matrix
+        self._board.canvas = matrix.CreateFrameCanvas()
+        self._board.checker_brightness = 0
+        self._board.checker_brightness_dir = 2
+        # Not yet decided — need None so WAR_GAMES knows nothing is selected yet
+        self._board.computer_player_r = None
+        self._board.computer_player_l = None
+        # Font for piece overlay — try fonts with good Unicode chess-symbol coverage
+        font_size = int(_CELL_PX * 0.52)
+        for _fname in ("applesymbols", "arial", "dejavusans", None):
+            if _fname is None or pygame.font.match_font(_fname):
+                self._font = pygame.font.SysFont(_fname, font_size)
+                break
+        # Panel UI fonts
+        self._pfont_sm = pygame.font.SysFont("monospace", 13)
+        self._pfont_md = pygame.font.SysFont("monospace", 15)
+        self._pfont_lg = pygame.font.SysFont("monospace", 18, bold=True)
+
+    # ── Properties that game/rules.py needs via the duck-type 'board' arg ─────
+
+    @property
+    def team_r(self) -> Team:
+        return self._board.team_r
+
+    @property
+    def team_l(self) -> Team:
+        return self._board.team_l
+
+    # ── Coordinate helpers ─────────────────────────────────────────────────────
+
+    @staticmethod
+    def _px_to_cell(px: int, py: int) -> Optional[tuple[int, int]]:
+        row = py // _CELL_PX
+        col = px // _CELL_PX
+        if 0 <= row < 8 and 0 <= col < 8:
+            return row, col
+        return None
+
+    # ── Team-piece helpers ─────────────────────────────────────────────────────
+
+    def _get_team_pieces(self, team: Team, grid=None) -> list:
+        b = self._board
+        if grid is None:
+            grid = b.grid
+        return [p for row in grid for p in row
+                if p is not None and p.team.r == team.r]
+
+    # ── Chess logic ────────────────────────────────────────────────────────────
+
+    def _apply_move(self, old_row: int, old_col: int,
+                    target_row: int, target_col: int) -> None:
+        b = self._board
+        piece = b.grid[target_row][target_col]
+        if isinstance(piece, Pawn):
+            self.peace_time = 0
+            enemy = piece.move(target_row, target_col, b.grid)
+            if enemy is not None:
+                b.grid[enemy.row][enemy.col] = None
+        elif isinstance(piece, King):
+            rook_loc, rook_tgt = piece.move(target_row, target_col, b.grid)
+            if rook_loc is not None:
+                b.grid[rook_tgt.row][rook_tgt.col] = (
+                    b.grid[rook_loc.row][rook_loc.col])
+                b.grid[rook_loc.row][rook_loc.col] = None
+                b.grid[rook_tgt.row][rook_tgt.col].move(
+                    rook_tgt.row, rook_tgt.col, b.grid)
+        else:
+            piece.move(target_row, target_col, b.grid)
+        b.grid[old_row][old_col] = None
+
+    def _add_nodes(self, node: Tree, team: Team, depth: int = 2) -> None:
+        b = self._board
+        if depth == 0:
+            return
+        team_king = None
+        check = False
+        for piece in self._get_team_pieces(team, node.board_state):
+            if isinstance(piece, King):
+                team_king = piece
+                check = team_king.calc_targets(node.board_state)
+        for piece in self._get_team_pieces(team, node.board_state):
+            piece.calc_targets(node.board_state)
+            if check and not isinstance(piece, King):
+                piece.filter_to_king_escape(team_king)
+            for target in piece.targets:
+                new_board = copy.deepcopy(node.board_state)
+                new_piece = new_board[piece.row][piece.col]
+                new_board[target.row][target.col] = new_piece
+                new_piece.move(target.row, target.col, new_board)
+                new_board[piece.row][piece.col] = None
+                with self._ai_display_lock:
+                    self._ai_display_board = new_board
+                node.add_child(Tree(
+                    new_board,
+                    Cell(piece.row, piece.col),
+                    Cell(target.row, target.col),
+                    b.team_r,
+                    b.team_l,
+                ))
+        next_team = b.team_r if team.r == b.team_l.r else b.team_l
+        for child in node.children:
+            self._add_nodes(child, next_team, depth - 1)
+
+    # ── ASCII board dump ───────────────────────────────────────────────────────
+
+    _PIECE_CHAR: dict[type, str] = {
+        Pawn: 'P', Rook: 'R', Knight: 'N',
+        Bishop: 'B', Queen: 'Q', King: 'K',
+    }
+
+    def _log_board_ascii(self) -> None:
+        """Print a compact ASCII board to the terminal.
+
+        Uppercase letters = team_r pieces (rows 0–1 at game start).
+        Lowercase letters = team_l pieces (rows 6–7 at game start).
+        '·' = empty square.
+        """
+        b = self._board
+        lines = ["", "    0 1 2 3 4 5 6 7", "  ┌─────────────────┐"]
+        for r, row in enumerate(b.grid):
+            cells = []
+            for piece in row:
+                if piece is None:
+                    cells.append("·")
+                else:
+                    ch = self._PIECE_CHAR.get(type(piece), "?")
+                    cells.append(ch if piece.team.r == b.team_r.r else ch.lower())
+            lines.append(f"{r} │ {' '.join(cells)} │")
+        lines.append("  └─────────────────┘")
+        lines.append(f"    {b.team_r.name}=UPPER  {b.team_l.name}=lower")
+        logger.info("\n".join(lines))
+
+    def declare_stalemate(self) -> None:
+        """Called by game/rules.py on fifty-move / threefold-repetition."""
+        self._is_draw = True
+        self.phase = Phase.GAME_OVER
+        self._log_board_ascii()
+        logger.info("Stalemate — draw declared.")
+
+    def _declare_victory(self, losing_team: Team) -> None:
+        b = self._board
+        self._winner_team = b.team_r if losing_team.r == b.team_l.r else b.team_l
+        self.phase = Phase.GAME_OVER
+
+    def _begin_turn(self, team: Team) -> None:
+        b = self._board
+        if _rules.check_fifty_move_rule(self, team, b.grid):
+            return
+
+        check = False
+        king_row, king_col = -1, -1
+        pieces_with_moves = 0
+
+        for row in b.grid:
+            for piece in row:
+                if (piece is not None
+                        and isinstance(piece, King)
+                        and piece.team.r == team.r):
+                    check = piece.calc_targets(b.grid)
+                    if len(piece.get_targets()) > 0:
+                        pieces_with_moves += 1
+                    king_row, king_col = piece.row, piece.col
+
+        for row in b.grid:
+            for piece in row:
+                if isinstance(piece, Pawn) and piece.team.r == team.r:
+                    piece.en_passantable = False
+                if piece is not None and not isinstance(piece, King):
+                    piece.calc_targets(b.grid)
+                    if check:
+                        piece.filter_to_king_escape(b.grid[king_row][king_col])
+                    if len(piece.get_targets()) > 0 and piece.team.r == team.r:
+                        pieces_with_moves += 1
+
+        if pieces_with_moves == 0:
+            self.game_over = True
+            self._log_board_ascii()
+            if not check:
+                self._is_draw = True
+                self.phase = Phase.GAME_OVER
+                logger.info("The only winning move is not to play")
+            else:
+                self._declare_victory(team)
+                logger.info("Checkmate! %s wins.", self._winner_team.name)
+            return
+
+        self._in_check = check
+        self._king_check_pos = (king_row, king_col) if check else None
+        if check:
+            logger.debug("KING IS IN CHECK")
+        logger.info("Player: %s's move.", team.name)
+
+        is_ai = (
+            (team.r == b.team_r.r and b.computer_player_r) or
+            (team.r == b.team_l.r and b.computer_player_l)
+        )
+        if is_ai:
+            self._ai_thinking = True
+
+    def _execute_ai_move(self) -> None:
+        """Launch the AI computation in a background thread."""
+        self._ai_result = None
+        self._ai_display_board = None
+        self._ai_thread = threading.Thread(target=self._run_ai, daemon=True)
+        self._ai_thread.start()
+
+    def _run_ai(self) -> None:
+        """Runs in a background thread — builds tree and stores best move."""
+        b = self._board
+        root = Tree(copy.deepcopy(b.grid), None, None, b.team_r, b.team_l)
+        self._add_nodes(root, self._current_team, depth=2)
+        if root.children:
+            self._ai_result = AI(root, self._current_team).alpha_beta_search()
+
+    def _next_turn(self) -> None:
+        b = self._board
+        self._selected_piece = None
+        self._in_check = False
+        self._king_check_pos = None
+        self._ai_thinking = False
+        self._current_team = (
+            b.team_l if self._current_team.r == b.team_r.r else b.team_r)
+        self._begin_turn(self._current_team)
+
+    # ── Rendering ──────────────────────────────────────────────────────────────
+
+    def _render_color_pick(self) -> None:
+        b = self._board
+        b.canvas.Clear()
+        r_sel = self._selected_r_idx
+        l_sel = self._selected_l_idx
+        for i in range(8):
+            t = b.team_array[i]
+            # Dim all cells except the selected one once a choice is made
+            if r_sel is not None and i != r_sel:
+                b.light_cell(b.canvas, 2, i, t.r // 4, t.g // 4, t.b // 4)
+            else:
+                b.light_cell(b.canvas, 2, i, t.r, t.g, t.b)
+            if l_sel is not None and i != l_sel:
+                b.light_cell(b.canvas, 5, i, t.r // 4, t.g // 4, t.b // 4)
+            else:
+                b.light_cell(b.canvas, 5, i, t.r, t.g, t.b)
+        b.matrix.blit_to_screen()
+
+    def _render_war_games(self) -> None:
+        b = self._board
+        b.canvas.Clear()
+        think = self._think
+
+        # Row 3: team R — cols 0-3 = Human, cols 4-7 = AI (mirrors war_games())
+        if b.computer_player_r is not None:
+            if b.computer_player_r:
+                # AI selected: animated single dot on white row
+                for i in range(8):
+                    if i == 7 - self._think_r:
+                        b.light_cell(b.canvas, 3, i,
+                                     b.team_r.r, b.team_r.g, b.team_r.b)
+                    else:
+                        b.light_cell(b.canvas, 3, i, 255, 255, 255)
+            else:
+                # Human selected: solid team color
+                for i in range(8):
+                    b.light_cell(b.canvas, 3, i, b.team_r.r, b.team_r.g, b.team_r.b)
+        else:
+            # Undecided: left half solid, right half animated
+            for i in range(8):
+                if i < 4:
+                    b.light_cell(b.canvas, 3, i, b.team_r.r, b.team_r.g, b.team_r.b)
+                else:
+                    if i == 7 - think:
+                        b.light_cell(b.canvas, 3, i,
+                                     b.team_r.r, b.team_r.g, b.team_r.b)
+                    else:
+                        b.light_cell(b.canvas, 3, i, 255, 255, 255)
+
+        # Row 4: team L — kitty-corner from row 3: cols 0-3 = AI, cols 4-7 = Human
+        if b.computer_player_l is not None:
+            if b.computer_player_l:
+                # AI selected: animated single dot on white row (left-to-right)
+                for i in range(8):
+                    if i == self._think_l:
+                        b.light_cell(b.canvas, 4, i,
+                                     b.team_l.r, b.team_l.g, b.team_l.b)
+                    else:
+                        b.light_cell(b.canvas, 4, i, 255, 255, 255)
+            else:
+                # Human selected: solid team color
+                for i in range(8):
+                    b.light_cell(b.canvas, 4, i, b.team_l.r, b.team_l.g, b.team_l.b)
+        else:
+            # Undecided: left half animated (AI), right half solid (Human)
+            for i in range(8):
+                if i < 4:
+                    if i == think:
+                        b.light_cell(b.canvas, 4, i,
+                                     b.team_l.r, b.team_l.g, b.team_l.b)
+                    else:
+                        b.light_cell(b.canvas, 4, i, 255, 255, 255)
+                else:
+                    b.light_cell(b.canvas, 4, i, b.team_l.r, b.team_l.g, b.team_l.b)
+
+        b.matrix.blit_to_screen()
+
+    def _draw_piece_overlay(self, grid=None) -> None:
+        """Draw chess pieces as Unicode-symbol circles on top of the scaled LED surface.
+
+        Uses grid enumeration indices (not piece.row/col) so the overlay always
+        matches the actual board state even if a piece's internal coords lag.
+        Pass a custom grid (e.g. AI's considered board) to visualize that instead;
+        selection highlights are suppressed when a custom grid is used.
+        """
+        screen = self._board.matrix._screen
+        if screen is None:
+            return
+        show_selection = grid is None
+        if grid is None:
+            grid = self._board.grid
+
+        b = self._board
+        team_r_r = b.team_r.r  # used to pick which Unicode glyph variant
+
+        r_circle = int(_CELL_PX * 0.38)    # piece circle radius
+        shadow_off = max(3, r_circle // 8)  # drop-shadow offset
+
+        for row_idx, row in enumerate(grid):
+            for col_idx, piece in enumerate(row):
+                if piece is None:
+                    continue
+                cx = col_idx * _CELL_PX + _CELL_PX // 2
+                cy = row_idx * _CELL_PX + _CELL_PX // 2
+                tc = (piece.team.r, piece.team.g, piece.team.b)
+
+                # Drop shadow
+                pygame.draw.circle(screen, (20, 20, 20),
+                                   (cx + shadow_off, cy + shadow_off), r_circle)
+                # Team-colour fill
+                pygame.draw.circle(screen, tc, (cx, cy), r_circle)
+                # Thin white ring
+                pygame.draw.circle(screen, (255, 255, 255), (cx, cy), r_circle, 2)
+
+                # Pick glyph: team_r → hollow/white variant, team_l → solid/black variant
+                glyphs = _PIECE_UNICODE.get(type(piece), ('?', '?'))
+                symbol = glyphs[0] if piece.team.r == team_r_r else glyphs[1]
+
+                # Text colour: white on dark teams, near-black on light teams
+                brightness = 0.299 * tc[0] + 0.587 * tc[1] + 0.114 * tc[2]
+                text_color = (20, 20, 20) if brightness > 140 else (245, 245, 245)
+
+                # Render with a 1-px outline for legibility (draw shadow then draw symbol)
+                surf = self._font.render(symbol, True, text_color)
+                rect = surf.get_rect(center=(cx, cy))
+                outline_surf = self._font.render(
+                    symbol, True,
+                    (20, 20, 20) if brightness <= 140 else (230, 230, 230))
+                for dx, dy in ((-1, 0), (1, 0), (0, -1), (0, 1)):
+                    screen.blit(outline_surf, rect.move(dx, dy))
+                screen.blit(surf, rect)
+
+        if not show_selection:
+            return
+
+        # Highlight selected piece with a pulsing bright ring
+        if self._selected_piece is not None:
+            p = self._selected_piece
+            for row_idx, row in enumerate(self._board.grid):
+                for col_idx, gp in enumerate(row):
+                    if gp is p:
+                        cx = col_idx * _CELL_PX + _CELL_PX // 2
+                        cy = row_idx * _CELL_PX + _CELL_PX // 2
+                        if (pygame.time.get_ticks() // 500) % 2:
+                            pygame.draw.circle(screen, (255, 255, 255),
+                                               (cx, cy), r_circle + 4, 3)
+
+    def _render_playing(self) -> None:
+        b = self._board
+        b.canvas.Clear()
+
+        if self._ai_thinking:
+            # Pulse checker while AI thinks — matches board's choose_light_checker_town
+            b.checker_brightness += b.checker_brightness_dir
+            if b.checker_brightness <= 0:
+                b.checker_brightness_dir *= -1
+                b.checker_brightness = 0
+            elif b.checker_brightness >= 255:
+                b.checker_brightness_dir *= -1
+                b.checker_brightness = 255
+            b.choose_light_checker_town()
+            b.matrix.blit_to_screen()
+            with self._ai_display_lock:
+                ai_grid = self._ai_display_board
+            self._draw_piece_overlay(grid=ai_grid)
+        else:
+            # Static white checker during human turn — matches do_turn rendering
+            b.light_checker_town(b.canvas)
+
+            if self._selected_piece:
+                # Light all legal target squares in team colour (board's actual method)
+                b.light_targets(self._selected_piece)
+                # Blink selected piece square: team colour for 0.5 s, off for 0.5 s
+                # (mirrors do_turn: if time.time() - int(time.time()) > 0.5)
+                if (pygame.time.get_ticks() // 500) % 2:
+                    p = self._selected_piece
+                    b.light_cell(b.canvas, p.row, p.col,
+                                 p.team.r, p.team.g, p.team.b)
+
+            b.matrix.blit_to_screen()
+            self._draw_piece_overlay()
+
+    def _render_game_over(self) -> None:
+        b = self._board
+        b.canvas.Clear()
+        if self._is_draw:
+            for i in range(4):
+                for j in range(8):
+                    b.light_cell(b.canvas, i, j,
+                                 b.team_r.r, b.team_r.g, b.team_r.b)
+            for i in range(4, 8):
+                for j in range(8):
+                    b.light_cell(b.canvas, i, j,
+                                 b.team_l.r, b.team_l.g, b.team_l.b)
+        else:
+            w = self._winner_team
+            # Regenerate random inner-square colors at 20 fps — matches Pi's time.sleep(0.05)
+            now = pygame.time.get_ticks()
+            if not self._game_over_colors or now - self._last_game_over_ms >= 50:
+                self._game_over_colors = [
+                    [(random.randint(0, 255), random.randint(0, 255), random.randint(0, 255))
+                     for _ in range(6)]
+                    for _ in range(6)
+                ]
+                self._last_game_over_ms = now
+            for m in range(8):
+                b.light_cell(b.canvas, m, 0, w.r, w.g, w.b)
+                b.light_cell(b.canvas, 0, m, w.r, w.g, w.b)
+                b.light_cell(b.canvas, m, 7, w.r, w.g, w.b)
+                b.light_cell(b.canvas, 7, m, w.r, w.g, w.b)
+            for j in range(6):
+                for k in range(6):
+                    r, g, bv = self._game_over_colors[j][k]
+                    b.light_cell(b.canvas, j + 1, k + 1, r, g, bv)
+        b.matrix.blit_to_screen()
+
+    # ── Event handlers ─────────────────────────────────────────────────────────
+
+    def _handle_color_pick(self, event: pygame.event.Event) -> None:
+        if event.type != pygame.MOUSEBUTTONDOWN:
+            return
+        cell = self._px_to_cell(*event.pos)
+        if cell is None:
+            return
+        row, col = cell
+        b = self._board
+        if row == 2:
+            self._selected_r_idx = col
+            t = b.team_array[col]
+            b.team_r.r, b.team_r.g, b.team_r.b = t.r, t.g, t.b
+            b.team_r.name = _COLOR_NAMES[col]
+        elif row == 5:
+            self._selected_l_idx = col
+            t = b.team_array[col]
+            b.team_l.r, b.team_l.g, b.team_l.b = t.r, t.g, t.b
+            b.team_l.name = _COLOR_NAMES[col]
+        if self._selected_r_idx is not None and self._selected_l_idx is not None:
+            b.team_r.r += 1  # BUG LOCK-IN: mirrors Board.color_picker() line 902
+            self.phase = Phase.WAR_GAMES
+
+    def _handle_war_games(self, event: pygame.event.Event) -> None:
+        if event.type != pygame.MOUSEBUTTONDOWN:
+            return
+        cell = self._px_to_cell(*event.pos)
+        if cell is None:
+            return
+        row, col = cell
+        b = self._board
+        if row == 3:
+            b.computer_player_r = col >= 4   # cols 4-7 = AI, 0-3 = Human
+        elif row == 4:
+            b.computer_player_l = col < 4    # cols 0-3 = AI, 4-7 = Human (kitty-corner)
+        if b.computer_player_r is not None and b.computer_player_l is not None:
+            self._start_game()
+
+    def _start_game(self) -> None:
+        b = self._board
+        b.initialize_game_board()
+        self._current_team = b.team_r
+        self.phase = Phase.PLAYING
+        logger.info(
+            "Running game... Right=%s (%d,%d,%d)  Left=%s (%d,%d,%d)",
+            b.team_r.name, b.team_r.r, b.team_r.g, b.team_r.b,
+            b.team_l.name, b.team_l.r, b.team_l.g, b.team_l.b,
+        )
+        self._begin_turn(self._current_team)
+
+    def _handle_playing(self, event: pygame.event.Event) -> None:
+        if event.type == pygame.KEYDOWN and event.key == pygame.K_n:
+            self._reset()
+            self._init_board()
+            return
+        if event.type != pygame.MOUSEBUTTONDOWN:
+            return
+        if self._ai_thinking:
+            return
+        cell = self._px_to_cell(*event.pos)
+        if cell is None:
+            self._selected_piece = None
+            return
+        row, col = cell
+        b = self._board
+
+        if self._selected_piece is not None:
+            for target in self._selected_piece.targets:
+                if target.row == row and target.col == col:
+                    old_r = self._selected_piece.row
+                    old_c = self._selected_piece.col
+                    logger.debug(
+                        "Human moves piece at %s%s to %s%s",
+                        old_r, old_c, row, col)
+                    if b.grid[row][col] is not None:
+                        self.peace_time = 0
+                    else:
+                        self.peace_time += 1
+                    b.grid[row][col] = b.grid[old_r][old_c]
+                    self._apply_move(old_r, old_c, row, col)
+                    self._move_count += 1
+                    self._selected_piece = None
+                    self._next_turn()
+                    return
+            piece = b.grid[row][col]
+            if piece is self._selected_piece:
+                # Clicking the already-selected piece puts it back down
+                self._selected_piece = None
+            elif piece is not None and piece.team.r == self._current_team.r:
+                self._selected_piece = piece
+            else:
+                self._selected_piece = None
+        else:
+            piece = b.grid[row][col]
+            if piece is not None and piece.team.r == self._current_team.r:
+                self._selected_piece = piece
+
+    def _handle_game_over(self, event: pygame.event.Event) -> None:
+        if event.type == pygame.KEYDOWN and event.key == pygame.K_n:
+            self._reset()
+            self._init_board()
+
+    def _handle_event(self, event: pygame.event.Event) -> None:
+        if self.phase == Phase.COLOR_PICK:
+            self._handle_color_pick(event)
+        elif self.phase == Phase.WAR_GAMES:
+            self._handle_war_games(event)
+        elif self.phase == Phase.PLAYING:
+            self._handle_playing(event)
+        elif self.phase == Phase.GAME_OVER:
+            self._handle_game_over(event)
+
+    # ── Update ─────────────────────────────────────────────────────────────────
+
+    def _update(self) -> None:
+        now = pygame.time.get_ticks()
+        if self.phase == Phase.WAR_GAMES and now - self._last_think_ms >= 200:
+            self._last_think_ms = now
+            self._think = (self._think + 1) % 4
+            self._think_l = (self._think_l + 1) % 8
+            self._think_r = (self._think_r + 1) % 8
+        if self.phase == Phase.PLAYING and self._ai_thinking:
+            if self._ai_thread is None:
+                self._execute_ai_move()
+            elif not self._ai_thread.is_alive():
+                self._ai_thread = None
+                best = self._ai_result
+                if best is not None:
+                    b = self._board
+                    old_r, old_c = best.old_cell.row, best.old_cell.col
+                    tgt_r, tgt_c = best.new_cell.row, best.new_cell.col
+                    logger.debug(
+                        "the best move involves moving the piece at square %s%s to %s%s",
+                        old_r, old_c, tgt_r, tgt_c)
+                    if b.grid[tgt_r][tgt_c] is not None:
+                        self.peace_time = 0
+                    else:
+                        self.peace_time += 1
+                    b.grid[tgt_r][tgt_c] = b.grid[old_r][old_c]
+                    self._apply_move(old_r, old_c, tgt_r, tgt_c)
+                    self._move_count += 1
+                self._ai_thinking = False
+                self._next_turn()
+
+    def _render_panel(self) -> None:
+        """Draw the telemetry / log side panel to the right of the board."""
+        if self._pfont_sm is None:
+            return  # fonts not ready (before _init_board)
+        screen = self._board.matrix._screen
+        if screen is None:
+            return
+
+        pad = 14
+        x0  = _BOARD_W          # left edge of panel
+        w   = _PANEL_W
+        h   = 32 * _SCALE
+
+        pygame.draw.rect(screen, _P_BG, (x0, 0, w, h))
+
+        y = 10
+
+        def text(msg: str, font, color, indent: int = 0) -> None:
+            nonlocal y
+            surf = font.render(msg, True, color)
+            screen.blit(surf, (x0 + pad + indent, y))
+            y += surf.get_height() + 3
+
+        def sep() -> None:
+            nonlocal y
+            y += 5
+            pygame.draw.line(screen, _P_SEP,
+                             (x0 + pad, y), (x0 + w - pad, y))
+            y += 8
+
+        def color_swatch(rgb: tuple, cx: int, cy: int, r: int = 7) -> None:
+            pygame.draw.circle(screen, rgb, (cx, cy), r)
+            pygame.draw.circle(screen, _P_SEP, (cx, cy), r, 1)
+
+        # ── Title ────────────────────────────────────────────────────────────
+        text("Chess 101", self._pfont_lg, _P_TEXT)
+        sep()
+
+        # ── Phase ────────────────────────────────────────────────────────────
+        text(f"Phase   {self.phase.name}", self._pfont_md, _P_DIM)
+
+        b = self._board
+
+        # ── Phase-specific status ─────────────────────────────────────────────
+        if self.phase == Phase.COLOR_PICK:
+            text("Row 2 → Right team colour", self._pfont_sm, _P_DIM)
+            text("Row 5 → Left  team colour", self._pfont_sm, _P_DIM)
+            if self._selected_r_idx is not None:
+                tc = b.team_r
+                text(f"Right  {tc.name}", self._pfont_sm,
+                     (tc.r, tc.g, tc.b))
+            if self._selected_l_idx is not None:
+                tc = b.team_l
+                text(f"Left   {tc.name}", self._pfont_sm,
+                     (tc.r, tc.g, tc.b))
+
+        elif self.phase == Phase.WAR_GAMES:
+            text("Row 3 left=Human right=AI", self._pfont_sm, _P_DIM)
+            text("Row 4 left=AI    right=Human", self._pfont_sm, _P_DIM)
+
+        elif self.phase in (Phase.PLAYING, Phase.GAME_OVER):
+            # ── Current team ──────────────────────────────────────────────
+            if self._current_team is not None:
+                tc = self._current_team
+                surf_t = self._pfont_md.render(
+                    f"Turn    {tc.name}", True, (tc.r, tc.g, tc.b))
+                screen.blit(surf_t, (x0 + pad, y))
+                swatch_x = x0 + pad + surf_t.get_width() + 10
+                swatch_y = y + surf_t.get_height() // 2
+                color_swatch((tc.r, tc.g, tc.b), swatch_x, swatch_y)
+                y += surf_t.get_height() + 3
+
+            text(f"Move    #{self._move_count}", self._pfont_md, _P_TEXT)
+
+            # ── Peace-time progress bar ───────────────────────────────────
+            peace = self.peace_time
+            text(f"Peace   {peace} / 50", self._pfont_sm, _P_DIM)
+            bar_w  = w - pad * 2
+            bar_h  = 9
+            pygame.draw.rect(screen, _P_SEP,
+                             (x0 + pad, y, bar_w, bar_h), border_radius=4)
+            filled = int(bar_w * min(peace, 50) / 50)
+            if filled > 0:
+                ratio = peace / 50
+                bar_c = (
+                    int(_P_GOOD[0] + (_P_BAD[0] - _P_GOOD[0]) * ratio),
+                    int(_P_GOOD[1] + (_P_BAD[1] - _P_GOOD[1]) * ratio),
+                    int(_P_GOOD[2] + (_P_BAD[2] - _P_GOOD[2]) * ratio),
+                )
+                pygame.draw.rect(screen, bar_c,
+                                 (x0 + pad, y, filled, bar_h), border_radius=4)
+            y += bar_h + 8
+
+            # ── Alerts ────────────────────────────────────────────────────
+            if self._in_check:
+                blink = (pygame.time.get_ticks() // 380) % 2
+                text("!! KING IN CHECK",
+                     self._pfont_md, _P_BAD if blink else _P_WARN)
+
+            if self._ai_thinking:
+                dots = "." * ((pygame.time.get_ticks() // 320) % 4 + 1)
+                text(f"AI thinking{dots}", self._pfont_md, _P_WARN)
+
+            # ── Game-over result ──────────────────────────────────────────
+            if self.phase == Phase.GAME_OVER:
+                sep()
+                if self._is_draw:
+                    text("  DRAW", self._pfont_lg, _P_WARN)
+                elif self._winner_team:
+                    wt = self._winner_team
+                    text(f"  {wt.name} wins!",
+                         self._pfont_lg, (wt.r, wt.g, wt.b))
+                text("Press N to play again", self._pfont_sm, _P_DIM)
+
+        sep()
+
+        # ── Log feed ─────────────────────────────────────────────────────────
+        text("LOG", self._pfont_md, _P_DIM)
+
+        line_h   = self._pfont_sm.get_height() + 2
+        avail_h  = h - y - pad
+        max_lines = max(1, avail_h // line_h)
+        char_w   = self._pfont_sm.size("X")[0]
+        max_chars = max(1, (w - pad * 2) // char_w)
+
+        records = list(self._panel_handler.records)[-max_lines:]
+        for rec in records:
+            src   = _LOG_SRC.get(rec.name, rec.name.split(".")[-1][:3])
+            lvl   = rec.levelname[0]
+            msg   = rec.getMessage()
+            line  = f"{lvl}[{src}] {msg}"
+            if len(line) > max_chars:
+                line = line[:max_chars - 1] + "…"
+            color = _P_LEVEL.get(rec.levelno, _P_TEXT)
+            surf  = self._pfont_sm.render(line, True, color)
+            screen.blit(surf, (x0 + pad, y))
+            y += line_h
+            if y >= h - pad:
+                break
+
+    def _render(self) -> None:
+        if self.phase == Phase.COLOR_PICK:
+            self._render_color_pick()
+        elif self.phase == Phase.WAR_GAMES:
+            self._render_war_games()
+        elif self.phase == Phase.PLAYING:
+            self._render_playing()
+        elif self.phase == Phase.GAME_OVER:
+            self._render_game_over()
+        self._render_panel()
+        pygame.display.flip()
+
+    # ── Game loop ──────────────────────────────────────────────────────────────
+
+    def run(self) -> None:
+        logging.basicConfig(
+            level=logging.DEBUG,
+            format="%(levelname)s %(name)s: %(message)s",
+        )
+        pygame.init()
+        pygame.display.set_mode((_WIN_W, 32 * _SCALE))
+        pygame.display.set_caption("Chess101 Simulator")
+        clock = pygame.time.Clock()
+        self._init_board()
+
+        running = True
+        while running:
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    running = False
+                else:
+                    self._handle_event(event)
+            self._update()
+            self._render()
+            clock.tick(60)
+
+        pygame.quit()

@@ -1,0 +1,7 @@
+# Mac simulator — install these in the venv for local development
+pygame>=2.5
+numpy
+
+# Pi hardware stack — only installable on Raspberry Pi (omit on Mac)
+# smbus2
+# RPi.GPIO

@@ -11,4 +11,8 @@ dist/
 build/
 .mypy_cache/
 .claude/
+<<<<<<< HEAD
 >>>>>>> Add behavior lock-in test suite (188 tests)
+=======
+.venv/
+>>>>>>> Added simulator
