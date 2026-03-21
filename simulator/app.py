@@ -196,6 +196,7 @@ class GameRunner:
         self._in_check = False
         self._king_check_pos: Optional[tuple[int, int]] = None
         self._ai_thinking = False
+        self._promoting_pawn: Optional[tuple[int, int]] = None  # (row, col) pending promotion
         self._current_team: Optional[Team] = None
         self._ai_thread: Optional[threading.Thread] = None
         self._ai_result: Optional[Tree] = None
@@ -341,6 +342,8 @@ class GameRunner:
             enemy = piece.move(target_row, target_col, b.grid)
             if enemy is not None:
                 b.grid[enemy.row][enemy.col] = None
+            if (piece.starting_row + 6) % 12 == target_row:
+                self._promoting_pawn = (target_row, target_col)
         elif isinstance(piece, King):
             rook_loc, rook_tgt = piece.move(target_row, target_col, b.grid)
             if rook_loc is not None and rook_tgt is not None:
@@ -781,6 +784,38 @@ class GameRunner:
             b.matrix.blit_to_screen()
             self._draw_piece_overlay()
 
+            if self._promoting_pawn is not None:
+                self._render_promotion_overlay()
+
+    def _render_promotion_overlay(self) -> None:
+        """Draw the promotion picker over the board.
+
+        Renders four piece-choice squares (Q/N/B/R) on rows 3-4, centre
+        columns, and prints keybinding hints via the window caption.
+        """
+        b = self._b
+        assert self._promoting_pawn is not None
+        assert self._current_team is not None
+        team = self._current_team
+        candidates: list[tuple[str, type]] = [
+            ("Q", Queen), ("N", Knight), ("B", Bishop), ("R", Rook)
+        ]
+        cols = [2, 3, 4, 5]
+        for (label, cls), col in zip(candidates, cols):
+            # Dim background cell in team colour
+            b.light_cell(b.canvas, 3, col, team.r // 2, team.g // 2, team.b // 2)
+            b.light_cell(b.canvas, 4, col, team.r // 2, team.g // 2, team.b // 2)
+        b.matrix.blit_to_screen()
+        # Draw labels on top via Pygame directly
+        screen = b.matrix._screen
+        font = pygame.font.SysFont("monospace", 28, bold=True)
+        for (label, cls), col in zip(candidates, cols):
+            px = col * _CELL_PX + _CELL_PX // 2
+            py = 3 * _CELL_PX + _CELL_PX // 2
+            surf = font.render(label, True, (255, 255, 255))
+            screen.blit(surf, surf.get_rect(center=(px, py)))
+        pygame.display.set_caption("PROMOTION — press Q N B R to choose")
+
     def _render_game_over(self) -> None:
         """Render the game-over screen to the LED canvas.
 
@@ -961,6 +996,23 @@ class GameRunner:
             self._reset()
             self._init_board()
             return
+        if self._promoting_pawn is not None:
+            if event.type == pygame.KEYDOWN:
+                _PROMO_MAP: dict[int, type[Queen] | type[Knight] | type[Bishop] | type[Rook]] = {
+                    pygame.K_q: Queen, pygame.K_n: Knight,
+                    pygame.K_b: Bishop, pygame.K_r: Rook,
+                }
+                chosen_cls = _PROMO_MAP.get(event.key)
+                if chosen_cls is not None:
+                    row, col = self._promoting_pawn
+                    pawn = self._b.grid[row][col]
+                    assert isinstance(pawn, Pawn)
+                    self._b.grid[row][col] = chosen_cls(row, col, pawn.team)
+                    logger.info("Promoted pawn to %s at (%d,%d)",
+                                chosen_cls.__name__, row, col)
+                    self._promoting_pawn = None
+                    self._next_turn()
+            return
         if event.type != pygame.MOUSEBUTTONDOWN:
             return
         if self._ai_thinking:
@@ -990,7 +1042,8 @@ class GameRunner:
                     self._apply_move(old_r, old_c, row, col)
                     self._move_count += 1
                     self._selected_piece = None
-                    self._next_turn()
+                    if self._promoting_pawn is None:
+                        self._next_turn()
                     return
             piece = b.grid[row][col]
             if piece is self._selected_piece:
