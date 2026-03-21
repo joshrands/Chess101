@@ -93,6 +93,12 @@ class GameClient:
         self._loop.run_until_complete(self._connect())
 
     async def _connect(self) -> None:
+        if websockets is None:
+            logger.error(
+                "websockets library not installed. "
+                "Run: pip install 'websockets>=12.0'"
+            )
+            return
         uri = f"ws://{self._host_ip}:{self._port}"
         try:
             async with websockets.connect(uri) as ws:  # type: ignore[attr-defined]

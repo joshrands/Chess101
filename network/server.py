@@ -107,6 +107,13 @@ class GameServer:
         self._loop.run_until_complete(self._serve())
 
     async def _serve(self) -> None:
+        if websockets is None:
+            logger.error(
+                "websockets library not installed. "
+                "Run: pip install 'websockets>=12.0'"
+            )
+            self._started.set()
+            return
         async with websockets.serve(self._accept, self._host, self._port):  # type: ignore[attr-defined]
             self._started.set()
             logger.info("GameServer listening on %s:%d", self._host, self._port)
