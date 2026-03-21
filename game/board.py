@@ -19,6 +19,7 @@ from core.cell import Cell
 import random
 from hardware.master import Master
 from hardware.sensor import BoardSensor
+from core.constants import CellOccupancy
 from game import rules as _rules
 from ui.renderer import light_cell as _light_cell
 from ai.tree import Tree
@@ -176,7 +177,7 @@ class Board(SampleBase):
             self.light_checker_town(self.canvas)
             for piece in team_r_pieces:
                 state = self.master.get_cell_state(piece.row, piece.col)
-                if state == 1:
+                if state == CellOccupancy.EMPTY:
                     mismatch = True
                     self.light_cell(self.canvas, piece.row, piece.col, r, g, b)
             self.canvas = self.matrix.SwapOnVSync(self.canvas)
@@ -193,7 +194,7 @@ class Board(SampleBase):
             self.light_checker_town(self.canvas)
             for piece in team_l_pieces:
                 state = self.master.get_cell_state(piece.row, piece.col)
-                if state == 1:
+                if state == CellOccupancy.EMPTY:
                     mismatch = True
                     self.light_cell(self.canvas, piece.row, piece.col, r, g, b)
                     time.sleep(0.01)
@@ -208,7 +209,7 @@ class Board(SampleBase):
             placed = True
             self.master.read_data()
             for col in range(8):
-                if self.master.get_cell_state(row, col) == 1:
+                if self.master.get_cell_state(row, col) == CellOccupancy.EMPTY:
                     placed = False
                     self.light_cell(self.canvas, row, col, 255, 255, 255)
                 else:
@@ -220,7 +221,7 @@ class Board(SampleBase):
         placed = False
         while not placed:
             self.master.read_data()
-            if self.master.get_cell_state(row, col) == 0:
+            if self.master.get_cell_state(row, col) == CellOccupancy.OCCUPIED:
                 placed = True
             time.sleep(0.01)
         self.light_cell(self.canvas, row, col, team.r, team.g, team.b)
@@ -232,7 +233,7 @@ class Board(SampleBase):
         lifted = None
         for piece in valid_pieces:
             state = self.master.get_cell_state(piece.row, piece.col)
-            if state == 1 and not valid:
+            if state == CellOccupancy.EMPTY and not valid:
                 valid = True
                 lifted = piece
         return valid, lifted
@@ -253,15 +254,15 @@ class Board(SampleBase):
         valid = False
         activated_target = None
         state = self.master.get_cell_state(piece.row, piece.col)
-        if state == 0:
+        if state == CellOccupancy.OCCUPIED:
             return_cell = Cell(piece.row, piece.col)
             return True, return_cell
         for cell in targets:
             state = self.master.get_cell_state(cell.row, cell.col)
             if self.grid[cell.row][cell.col] is not None:
-                if state == 1:
+                if state == CellOccupancy.EMPTY:
                     activated_target = cell
-                    while state == 1:
+                    while state == CellOccupancy.EMPTY:
                         self.canvas.Clear()
                         self.light_checker_town(self.canvas)
                         if ((time.time() - int(time.time())) * 1000) % 250 > 125:
@@ -272,7 +273,7 @@ class Board(SampleBase):
                         self.master.read_data()
                         state = self.master.get_cell_state(cell.row, cell.col)
                     valid = True
-            elif state == 0:
+            elif state == CellOccupancy.OCCUPIED:
                 valid = True
                 activated_target = cell
         return valid, activated_target
@@ -665,7 +666,7 @@ class Board(SampleBase):
 
         if self.grid[best_move.new_cell.row][best_move.new_cell.col] is None:
             self.peace_time += 1
-            while state == 0:
+            while state == CellOccupancy.OCCUPIED:
                 self.master.read_data()
                 self.canvas.Clear()
                 self.light_checker_town(self.canvas)
@@ -673,7 +674,7 @@ class Board(SampleBase):
                                 team.r, team.g, team.b)
                 self.canvas = self.matrix.SwapOnVSync(self.canvas)
                 state = self.master.get_cell_state(best_move.old_cell.row, best_move.old_cell.col)
-            while state == 1:
+            while state == CellOccupancy.EMPTY:
                 self.master.read_data()
                 self.canvas.Clear()
                 self.light_checker_town(self.canvas)
@@ -687,7 +688,7 @@ class Board(SampleBase):
                 state = self.master.get_cell_state(best_move.new_cell.row, best_move.new_cell.col)
         else:
             state = 0
-            while state == 0:
+            while state == CellOccupancy.OCCUPIED:
                 self.master.read_data()
                 self.canvas.Clear()
                 self.light_checker_town(self.canvas)
@@ -696,7 +697,7 @@ class Board(SampleBase):
                 self.canvas = self.matrix.SwapOnVSync(self.canvas)
                 state = self.master.get_cell_state(best_move.old_cell.row, best_move.old_cell.col)
             state = 0
-            while state == 0:
+            while state == CellOccupancy.OCCUPIED:
                 self.master.read_data()
                 self.canvas.Clear()
                 self.light_checker_town(self.canvas)
@@ -705,7 +706,7 @@ class Board(SampleBase):
                 self.canvas = self.matrix.SwapOnVSync(self.canvas)
                 state = self.master.get_cell_state(best_move.new_cell.row, best_move.new_cell.col)
             time.sleep(.1)
-            while state == 1:
+            while state == CellOccupancy.EMPTY:
                 self.master.read_data()
                 self.canvas.Clear()
                 self.light_checker_town(self.canvas)
@@ -740,7 +741,7 @@ class Board(SampleBase):
             if enemy is not None:
                 self.grid[enemy.row][enemy.col] = None
                 state = self.master.get_cell_state(enemy.row, enemy.col)
-                while state == 0:
+                while state == CellOccupancy.OCCUPIED:
                     self.master.read_data()
                     time.sleep(0.4)
                     for r in range(201):
@@ -816,22 +817,22 @@ class Board(SampleBase):
             restart_key2 = False
             self.master.read_data()
             for i in range(8):
-                if self.master.get_cell_state(2, i) == 0:
+                if self.master.get_cell_state(2, i) == CellOccupancy.OCCUPIED:
                     team1_found = True
                     self.team_r.r = self.team_array[i].r
                     self.team_r.g = self.team_array[i].g
                     self.team_r.b = self.team_array[i].b
-                if self.master.get_cell_state(5, i) == 0:
+                if self.master.get_cell_state(5, i) == CellOccupancy.OCCUPIED:
                     team2_found = True
                     self.team_l.r = self.team_array[i].r
                     self.team_l.g = self.team_array[i].g
                     self.team_l.b = self.team_array[i].b
             for i in range(8):
-                if self.master.get_cell_state(3, i) == 0:
+                if self.master.get_cell_state(3, i) == CellOccupancy.OCCUPIED:
                     shut_down_key1 = True
                     if i == 7:
                         restart_key1 = True
-                if self.master.get_cell_state(4, i) == 0:
+                if self.master.get_cell_state(4, i) == CellOccupancy.OCCUPIED:
                     shut_down_key2 = True
                     if i == 7:
                         restart_key2 = True
@@ -865,17 +866,17 @@ class Board(SampleBase):
             self.canvas.Clear()
             if team1_found and team2_found:
                 for i in range(8):
-                    if self.master.get_cell_state(2, i) == 0:
+                    if self.master.get_cell_state(2, i) == CellOccupancy.OCCUPIED:
                         self.light_cell(self.canvas, 2, i,
                                         self.team_array[i].r, self.team_array[i].g, self.team_array[i].b)
-                    if self.master.get_cell_state(5, i) == 0:
+                    if self.master.get_cell_state(5, i) == CellOccupancy.OCCUPIED:
                         self.light_cell(self.canvas, 5, i,
                                         self.team_array[i].r, self.team_array[i].g, self.team_array[i].b)
                 self.canvas = self.matrix.SwapOnVSync(self.canvas)
                 time.sleep(2)
             elif team1_found:
                 for i in range(8):
-                    if self.master.get_cell_state(2, i) == 0:
+                    if self.master.get_cell_state(2, i) == CellOccupancy.OCCUPIED:
                         self.light_cell(self.canvas, 2, i,
                                         self.team_array[i].r, self.team_array[i].g, self.team_array[i].b)
                 for i in range(8):
@@ -884,7 +885,7 @@ class Board(SampleBase):
                 self.canvas = self.matrix.SwapOnVSync(self.canvas)
             elif team2_found:
                 for i in range(8):
-                    if self.master.get_cell_state(5, i) == 0:
+                    if self.master.get_cell_state(5, i) == CellOccupancy.OCCUPIED:
                         self.light_cell(self.canvas, 5, i,
                                         self.team_array[i].r, self.team_array[i].g, self.team_array[i].b)
                 for i in range(8):
@@ -918,17 +919,17 @@ class Board(SampleBase):
 
             for i in range(8):
                 if i < 4:
-                    if self.master.get_cell_state(3, i) == 0 and not team1_decided:
+                    if self.master.get_cell_state(3, i) == CellOccupancy.OCCUPIED and not team1_decided:
                         team1_decided = True
                         self.computer_player_r = False
-                    if self.master.get_cell_state(4, i) == 0 and not team2_decided:
+                    if self.master.get_cell_state(4, i) == CellOccupancy.OCCUPIED and not team2_decided:
                         team2_decided = True
                         self.computer_player_l = True
                 else:
-                    if self.master.get_cell_state(3, i) == 0 and not team1_decided:
+                    if self.master.get_cell_state(3, i) == CellOccupancy.OCCUPIED and not team1_decided:
                         team1_decided = True
                         self.computer_player_r = True
-                    if self.master.get_cell_state(4, i) == 0 and not team2_decided:
+                    if self.master.get_cell_state(4, i) == CellOccupancy.OCCUPIED and not team2_decided:
                         team2_decided = True
                         self.computer_player_l = False
                 if team1_decided and team2_decided:

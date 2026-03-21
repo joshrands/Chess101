@@ -1,3 +1,3 @@
-from core.constants import PieceValue
+from core.constants import PieceValue, CellOccupancy
 
-__all__ = ["PieceValue"]
+__all__ = ["PieceValue", "CellOccupancy"]
