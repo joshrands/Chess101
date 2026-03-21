@@ -31,6 +31,27 @@ import numpy as np
 
 
 class Board(SampleBase):
+    """Central game controller for the Chess101 physical board.
+
+    Extends SampleBase to access the RGB LED matrix. Orchestrates the full
+    game lifecycle: color selection, piece setup, turn processing (human or AI),
+    mismatch detection between physical sensor state and software state, and
+    end-game displays. Communicates with eight row Arduinos via the BoardSensor
+    interface.
+
+    Attributes:
+        team_r: Team object for the player occupying rows 0-1.
+        team_l: Team object for the player occupying rows 6-7.
+        grid: 8x8 list of Piece | None representing the logical board state.
+        master: BoardSensor used to query physical reed-switch sensor data.
+        computer_player_r: Whether team_r is controlled by the AI.
+        computer_player_l: Whether team_l is controlled by the AI.
+        checker_brightness: Current brightness level of the pulsing checker animation.
+        checker_brightness_dir: Direction (+/-) of brightness pulse each frame.
+        game_over: Flag set to True when the game has ended.
+        peace_time: Consecutive moves without a capture or pawn move (fifty-move rule counter).
+        team_array: Palette of 8 Team colour options shown during colour selection.
+    """
 
     def __init__(self, *args, sensor: BoardSensor | None = None, **kwargs):
         super(Board, self).__init__(*args, **kwargs)
@@ -66,6 +87,12 @@ class Board(SampleBase):
             self.grid.append([None, None, None, None, None, None, None, None])
 
     def run(self):
+        """Execute the full game loop from setup to game-over.
+
+        Calls color_picker, war_games, and create_players to configure the
+        session, then runs interactive_setup for both teams before entering
+        the main alternating turn loop until self.game_over is set.
+        """
         logger.info("Running game...")
         self.canvas = self.matrix.CreateFrameCanvas()
 
@@ -110,10 +137,26 @@ class Board(SampleBase):
             self.canvas = self.matrix.SwapOnVSync(self.canvas)
 
     def light_path(self, start_row, start_col, end_row, end_col):
+        """Compute incremental steps for animating a path between two cells.
+
+        Args:
+            start_row: Row index of the path origin.
+            start_col: Column index of the path origin.
+            end_row: Row index of the path destination.
+            end_col: Column index of the path destination.
+        """
         row_increment = (end_row - start_row) / 8.0
         col_increment = (end_col - start_col) / 8.0
 
     def light_checker_town(self, canvas):
+        """Paint the alternating white checker pattern on the given canvas.
+
+        Lights every dark square of the standard chess checkerboard at full
+        white (255, 255, 255) so players can orient the physical board.
+
+        Args:
+            canvas: The RGBMatrix frame canvas to draw onto.
+        """
         r = 255
         g = 255
         b = 255
@@ -125,6 +168,12 @@ class Board(SampleBase):
                 self.light_cell(canvas, 2 * x, 1 + 2 * y, r, g, b)
 
     def choose_light_checker_town(self):
+        """Paint the checker pattern at the current pulsing brightness level.
+
+        Uses self.checker_brightness (0–255) rather than full white, producing
+        the breathing animation shown during AI thinking and piece setup.
+        Draws onto self.canvas directly.
+        """
         r = self.checker_brightness
         g = self.checker_brightness
         b = self.checker_brightness
@@ -136,6 +185,15 @@ class Board(SampleBase):
                 self.light_cell(self.canvas, 2 * x, 1 + 2 * y, r, g, b)
 
     def interactive_setup(self, team):
+        """Guide a team through placing all 16 pieces on the physical board.
+
+        Sequentially calls detect_piece for each back-rank piece and
+        detect_pawns for the pawn row, waiting for reed switches to confirm
+        each placement before moving on.
+
+        Args:
+            team: The Team whose pieces are being set up (team_r or team_l).
+        """
         if team == self.team_r:
             self.detect_piece(team, "Rook", 0, 0)
             self.detect_piece(team, "Rook", 0, 7)
@@ -158,6 +216,15 @@ class Board(SampleBase):
             self.detect_pawns(team, 6)
 
     def detect_mismatch(self):
+        """Block until the physical board matches the logical grid for both teams.
+
+        Polls the reed-switch sensors and highlights in red any cell where the
+        software expects a piece but the sensor reads EMPTY. Loops separately
+        for team_r and team_l until both pass without a discrepancy.
+
+        Returns:
+            True once both teams' physical positions match the software state.
+        """
         self.master.read_data()
         r = 255
         g = 0
@@ -202,6 +269,16 @@ class Board(SampleBase):
         return True
 
     def detect_pawns(self, team, row):
+        """Wait for all eight pawns to be placed on the given row.
+
+        Lights unoccupied cells white and switches them to the team colour once
+        the reed switch detects a piece. Loops until all eight cells in the row
+        are occupied.
+
+        Args:
+            team: The Team whose pawns are being placed (determines LED colour).
+            row: Board row index (0–7) where the pawns belong.
+        """
         for col in range(8):
             self.light_cell(self.canvas, row, col, 255, 255, 255)
         placed = False
@@ -217,6 +294,17 @@ class Board(SampleBase):
             time.sleep(0.1)
 
     def detect_piece(self, team, piece, row, col):
+        """Wait for a single piece to be placed on the specified cell.
+
+        Lights the target cell white until the reed switch at (row, col)
+        reports OCCUPIED, then switches the LED to the team colour.
+
+        Args:
+            team: The Team that owns the piece (determines LED colour).
+            piece: String name of the piece type (e.g. "King", "Rook").
+            row: Board row index of the expected cell.
+            col: Board column index of the expected cell.
+        """
         self.light_cell(self.canvas, row, col, 255, 255, 255)
         placed = False
         while not placed:
@@ -227,6 +315,19 @@ class Board(SampleBase):
         self.light_cell(self.canvas, row, col, team.r, team.g, team.b)
 
     def detect_lift_off(self, team):
+        """Check whether a team's piece has been lifted from the board.
+
+        Scans all pieces belonging to team and returns the first one whose
+        cell now reads EMPTY on the sensor.
+
+        Args:
+            team: The Team whose pieces are checked for lift-off.
+
+        Returns:
+            A tuple (valid, lifted) where valid is True if a piece was lifted
+            and lifted is the Piece object that was picked up, or None if no
+            piece was lifted.
+        """
         valid_pieces = self.get_team_pieces(team)
         self.master.read_data()
         valid = False
@@ -239,6 +340,15 @@ class Board(SampleBase):
         return valid, lifted
 
     def get_team_pieces(self, team, grid=None):
+        """Return a flat list of all pieces belonging to a team on a given grid.
+
+        Args:
+            team: The Team to filter by (matched via team.r colour value).
+            grid: Optional 8x8 board state to search; defaults to self.grid.
+
+        Returns:
+            A list of Piece objects whose team colour matches the given team.
+        """
         if grid is None:
             grid = self.grid
         valid_pieces = []
@@ -249,6 +359,20 @@ class Board(SampleBase):
         return valid_pieces
 
     def detect_landing(self, piece):
+        """Detect where a lifted piece has been set down.
+
+        Checks the piece's origin cell and each of its valid target cells
+        against the sensor. If the piece is set down on an occupied target,
+        pulses the target LED until the captured piece is physically removed.
+
+        Args:
+            piece: The Piece that was lifted, whose targets list is inspected.
+
+        Returns:
+            A tuple (valid, cell) where valid is True if the piece landed on a
+            legal square and cell is the Cell it landed on, or (False, None)
+            if no landing was detected yet.
+        """
         self.master.read_data()
         targets = piece.targets
         valid = False
@@ -279,6 +403,16 @@ class Board(SampleBase):
         return valid, activated_target
 
     def declare_victory(self, team):
+        """Display the victory animation for the winning team.
+
+        The border of the LED matrix is lit in the winner's colour and the
+        interior cells cycle through random colours. Loops until check_new_game
+        signals that pieces have been reset for a new game.
+
+        Args:
+            team: The Team that lost (the opposite team's colour is displayed
+                as the winner).
+        """
         if team == self.team_l:
             team = self.team_r
         else:
@@ -302,6 +436,11 @@ class Board(SampleBase):
             self.canvas = self.matrix.SwapOnVSync(self.canvas)
 
     def declare_stalemate(self):
+        """Display the stalemate animation splitting the board between both teams.
+
+        The top four rows are lit in team_r's colour and the bottom four in
+        team_l's colour. Loops until check_new_game signals a board reset.
+        """
         self.canvas.Clear()
         for i in range(4):
             for j in range(8):
@@ -315,6 +454,17 @@ class Board(SampleBase):
                 return
 
     def do_turn(self, team):
+        """Process a single human player turn for the given team.
+
+        Calculates legal moves for all pieces, checks for checkmate and
+        stalemate, verifies the physical board state, then waits for the
+        player to lift a piece and set it down on a valid target square.
+        Updates the logical grid and calls _apply_move once a valid move is
+        confirmed.
+
+        Args:
+            team: The Team whose turn it is (team_r or team_l).
+        """
         if self.check_fifty_move_rule(team, self.grid):
             return
 
@@ -424,6 +574,14 @@ class Board(SampleBase):
                         self.canvas = self.matrix.SwapOnVSync(self.canvas)
 
     def light_targets(self, piece):
+        """Illuminate all valid target squares for a piece in its team colour.
+
+        Reads piece.get_targets() and calls light_cell for each target cell
+        using the piece's team RGB values.
+
+        Args:
+            piece: The Piece whose target squares should be highlighted.
+        """
         r = piece.team.r
         g = piece.team.g
         b = piece.team.b
@@ -432,6 +590,11 @@ class Board(SampleBase):
             self.light_cell(self.canvas, cell.row, cell.col, r, g, b)
 
     def initialize_game_board(self):
+        """Populate self.grid with the standard chess starting position.
+
+        Places all 32 pieces for both teams: team_r occupies rows 0–1 and
+        team_l occupies rows 6–7 with the conventional piece arrangement.
+        """
         for col in range(8):
             self.grid[1][col] = Pawn(1, col, self.team_r)
         self.grid[0][2] = Bishop(0, 2, self.team_r)
@@ -455,6 +618,11 @@ class Board(SampleBase):
         self.grid[7][4] = King(7, 4, self.team_l)
 
     def initialize_game_board2(self):
+        """Populate self.grid with a custom mid-game test position (scenario 2).
+
+        Places a reduced set of pieces for both teams in a specific layout used
+        for development and testing of chess logic.
+        """
         for col in range(7):
             self.grid[1][col] = Pawn(1, col, self.team_r)
         self.grid[5][7] = Pawn(5, 7, self.team_r)
@@ -471,6 +639,11 @@ class Board(SampleBase):
         self.grid[7][4] = King(7, 4, self.team_l)
 
     def initialize_game_board3(self):
+        """Populate self.grid with a custom mid-game test position (scenario 3).
+
+        Places pieces for both teams in a specific layout with pre-touched kings
+        used for development and testing of castling and pin logic.
+        """
         self.grid[1][0] = Pawn(1, 0, self.team_r)
         self.grid[2][1] = Pawn(2, 1, self.team_r)
         self.grid[1][6] = Pawn(1, 6, self.team_r)
@@ -500,6 +673,11 @@ class Board(SampleBase):
         self.grid[6][4].touched = True
 
     def initialize_game_board4(self):
+        """Populate self.grid with a custom mid-game test position (scenario 4).
+
+        Similar to scenario 3 but with a different pawn and rook layout, used
+        for development and testing of specific endgame patterns.
+        """
         self.grid[1][0] = Pawn(1, 0, self.team_r)
         self.grid[2][1] = Pawn(2, 1, self.team_r)
         self.grid[1][6] = Pawn(1, 6, self.team_r)
@@ -527,6 +705,11 @@ class Board(SampleBase):
         self.grid[6][4].touched = True
 
     def initialize_game_board5(self):
+        """Populate self.grid with a minimal pawn-and-king endgame (scenario 5).
+
+        Places a single pawn for team_r and a rook plus king for team_l, used
+        for testing pawn promotion and basic endgame scenarios.
+        """
         self.grid[6][1] = Pawn(6, 1, self.team_r)
         self.grid[6][1].direction = 1
         self.grid[6][1].starting_row = 1
@@ -538,6 +721,12 @@ class Board(SampleBase):
         self.grid[6][4].touched = True
 
     def initialize_game_board6(self):
+        """Populate self.grid with a complex multi-piece test position (scenario 6).
+
+        Places pawns, rooks, bishops, and kings for both teams with pre-set
+        directions and touched flags, used for testing advanced move logic
+        including passed pawns and rook activity.
+        """
         self.grid[1][0] = Pawn(1, 0, self.team_r)
         self.grid[1][0].direction = 1
         self.grid[1][0].starting_row = 1
@@ -586,6 +775,12 @@ class Board(SampleBase):
         self.grid[7][3].touched = True
 
     def create_players(self):
+        """Assign display names to both teams based on human/computer flags.
+
+        Sets team names to "Computer"/"Human" for AI games, or "Player 1"/
+        "Player 2" for two-human games, using the computer_player_r and
+        computer_player_l flags set during war_games.
+        """
         if self.computer_player_r:
             self.team_r.set_name("Computer")
             self.team_l.set_name("Human")
@@ -597,15 +792,44 @@ class Board(SampleBase):
             self.team_r.set_name("Player 1")
 
     def light_cell(self, canvas, x, y, r, g, b):
+        """Light an 8x8 pixel block on the LED matrix for board cell (x, y).
+
+        Delegates to the ui.renderer.light_cell helper, which maps the logical
+        (row, col) cell coordinate to the corresponding pixel region.
+
+        Args:
+            canvas: The RGBMatrix frame canvas to draw onto.
+            x: Board row index (0–7).
+            y: Board column index (0–7).
+            r: Red component (0–255).
+            g: Green component (0–255).
+            b: Blue component (0–255).
+        """
         _light_cell(canvas, x, y, r, g, b)
 
     def print_board_states(self, grid=None):
+        """Print each row of the board state to stdout for debugging.
+
+        Args:
+            grid: Optional 8x8 board state to print; defaults to self.grid.
+        """
         if grid is None:
             grid = self.grid
         for r in range(8):
             print(grid[r])
 
     def computer_move(self, team, depth=2):
+        """Compute and execute the AI's best move for the given team.
+
+        Calculates legal moves, checks for checkmate/stalemate, builds the
+        alpha-beta game tree via add_nodes, queries the AI for the best move,
+        then guides the physical board interaction (waiting for the human
+        operator to move the piece) before updating the logical grid.
+
+        Args:
+            team: The Team the AI is playing for (team_r or team_l).
+            depth: Minimax search depth; defaults to 2.
+        """
         if self.check_fifty_move_rule(team, self.grid):
             return
 
@@ -772,6 +996,15 @@ class Board(SampleBase):
         self.grid[old_row][old_col] = None
 
     def draw_board(self, board_state):
+        """Render a board state to the LED matrix with a pulsing checker background.
+
+        Advances the checker brightness animation by one step, draws the
+        checker pattern at the current brightness, then overlays each piece
+        in its team colour.
+
+        Args:
+            board_state: An 8x8 list of Piece | None to render.
+        """
         self.canvas.Clear()
         self.checker_brightness += self.checker_brightness_dir
         if self.checker_brightness <= 0:
@@ -791,6 +1024,13 @@ class Board(SampleBase):
         self.canvas = self.matrix.SwapOnVSync(self.canvas)
 
     def color_picker(self):
+        """Display the colour-selection UI and wait for both teams to choose colours.
+
+        Shows eight colour swatches on rows 2 and 5 of the LED matrix. Players
+        place a piece on their chosen column to select that colour. Rows 3 and 4
+        act as shutdown/restart triggers when both are occupied simultaneously.
+        Loops until team_r (row 2) and team_l (row 5) have each made a selection.
+        """
         self.canvas.Clear()
 
         for i in range(8):
@@ -902,6 +1142,13 @@ class Board(SampleBase):
         self.team_r.r = self.team_r.r + 1
 
     def war_games(self):
+        """Display the human-vs-computer selection UI and wait for both teams to decide.
+
+        Rows 3 and 4 are used as input rows. Columns 0–3 select "Human" and
+        columns 4–7 select "Computer" for each respective team. Animates a
+        pulsing indicator while waiting, then breaks once both teams have
+        committed to a choice.
+        """
         self.canvas.Clear()
         logger.info("The only winning move is not to play")
 
@@ -991,6 +1238,18 @@ class Board(SampleBase):
                 break
 
     def add_nodes(self, current_node, team, depth=2):
+        """Recursively expand the game tree by generating all legal moves.
+
+        For the given team at the current node, computes legal moves for every
+        piece (respecting check constraints), creates a deep-copied child board
+        state for each move, renders it via draw_board, and recurses for the
+        opposing team at depth - 1.
+
+        Args:
+            current_node: The Tree node whose children are to be populated.
+            team: The Team whose moves are generated at this ply.
+            depth: Remaining search depth; stops recursing when 0.
+        """
         if depth == 0:
             return
         team_king = None
@@ -1033,6 +1292,15 @@ class Board(SampleBase):
             self.add_nodes(child, team, depth - 1)
 
     def check_new_game(self):
+        """Determine whether the physical board has been reset for a new game.
+
+        Counts occupied cells per row. Returns True if the board is completely
+        empty or if rows 0, 1, 6, and 7 are all fully occupied (standard
+        starting position).
+
+        Returns:
+            True if a new game should begin, False otherwise.
+        """
         self.master.read_data()
         row_counts = [0] * 8
         total = 0
@@ -1048,8 +1316,34 @@ class Board(SampleBase):
             return False
 
     def check_fifty_move_rule(self, team, board_state):
+        """Check whether the fifty-move rule triggers a draw.
+
+        Delegates to the game.rules module. If the rule is triggered, the draw
+        is declared and the method returns True so the caller can return early.
+
+        Args:
+            team: The Team whose turn is being checked.
+            board_state: The current 8x8 board grid to evaluate.
+
+        Returns:
+            True if the fifty-move rule ends the game, False otherwise.
+        """
         return _rules.check_fifty_move_rule(self, team, board_state)
 
     def check_threefold_repetition(self, team, board_state, days_since_injury, double_jeopardy):
+        """Check whether the threefold repetition rule triggers a draw.
+
+        Delegates to the game.rules module. Compares the current board state
+        against the history tracked in days_since_injury and double_jeopardy.
+
+        Args:
+            team: The Team whose turn is being checked.
+            board_state: The current 8x8 board grid to evaluate.
+            days_since_injury: List tracking prior board states for this team.
+            double_jeopardy: List tracking repeated occurrences of states.
+
+        Returns:
+            True if threefold repetition ends the game, False otherwise.
+        """
         return _rules.check_threefold_repetition(
             self, team, board_state, days_since_injury, double_jeopardy)

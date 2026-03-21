@@ -9,30 +9,59 @@ import pygame
 
 
 class FakeFrameCanvas:
+    """Simulated LED frame canvas backed by a 32x32 pygame.Surface."""
+
     def __init__(self) -> None:
+        """Initialize a blank 32x32 surface."""
         self._surface = pygame.Surface((32, 32))
 
     def SetPixel(self, x: int, y: int, r: int, g: int, b: int) -> None:
+        """Set one LED pixel on the surface.
+
+        Args:
+            x: Row index (0–31).
+            y: Column index (0–31).
+            r: Red channel (0–255).
+            g: Green channel (0–255).
+            b: Blue channel (0–255).
+        """
         if 0 <= x < 32 and 0 <= y < 32:
             # pygame uses (col, row) — swap x/y
             self._surface.set_at((y, x), (r, g, b))
 
     def Clear(self) -> None:
+        """Fill the entire surface with black (all LEDs off)."""
         self._surface.fill((0, 0, 0))
 
 
 class FakeRGBMatrixOptions:
-    """Drop-in for RGBMatrixOptions — accepts all attribute assignments."""
+    """Drop-in for RGBMatrixOptions — accepts all attribute assignments silently."""
 
 
 class FakeRGBMatrix:
+    """Simulated RGBMatrix for the Mac Pygame simulator.
+
+    Replaces the Pi's hardware RGBMatrix. Renders to a pygame.Surface
+    scaled up by SCALE so each 1-pixel LED cell appears as a large square.
+    """
+
     SCALE = 30  # each 4×4 LED cell → 120×120 px; 32*30 = 960 px window
 
     def __init__(self, options=None) -> None:
+        """Initialize with no attached screen; caller must set _screen before rendering.
+
+        Args:
+            options: Ignored; present only for API compatibility.
+        """
         self._screen: pygame.Surface | None = None
         self._canvas = FakeFrameCanvas()
 
     def CreateFrameCanvas(self) -> FakeFrameCanvas:
+        """Return the single shared FakeFrameCanvas.
+
+        Returns:
+            The canvas instance used for all pixel writes.
+        """
         return self._canvas
 
     def SwapOnVSync(self, canvas: FakeFrameCanvas) -> FakeFrameCanvas:
@@ -51,6 +80,6 @@ class FakeRGBMatrix:
         self._screen.blit(scaled, (0, 0))
 
     def flip(self) -> None:
-        """Scale, blit, and present to screen."""
+        """Scale the canvas, blit it to the pygame screen, and present the frame."""
         self.blit_to_screen()
         pygame.display.flip()

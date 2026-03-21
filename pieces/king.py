@@ -7,8 +7,28 @@ from core.constants import PieceValue
 
 
 class King(Piece):
+    """The king chess piece.
+
+    Moves one square in any direction. Responsible for detecting check,
+    computing castling eligibility, identifying pinned friendly pieces, and
+    building the set of squares that would resolve a check.
+
+    Attributes:
+        direction: +1 for the king starting on row 0, -1 for row 7. Used when
+            checking pawn-attack direction during find_attacker().
+        king_escape_cells: Squares that, if moved to by any friendly piece,
+            would resolve a current check (i.e., the attacker's square and all
+            squares between the attacker and the king on the attack ray).
+    """
 
     def __init__(self, row: int, col: int, team: Team) -> None:
+        """Initializes the King at the given board position.
+
+        Args:
+            row: Starting row on the board.
+            col: Starting column on the board.
+            team: The team this king belongs to.
+        """
         self.row = row
         self.col = col
         self.targets: list[Cell] = []
@@ -22,6 +42,19 @@ class King(Piece):
         self.king_escape_cells: list[Cell] = []
 
     def _walk(self, board: BoardGrid, dr: int, dc: int, row: int, col: int) -> None:
+        """Adds the single adjacent square in direction (dr, dc) to self.targets if reachable.
+
+        The square is considered reachable if it is on the board and either
+        empty or occupied by an enemy piece. Does not check whether the square
+        is safe — that filtering happens in calc_targets().
+
+        Args:
+            board: The current 8x8 board state.
+            dr: Row step (-1, 0, or 1).
+            dc: Column step (-1, 0, or 1).
+            row: The king's current row.
+            col: The king's current column.
+        """
         if 0 <= row + dr <= 7 and 0 <= col + dc <= 7:
             if board[row + dr][col + dc] is None:
                 self.targets.append(Cell(row + dr, col + dc))
@@ -29,6 +62,25 @@ class King(Piece):
                 self.targets.append(Cell(row + dr, col + dc))
 
     def calc_targets(self, board: BoardGrid) -> bool:
+        """Populates self.targets with legal king moves and returns whether the king is in check.
+
+        Steps performed:
+        1. Generates all one-step candidate squares via _walk().
+        2. Adds castling destinations (queen-side col-2, king-side col+2) if
+           the king and the relevant rook are both untouched and the squares
+           between them are empty.
+        3. Simulates each candidate move on the board to detect self-check via
+           find_attacker(); unsafe squares are removed.
+        4. Castling is additionally disallowed if the king is currently in
+           check or if the intermediate step square is attacked.
+
+        Args:
+            board: The current 8x8 board state.
+
+        Returns:
+            True if the king is currently in check after all filtering, False
+            otherwise.
+        """
         from pieces.rook import Rook
         self.targets = []
         self._walk(board, 1, 1, self.row, self.col)
@@ -106,12 +158,40 @@ class King(Piece):
         return in_check
 
     def get_value(self, board: BoardGrid) -> int:
+        """Returns the heuristic value of the king.
+
+        Returns PieceValue.KING normally, or 0 if the king is currently in
+        check (signaling a degraded position to the AI evaluator).
+
+        Args:
+            board: The current 8x8 board state.
+
+        Returns:
+            Integer heuristic score for this king.
+        """
         value = PieceValue.KING
         if self.find_attacker(board):
             value = 0
         return value
 
     def move(self, new_row: int, new_col: int, board: BoardGrid) -> tuple[Cell | None, Cell | None]:
+        """Moves the king and signals the rook positions involved in a castling move.
+
+        Updates the king's position and marks it as touched. If the move is a
+        two-square horizontal move, it is a castling move and the method returns
+        the rook's current cell and its destination cell so the caller can
+        reposition the rook on the board.
+
+        Args:
+            new_row: Destination row.
+            new_col: Destination column.
+            board: The current 8x8 board state (not mutated here; the caller
+                is responsible for updating rook position on castling).
+
+        Returns:
+            A (rook_from_cell, rook_to_cell) tuple if castling, or
+            (None, None) for a regular king move.
+        """
         old_row = self.row
         old_col = self.col
         self.row = new_row
@@ -125,6 +205,23 @@ class King(Piece):
             return None, None
 
     def find_attacker(self, board: BoardGrid) -> tuple[int, int]:
+        """Scans the board for any enemy piece currently giving check to this king.
+
+        Also clears and resets the critical (pin) flags on all friendly pieces,
+        then re-evaluates pins by examining every ray from the king outward. A
+        friendly piece on a ray is marked critical (pinned) when an enemy
+        sliding piece of the correct type lies further along the same ray.
+
+        Sets self.king_escape_cells to the squares that would block or capture
+        the checking piece if check is detected.
+
+        Args:
+            board: The current 8x8 board state.
+
+        Returns:
+            (row, col) of the attacking piece if the king is in check, or
+            (-1, -1) if the king is safe.
+        """
         from pieces.rook import Rook
         from pieces.bishop import Bishop
         from pieces.knight import Knight
@@ -205,6 +302,32 @@ class King(Piece):
         dr: int,
         dc: int,
     ) -> tuple[int, int, int, int]:
+        """Scans a ray outward from the king to detect checks and pins.
+
+        Walks the ray one square at a time:
+        - Empty square: recurse further along the ray.
+        - Enemy piece with no friendly piece between it and the king:
+          returns (enemy_row, enemy_col, -1, -1) indicating a direct threat.
+        - Friendly piece encountered first: uses _ray_cast() from that
+          friendly piece's position to look for an enemy behind it. If found,
+          returns (enemy_row, enemy_col, friendly_row, friendly_col) indicating
+          a pin; the friendly piece is the scout.
+
+        Args:
+            board: The current 8x8 board state.
+            current_row: Row of the square currently being examined.
+            current_col: Column of the square currently being examined.
+            dr: Row step direction (-1, 0, or 1).
+            dc: Column step direction (-1, 0, or 1).
+
+        Returns:
+            A four-tuple (enemy_row, enemy_col, scout_row, scout_col).
+            enemy_row/enemy_col: position of the threatening enemy piece, or
+                -1/-1 if none found on this ray.
+            scout_row/scout_col: position of the pinned friendly piece, or
+                -1/-1 if the king is directly threatened (no friendly piece
+                between the king and the attacker).
+        """
         next_loc = (
             0 <= current_row + dr < 8 and 0 <= current_col + dc < 8
         )
@@ -230,6 +353,18 @@ class King(Piece):
         row: int,
         col: int,
     ) -> tuple[int, int]:
+        """Checks whether an enemy knight occupies the given L-shaped offset from (row, col).
+
+        Args:
+            board: The current 8x8 board state.
+            dr: Row offset for the knight jump.
+            dc: Column offset for the knight jump.
+            row: The king's current row.
+            col: The king's current column.
+
+        Returns:
+            (row+dr, col+dc) if an enemy knight is at that square, else (-1, -1).
+        """
         from pieces.knight import Knight
         if 0 <= row + dr <= 7 and 0 <= col + dc <= 7:
             if (isinstance(board[row + dr][col + dc], Knight)
@@ -238,6 +373,21 @@ class King(Piece):
         return -1, -1
 
     def build_check_escape_path(self, enemy_row: int, enemy_col: int) -> list[Cell]:
+        """Builds the list of squares a friendly piece can move to in order to resolve a check.
+
+        Starts at the attacker's square and steps toward the king, collecting
+        every intermediate square (inclusive of the attacker, exclusive of the
+        king itself). A friendly piece can resolve the check by moving to any
+        one of these squares (either capturing the attacker or interposing).
+
+        Args:
+            enemy_row: Row of the attacking piece.
+            enemy_col: Column of the attacking piece.
+
+        Returns:
+            List of Cell objects from the attacker's square to the square
+            immediately adjacent to the king along the attack ray.
+        """
         dr, dc = self.determine_direction_from_enemy_towards_king(enemy_row, enemy_col)
         save_the_king: list[Cell] = []
         while not (enemy_row == self.row and enemy_col == self.col):
@@ -249,6 +399,19 @@ class King(Piece):
     def determine_direction_from_enemy_towards_king(
         self, enemy_row: int, enemy_col: int
     ) -> tuple[float, float]:
+        """Computes the unit step (dr, dc) pointing from the attacker toward the king.
+
+        Handles three cases: same row (horizontal ray), same column (vertical
+        ray), and diagonal rays. Each component is either 0, +1, or -1.
+
+        Args:
+            enemy_row: Row of the attacking piece.
+            enemy_col: Column of the attacking piece.
+
+        Returns:
+            A (dr, dc) tuple of floats representing the normalized direction
+            from the attacker toward the king.
+        """
         if enemy_row == self.row:
             return 0, -1 * (enemy_col - self.col) / abs(enemy_col - self.col)
         elif enemy_col == self.col:
@@ -260,4 +423,5 @@ class King(Piece):
             )
 
     def print_piece(self) -> None:
+        """Prints the piece type and current position to stdout."""
         print("King at", self.row, ",", self.col)

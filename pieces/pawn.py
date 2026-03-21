@@ -6,7 +6,30 @@ from core.constants import PieceValue
 
 
 class Pawn(Piece):
+    """A pawn chess piece.
+
+    Moves one square forward, captures diagonally, and supports en passant
+    and promotion to Queen upon reaching the opposite back rank.
+
+    Attributes:
+        starting_row: The row the pawn occupied at the start of the game.
+        starting_col: The column the pawn occupied at the start of the game.
+        direction: +1 for pawns starting on row 1 (moving toward row 7),
+            -1 for pawns starting on row 6 (moving toward row 0).
+        en_passantable: True for exactly one turn after this pawn advances
+            two squares, making it capturable via en passant.
+        en_passant_loc: The square to move to when capturing en passant,
+            or None if no en passant capture is currently available.
+    """
+
     def __init__(self, row: int, col: int, team) -> None:
+        """Initializes a Pawn at the given board position.
+
+        Args:
+            row: Starting row on the board.
+            col: Starting column on the board.
+            team: The team this pawn belongs to.
+        """
         self.row = row
         self.col = col
         self.targets: list[Cell] = []
@@ -23,6 +46,18 @@ class Pawn(Piece):
         self.critical_targets: list[Cell] = []
 
     def calc_targets(self, board: BoardGrid) -> None:
+        """Populates self.targets with all legal pawn moves on the given board.
+
+        Computes diagonal captures, one-square advances, the optional two-square
+        advance from the starting row, and en passant captures. Applies pin
+        filtering if the pawn is pinned (self.critical is True).
+
+        Sets self.en_passant_loc to the destination square if an en passant
+        capture is available, otherwise leaves it as None.
+
+        Args:
+            board: The current 8x8 board state.
+        """
         from pieces.pawn import Pawn  # local import to avoid circular ref at class level
         self.en_passant_loc = None
         self.targets = []
@@ -61,6 +96,18 @@ class Pawn(Piece):
             super().filter_to_pin_ray()
 
     def get_value(self, board: BoardGrid) -> int:
+        """Returns the heuristic value of this pawn.
+
+        Base value from PieceValue.PAWN, plus one point per reachable square,
+        and an extra point for each target in the four central squares
+        (rows 3–4, cols 3–4).
+
+        Args:
+            board: The current 8x8 board state.
+
+        Returns:
+            Integer heuristic score for this pawn.
+        """
         self.calc_targets(board)
         total = PieceValue.PAWN
         total = total + len(self.targets)
@@ -71,6 +118,16 @@ class Pawn(Piece):
         return total
 
     def filter_to_king_escape(self, king) -> None:
+        """Restricts targets to squares that resolve a check, preserving en passant.
+
+        Overrides Piece.filter_to_king_escape() to also keep the en passant
+        destination when one is available, since capturing the attacker via
+        en passant can itself resolve the check.
+
+        Args:
+            king: The friendly King whose king_escape_cells define the squares
+                that resolve the check.
+        """
         new_targets = []
         for target in self.targets:
             for saving_target in king.king_escape_cells:
@@ -81,6 +138,28 @@ class Pawn(Piece):
         self.targets = new_targets
 
     def move(self, new_row: int, new_col: int, board: BoardGrid) -> Cell | None:
+        """Moves the pawn, handling promotion, en passant flag, and en passant capture.
+
+        If the pawn reaches the opposite back rank it is immediately replaced
+        on the board by a Queen of the same team.
+
+        If the pawn advances two squares from its starting position,
+        self.en_passantable is set to True so adjacent enemy pawns can capture
+        it via en passant on the very next turn.
+
+        If the destination matches self.en_passant_loc, this is an en passant
+        capture and the method returns the Cell of the captured pawn so the
+        caller can remove it from the board.
+
+        Args:
+            new_row: Destination row.
+            new_col: Destination column.
+            board: The current 8x8 board state (mutated in-place on promotion).
+
+        Returns:
+            The Cell of the enemy pawn captured via en passant, or None if this
+            was a normal move or advance.
+        """
         from pieces.queen import Queen
         old_row = self.row
         old_col = self.col
@@ -100,4 +179,5 @@ class Pawn(Piece):
             return None
 
     def print_piece(self) -> None:
+        """Prints the piece type and current position to stdout."""
         print("Pawn at", self.row, ",", self.col)

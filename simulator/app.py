@@ -82,14 +82,34 @@ class _PanelLogHandler(logging.Handler):
     """Captures log records into a deque for display in the side panel."""
 
     def __init__(self, maxlines: int = 120) -> None:
+        """Initialize the handler with a fixed-capacity record deque.
+
+        Args:
+            maxlines: Maximum number of log records to retain before the
+                oldest entries are discarded.
+        """
         super().__init__()
         self.records: collections.deque = collections.deque(maxlen=maxlines)
 
     def emit(self, record: logging.LogRecord) -> None:
+        """Append a log record to the internal deque for panel display.
+
+        Args:
+            record: The log record produced by the logging framework.
+        """
         self.records.append(record)
 
 
 class Phase(Enum):
+    """Finite-state-machine phases that govern the simulator's game loop.
+
+    Attributes:
+        COLOR_PICK: Players are choosing team colours on the LED grid.
+        WAR_GAMES: Players are selecting Human vs. AI for each side.
+        PLAYING: The chess game is in progress.
+        GAME_OVER: The game has ended (checkmate, stalemate, or draw).
+    """
+
     COLOR_PICK = auto()
     WAR_GAMES = auto()
     PLAYING = auto()
@@ -102,6 +122,12 @@ class GameRunner:
     # ── Lifecycle ──────────────────────────────────────────────────────────────
 
     def __init__(self) -> None:
+        """Set up the persistent panel log handler and perform the first reset.
+
+        The panel log handler is attached to the root logger here so it
+        survives across game resets. All other mutable state is delegated
+        to `_reset()`.
+        """
         self._board: Optional[Board] = None
         # Panel log handler — created once so it persists across resets
         self._panel_handler = _PanelLogHandler(maxlines=120)
@@ -114,6 +140,13 @@ class GameRunner:
         self._reset()
 
     def _reset(self) -> None:
+        """Reset all transient game state back to initial values.
+
+        Clears phase, team selections, piece selections, AI worker state,
+        game-over flags, duck-typed board attributes consumed by
+        ``game/rules.py``, move counters, and WAR_GAMES animation counters.
+        Does NOT destroy the ``_board`` instance or the panel log handler.
+        """
         self.phase = Phase.COLOR_PICK
 
         # Color-pick transient state
@@ -183,16 +216,36 @@ class GameRunner:
 
     @property
     def team_r(self) -> Team:
+        """Return the right (first) player's Team object from the active Board.
+
+        Returns:
+            The Team instance for the right-hand player.
+        """
         return self._board.team_r
 
     @property
     def team_l(self) -> Team:
+        """Return the left (second) player's Team object from the active Board.
+
+        Returns:
+            The Team instance for the left-hand player.
+        """
         return self._board.team_l
 
     # ── Coordinate helpers ─────────────────────────────────────────────────────
 
     @staticmethod
     def _px_to_cell(px: int, py: int) -> Optional[tuple[int, int]]:
+        """Convert a screen pixel coordinate to a board (row, col) index.
+
+        Args:
+            px: Pixel x-coordinate within the board canvas area.
+            py: Pixel y-coordinate within the board canvas area.
+
+        Returns:
+            A ``(row, col)`` tuple if the pixel falls within the 8x8 grid,
+            or ``None`` if it is outside the board area.
+        """
         row = py // _CELL_PX
         col = px // _CELL_PX
         if 0 <= row < 8 and 0 <= col < 8:
@@ -202,6 +255,16 @@ class GameRunner:
     # ── Team-piece helpers ─────────────────────────────────────────────────────
 
     def _get_team_pieces(self, team: Team, grid=None) -> list:
+        """Collect all pieces on the board that belong to the given team.
+
+        Args:
+            team: The team whose pieces should be returned.
+            grid: An optional 8x8 board grid to search. Defaults to the
+                live ``Board.grid`` when not provided.
+
+        Returns:
+            A flat list of ``Piece`` instances owned by ``team``.
+        """
         b = self._board
         if grid is None:
             grid = b.grid
@@ -212,6 +275,19 @@ class GameRunner:
 
     def _apply_move(self, old_row: int, old_col: int,
                     target_row: int, target_col: int) -> None:
+        """Finalize a piece move on the live board grid.
+
+        Calls the appropriate piece-specific ``move()`` method to handle
+        special rules (en passant for Pawns, castling for Kings), then
+        clears the origin square. The destination square must already hold
+        the moving piece before this method is called.
+
+        Args:
+            old_row: Row index the piece moved from.
+            old_col: Column index the piece moved from.
+            target_row: Row index the piece moved to.
+            target_col: Column index the piece moved to.
+        """
         b = self._board
         piece = b.grid[target_row][target_col]
         if isinstance(piece, Pawn):
@@ -232,6 +308,24 @@ class GameRunner:
         b.grid[old_row][old_col] = None
 
     def _add_nodes(self, node: Tree, team: Team, depth: int = 2) -> None:
+        """Recursively expand a game-tree node with all legal moves for a team.
+
+        For each piece belonging to ``team`` in ``node.board_state``, legal
+        targets are computed (with check filtering applied), a deep-copied
+        child board is created for every target, and the resulting ``Tree``
+        nodes are attached as children. The opponent's moves are then
+        expanded recursively until ``depth`` reaches zero.
+
+        As boards are generated they are also written to
+        ``_ai_display_board`` (under ``_ai_display_lock``) so the render
+        loop can animate the AI's search in real time.
+
+        Args:
+            node: The parent game-tree node to expand.
+            team: The team whose moves are generated at this ply.
+            depth: Remaining half-moves (plies) to expand. Expansion stops
+                when this reaches zero.
+        """
         b = self._board
         if depth == 0:
             return
@@ -301,11 +395,29 @@ class GameRunner:
         logger.info("Stalemate — draw declared.")
 
     def _declare_victory(self, losing_team: Team) -> None:
+        """Record the winning team and transition to the GAME_OVER phase.
+
+        Args:
+            losing_team: The team that has been checkmated; the opponent is
+                stored as the winner.
+        """
         b = self._board
         self._winner_team = b.team_r if losing_team.r == b.team_l.r else b.team_l
         self.phase = Phase.GAME_OVER
 
     def _begin_turn(self, team: Team) -> None:
+        """Set up the board state at the start of a team's turn.
+
+        Checks the fifty-move rule, calculates legal moves for every piece
+        belonging to ``team`` (applying king-escape filtering when the king
+        is in check), and detects checkmate or stalemate when no moves
+        remain. Updates ``_in_check`` and ``_king_check_pos`` for the
+        renderer and kicks off the AI worker when the active team is
+        computer-controlled.
+
+        Args:
+            team: The team whose turn is beginning.
+        """
         b = self._board
         if _rules.check_fifty_move_rule(self, team, b.grid):
             return
@@ -376,6 +488,11 @@ class GameRunner:
             self._ai_result = AI(root, self._current_team).alpha_beta_search()
 
     def _next_turn(self) -> None:
+        """Clear per-turn state and hand control to the opposing team.
+
+        Resets the selected piece, check indicators, and AI flag, then
+        swaps the active team and calls ``_begin_turn`` for the new side.
+        """
         b = self._board
         self._selected_piece = None
         self._in_check = False
@@ -388,6 +505,12 @@ class GameRunner:
     # ── Rendering ──────────────────────────────────────────────────────────────
 
     def _render_color_pick(self) -> None:
+        """Render the colour-selection screen to the LED canvas.
+
+        Lights row 2 with all eight team colours for the right player and
+        row 5 for the left player. Once a side has made a selection, all
+        other colour cells on that row are dimmed to a quarter brightness.
+        """
         b = self._board
         b.canvas.Clear()
         r_sel = self._selected_r_idx
@@ -406,6 +529,15 @@ class GameRunner:
         b.matrix.blit_to_screen()
 
     def _render_war_games(self) -> None:
+        """Render the Human-vs-AI selection screen to the LED canvas.
+
+        Row 3 represents the right team (cols 0-3 = Human, cols 4-7 = AI)
+        and row 4 represents the left team (cols 0-3 = AI, cols 4-7 = Human),
+        mirroring the layout of ``Board.war_games()``. Unselected halves
+        show an animated single-dot sweep on a white background; confirmed
+        AI choices show a sweeping dot, confirmed Human choices show a solid
+        team-colour fill.
+        """
         b = self._board
         b.canvas.Clear()
         think = self._think
@@ -535,6 +667,14 @@ class GameRunner:
                                                (cx, cy), r_circle + 4, 3)
 
     def _render_playing(self) -> None:
+        """Render one frame of the active chess game to the LED canvas.
+
+        While the AI is thinking, pulses the checker pattern and draws the
+        AI's currently-considered board state as a piece overlay. During a
+        human turn, draws a static white checker pattern, highlights legal
+        target squares for the selected piece, blinks the selected piece's
+        cell, and overlays all pieces as Unicode-symbol circles.
+        """
         b = self._board
         b.canvas.Clear()
 
@@ -570,6 +710,14 @@ class GameRunner:
             self._draw_piece_overlay()
 
     def _render_game_over(self) -> None:
+        """Render the game-over screen to the LED canvas.
+
+        On a draw, the top four rows are lit in the right team's colour and
+        the bottom four in the left team's colour. On a win, the border
+        cells pulse the winner's colour while the 6x6 inner grid cycles
+        through random colours at roughly 20 fps, matching the Pi's
+        ``time.sleep(0.05)`` animation.
+        """
         b = self._board
         b.canvas.Clear()
         if self._is_draw:
@@ -606,6 +754,16 @@ class GameRunner:
     # ── Event handlers ─────────────────────────────────────────────────────────
 
     def _handle_color_pick(self, event: pygame.event.Event) -> None:
+        """Handle mouse clicks during the COLOR_PICK phase.
+
+        A click on row 2 assigns a colour to the right team; a click on
+        row 5 assigns a colour to the left team. Once both teams have
+        chosen, applies the Board's colour-picker bug lock-in and advances
+        the phase to WAR_GAMES.
+
+        Args:
+            event: The Pygame event to process.
+        """
         if event.type != pygame.MOUSEBUTTONDOWN:
             return
         cell = self._px_to_cell(*event.pos)
@@ -628,6 +786,16 @@ class GameRunner:
             self.phase = Phase.WAR_GAMES
 
     def _handle_war_games(self, event: pygame.event.Event) -> None:
+        """Handle mouse clicks during the WAR_GAMES phase.
+
+        A click on row 3 sets whether the right team is Human or AI
+        (cols 0-3 = Human, cols 4-7 = AI). A click on row 4 does the same
+        for the left team (cols 0-3 = AI, cols 4-7 = Human). Once both
+        sides are decided, ``_start_game()`` is called.
+
+        Args:
+            event: The Pygame event to process.
+        """
         if event.type != pygame.MOUSEBUTTONDOWN:
             return
         cell = self._px_to_cell(*event.pos)
@@ -643,6 +811,12 @@ class GameRunner:
             self._start_game()
 
     def _start_game(self) -> None:
+        """Initialize the board for play and begin the right team's first turn.
+
+        Calls ``Board.initialize_game_board()`` to place all pieces, sets
+        the active team to ``team_r``, transitions to the PLAYING phase, and
+        delegates to ``_begin_turn``.
+        """
         b = self._board
         b.initialize_game_board()
         self._current_team = b.team_r
@@ -655,6 +829,17 @@ class GameRunner:
         self._begin_turn(self._current_team)
 
     def _handle_playing(self, event: pygame.event.Event) -> None:
+        """Handle input during the PLAYING phase.
+
+        Pressing N resets the game. Mouse clicks outside the board deselect
+        the current piece. Clicks on the board either select a friendly
+        piece, execute a legal move for the already-selected piece, or
+        deselect if the same piece is clicked again. Input is ignored while
+        the AI is thinking.
+
+        Args:
+            event: The Pygame event to process.
+        """
         if event.type == pygame.KEYDOWN and event.key == pygame.K_n:
             self._reset()
             self._init_board()
@@ -702,11 +887,24 @@ class GameRunner:
                 self._selected_piece = piece
 
     def _handle_game_over(self, event: pygame.event.Event) -> None:
+        """Handle input during the GAME_OVER phase.
+
+        Pressing N resets all game state and re-initialises the board so a
+        new game can be started.
+
+        Args:
+            event: The Pygame event to process.
+        """
         if event.type == pygame.KEYDOWN and event.key == pygame.K_n:
             self._reset()
             self._init_board()
 
     def _handle_event(self, event: pygame.event.Event) -> None:
+        """Route a Pygame event to the handler for the current phase.
+
+        Args:
+            event: The Pygame event to dispatch.
+        """
         if self.phase == Phase.COLOR_PICK:
             self._handle_color_pick(event)
         elif self.phase == Phase.WAR_GAMES:
@@ -719,6 +917,14 @@ class GameRunner:
     # ── Update ─────────────────────────────────────────────────────────────────
 
     def _update(self) -> None:
+        """Advance time-driven state for the current frame.
+
+        During WAR_GAMES, advances the animation dot counters every 200 ms.
+        During PLAYING with an active AI, launches the AI worker thread on
+        the first call, and on subsequent calls checks whether the thread
+        has finished; when it has, applies the best move found and hands
+        off to the next turn.
+        """
         now = pygame.time.get_ticks()
         if self.phase == Phase.WAR_GAMES and now - self._last_think_ms >= 200:
             self._last_think_ms = now
@@ -889,6 +1095,11 @@ class GameRunner:
                 break
 
     def _render(self) -> None:
+        """Render the current frame by delegating to the phase-specific renderer.
+
+        Calls the appropriate ``_render_*`` method for the active phase,
+        then draws the side panel and flips the Pygame display buffer.
+        """
         if self.phase == Phase.COLOR_PICK:
             self._render_color_pick()
         elif self.phase == Phase.WAR_GAMES:
@@ -903,6 +1114,13 @@ class GameRunner:
     # ── Game loop ──────────────────────────────────────────────────────────────
 
     def run(self) -> None:
+        """Start the simulator: initialise Pygame, create the board, and run the game loop.
+
+        Configures the root logger, opens the Pygame window sized to fit the
+        LED board canvas plus the side panel, initialises the Board with
+        fake hardware, then enters the main 60 fps event/update/render loop
+        until the window is closed.
+        """
         logging.basicConfig(
             level=logging.DEBUG,
             format="%(levelname)s %(name)s: %(message)s",

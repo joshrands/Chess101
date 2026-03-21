@@ -1,3 +1,9 @@
+"""Base class for all Chess101 LED matrix programs.
+
+Provides argument parsing for rpi-rgb-led-matrix configuration flags and
+initialises the RGBMatrix hardware. Subclasses override run() with their
+rendering logic and call process() to start the loop.
+"""
 import argparse
 import time
 import sys
@@ -8,6 +14,19 @@ from rgbmatrix import RGBMatrix, RGBMatrixOptions
 
 
 class SampleBase(object):
+    """Base class providing LED matrix initialisation and CLI flag parsing.
+
+    Parses rpi-rgb-led-matrix flags (rows, cols, brightness, GPIO mapping,
+    etc.) from sys.argv, constructs an RGBMatrix with the resulting options,
+    then calls self.run() inside a KeyboardInterrupt guard.
+
+    Attributes:
+        parser: argparse.ArgumentParser pre-loaded with all matrix flags.
+        args: Parsed arguments namespace, set by process().
+        options: RGBMatrixOptions populated from args, set by process().
+        matrix: RGBMatrix instance, set by process().
+    """
+
     def __init__(self, *args, **kwargs):
         self.parser = argparse.ArgumentParser()
 
@@ -28,12 +47,27 @@ class SampleBase(object):
         self.parser.add_argument("--led-multiplexing", action="store", help="Multiplexing type: 0=direct; 1=strip; 2=checker; 3=spiral (Default: 0)", default=0, type=int, choices=[0,1,2,3])
 
     def usleep(self, value):
+        """Sleep for the given number of microseconds.
+
+        Args:
+            value: Duration in microseconds.
+        """
         time.sleep(value / 1000000.0)
 
     def run(self):
+        """Override in subclasses to implement the rendering loop."""
         print("Running")
 
     def process(self, skip_setup=False, init_num=""):
+        """Parse CLI flags, initialise RGBMatrix, then call run().
+
+        Applies all LED matrix options from parsed arguments before creating
+        the RGBMatrix instance. Catches KeyboardInterrupt so Ctrl-C exits
+        cleanly.
+
+        Returns:
+            True after run() returns normally.
+        """
         self.args = self.parser.parse_args()
 
         self.options = RGBMatrixOptions()
