@@ -1336,7 +1336,15 @@ class GameRunner:
         elif self.phase == Phase.GAME_OVER:
             self._render_game_over()
         self._render_panel()
+        self._pre_flip()
         pygame.display.flip()
+
+    def _pre_flip(self) -> None:
+        """Hook called just before ``pygame.display.flip()`` each frame.
+
+        Subclasses can override to blit overlays onto the screen without
+        causing a double-flip artefact.
+        """
 
     # ── Game loop ──────────────────────────────────────────────────────────────
 

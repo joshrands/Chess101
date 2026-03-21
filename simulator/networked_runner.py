@@ -125,6 +125,19 @@ class NetworkedGameRunner(GameRunner):
 
     # ── Helpers ────────────────────────────────────────────────────────────────
 
+    def _reset(self) -> None:
+        """Reset networked state alongside base game state."""
+        self._local_color_sent = False
+        self._remote_color_received = False
+        self._local_war_sent = False
+        self._remote_war_received = False
+        self._waiting_for_game_start = False
+        self._net_seq = 0
+        self._pending_send_move = None
+        self._waiting_for_ack = False
+        self._pending_remote_move = None
+        super()._reset()
+
     def _net_send(self, msg: dict) -> None:
         """Send a message over the active connection (thread-safe)."""
         if self._server:
@@ -167,6 +180,7 @@ class NetworkedGameRunner(GameRunner):
             "pong":              self._on_pong,
             "error":             self._on_error,
             "_peer_lost":        self._on_peer_lost,
+            "new_game":          self._on_new_game,
         }
         handler = handlers.get(t)
         if handler:
@@ -209,6 +223,18 @@ class NetworkedGameRunner(GameRunner):
         """Internal: peer disconnected, show overlay."""
         self._peer_disconnected = True
 
+    def _on_new_game(self, msg: dict) -> None:  # noqa: ARG002
+        """Peer pressed N — reset without re-broadcasting."""
+        self._reset()
+        self._init_board()
+        logger.info("New game triggered by peer")
+
+    def _new_game_local(self) -> None:
+        """Local player pressed N — broadcast then reset."""
+        self._net_send({"type": "new_game"})
+        self._reset()
+        self._init_board()
+
     def _on_hello(self, msg: dict) -> None:
         remote_ver = msg.get("version", "")
         if remote_ver != _PROTOCOL_VERSION:
@@ -216,7 +242,9 @@ class NetworkedGameRunner(GameRunner):
             self._net_send({"type": "error", "code": "version_mismatch"})
             return
         self._peer_name = msg.get("player_name", "Opponent")
-        peer_role       = msg.get("role", "guest")
+        self._peer_disconnected = False   # clear any stale flag from handshake hiccup
+        self._disconnect_time_ms = None
+        peer_role = msg.get("role", "guest")
         logger.info("Hello from %r (role=%s)", self._peer_name, peer_role)
 
         if self._role == NetworkRole.HOST:
@@ -549,8 +577,18 @@ class NetworkedGameRunner(GameRunner):
 
     # ── Overrides — PLAYING ───────────────────────────────────────────────────
 
+    def _handle_game_over(self, event: pygame.event.Event) -> None:
+        """N key broadcasts new_game to both sides then resets."""
+        if event.type == pygame.KEYDOWN and event.key == pygame.K_n:
+            self._new_game_local()
+            return
+        super()._handle_game_over(event)
+
     def _handle_playing(self, event: pygame.event.Event) -> None:
         """Block input during opponent's turn or while waiting for move_ack."""
+        if event.type == pygame.KEYDOWN and event.key == pygame.K_n:
+            self._new_game_local()
+            return
         if not self._is_my_turn() or self._waiting_for_ack:
             return
         # Capture move info before applying
@@ -723,6 +761,14 @@ class NetworkedGameRunner(GameRunner):
             role_label = f"Network ({self._role.name.capitalize()})"
         text(f"Mode    {role_label}", pfont_md, _P_DIM)
 
+        if self.phase == Phase.PLAYING and self._role != NetworkRole.SPECTATOR:
+            if self._peer_disconnected:
+                pass   # shown below
+            elif self._is_my_turn():
+                text(">>> YOUR TURN <<<", pfont_md, _P_GOOD)
+            else:
+                text(f"Waiting for {self._peer_name or 'opponent'}...", pfont_sm, _P_DIM)
+
         if self._peer_name:
             bars = "●" * 4   # static for now; could use ping RTT in future
             text(f"Peer    {self._peer_name}  {bars}", pfont_sm, _P_GOOD)
@@ -740,17 +786,30 @@ class NetworkedGameRunner(GameRunner):
             l_done = "✓" if self._physical_setup_l_complete else "…"
             text(f"Pi setup  R:{r_done}  L:{l_done}", pfont_sm, _P_DIM)
 
-    def _render(self) -> None:
-        """Dim the board when the peer has disconnected."""
-        super()._render()
-        if self._peer_disconnected and self.phase == Phase.PLAYING:
-            # Semi-transparent dark overlay on the board area
-            b = self._b
-            if b.matrix._screen is not None:
-                overlay = pygame.Surface((_BOARD_W, 32 * _SCALE), pygame.SRCALPHA)
-                overlay.fill((0, 0, 0, 140))
-                b.matrix._screen.blit(overlay, (0, 0))
-                pygame.display.flip()
+    def _pre_flip(self) -> None:
+        """Apply board overlay before the single display flip each frame.
+
+        Bright board  = it is your turn.
+        Light dim     = waiting for the opponent's move.
+        Heavy dim     = opponent disconnected.
+        """
+        if self.phase != Phase.PLAYING:
+            return
+        b = self._b
+        screen = b.matrix._screen
+        if screen is None:
+            return
+
+        if self._peer_disconnected:
+            alpha = 140   # heavy: disconnected
+        elif self._role != NetworkRole.SPECTATOR and not self._is_my_turn():
+            alpha = 70    # light: waiting for opponent
+        else:
+            return        # board stays bright — it is your turn
+
+        overlay = pygame.Surface((_BOARD_W, 32 * _SCALE), pygame.SRCALPHA)
+        overlay.fill((0, 0, 0, alpha))
+        screen.blit(overlay, (0, 0))
 
     # ── run() ─────────────────────────────────────────────────────────────────
 
