@@ -13,6 +13,10 @@ Tests focus on:
   - check_threefold_repetition (threefold repetition, including type-only comparison bug)
   - light_cell() pixel coordinates
   - add_nodes() tree depth behavior
+  - light_checker_town() colour parameter (from origin/master)
+  - choose_light_checker_town() brightness-scaled colour (from origin/master)
+  - run(skip_setup, init_num) quick-start flags (from origin/master)
+  - detect_mismatch() red bg + yellow pieces + both teams (from origin/master)
 """
 import copy
 import pytest
@@ -372,3 +376,209 @@ class TestAddNodes:
             # Old cell must be the rook's original position
             assert child.old_cell.row == 4
             assert child.old_cell.col == 4
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# light_checker_town(canvas, color) — colour parameter (from origin/master)
+# ─────────────────────────────────────────────────────────────────────────────
+
+class TestLightCheckerTown:
+    def test_default_color_is_white(self, board_instance):
+        b = board_instance
+        canvas = MagicMock()
+        b.light_checker_town(canvas)
+        for call in canvas.SetPixel.call_args_list:
+            args, _ = call
+            assert args[2] == 255  # r
+            assert args[3] == 255  # g
+            assert args[4] == 255  # b
+
+    def test_custom_color_is_passed_through(self, board_instance):
+        b = board_instance
+        canvas = MagicMock()
+        b.light_checker_town(canvas, color=(255, 0, 0))
+        for call in canvas.SetPixel.call_args_list:
+            args, _ = call
+            assert args[2] == 255  # r
+            assert args[3] == 0    # g
+            assert args[4] == 0    # b
+
+    def test_lights_exactly_32_cells(self, board_instance):
+        # 16 odd-row/even-col dark squares + 16 even-row/odd-col dark squares
+        b = board_instance
+        canvas = MagicMock()
+        b.light_checker_town(canvas)
+        # Each cell = 4×4 pixels = 16 SetPixel calls; 32 cells = 512 total
+        assert canvas.SetPixel.call_count == 32 * 16
+
+    def test_only_dark_squares_are_lit(self, board_instance):
+        # Dark squares: (row%2==1, col%2==0) and (row%2==0, col%2==1)
+        b = board_instance
+        canvas = MagicMock()
+        b.light_checker_town(canvas)
+        lit_cells: set[tuple[int, int]] = set()
+        for call in canvas.SetPixel.call_args_list:
+            args, _ = call
+            row = args[0] // 4
+            col = args[1] // 4
+            lit_cells.add((row, col))
+        for row, col in lit_cells:
+            assert (row % 2) != (col % 2), (
+                f"Light square ({row},{col}) should not be lit"
+            )
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# choose_light_checker_town(color) — brightness scaling (from origin/master)
+# ─────────────────────────────────────────────────────────────────────────────
+
+class TestChooseLightCheckerTown:
+    def test_default_uses_brightness_for_white(self, board_instance):
+        b = board_instance
+        b.checker_brightness = 128
+        with patch.object(b, 'light_checker_town') as mock_lct:
+            b.choose_light_checker_town()
+        mock_lct.assert_called_once()
+        _, kwargs = mock_lct.call_args
+        r, g, bl = kwargs['color']
+        assert r == g == bl  # grey (scaled white)
+        assert r == int(255 * (128 / 255))
+
+    def test_custom_color_scaled_by_brightness(self, board_instance):
+        b = board_instance
+        b.checker_brightness = 128
+        with patch.object(b, 'light_checker_town') as mock_lct:
+            b.choose_light_checker_town(color=(200, 100, 50))
+        _, kwargs = mock_lct.call_args
+        r, g, bl = kwargs['color']
+        assert r == int(200 * (128 / 255))
+        assert g == int(100 * (128 / 255))
+        assert bl == int(50 * (128 / 255))
+
+    def test_full_brightness_preserves_color(self, board_instance):
+        b = board_instance
+        b.checker_brightness = 255
+        with patch.object(b, 'light_checker_town') as mock_lct:
+            b.choose_light_checker_town(color=(200, 100, 50))
+        _, kwargs = mock_lct.call_args
+        assert kwargs['color'] == (200, 100, 50)
+
+    def test_zero_brightness_produces_black(self, board_instance):
+        b = board_instance
+        b.checker_brightness = 0
+        with patch.object(b, 'light_checker_town') as mock_lct:
+            b.choose_light_checker_town(color=(200, 100, 50))
+        _, kwargs = mock_lct.call_args
+        assert kwargs['color'] == (0, 0, 0)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# run(skip_setup, init_num) — quick-start flags (from origin/master)
+# ─────────────────────────────────────────────────────────────────────────────
+
+class TestRunSkipSetup:
+    def _patched_run(self, board_instance, **run_kwargs):
+        """Call run() with all blocking methods patched; return the mocks."""
+        b = board_instance
+        b.matrix.CreateFrameCanvas.return_value = MagicMock()
+        # Make game_over True after first iteration to exit the while loop
+        b.game_over = True
+        with patch.object(b, 'color_picker') as cp, \
+             patch.object(b, 'war_games') as wg, \
+             patch.object(b, 'create_players') as crp, \
+             patch.object(b, 'interactive_setup') as isu, \
+             patch.object(b, 'initialize_game_board') as igb, \
+             patch.object(b, 'initialize_game_board2') as igb2:
+            b.run(**run_kwargs)
+        return cp, wg, crp, isu, igb, igb2
+
+    def test_skip_setup_false_calls_color_picker(self, board_instance):
+        cp, wg, crp, isu, igb, igb2 = self._patched_run(board_instance, skip_setup=False)
+        cp.assert_called_once()
+
+    def test_skip_setup_false_calls_interactive_setup_twice(self, board_instance):
+        cp, wg, crp, isu, igb, igb2 = self._patched_run(board_instance, skip_setup=False)
+        assert isu.call_count == 2
+
+    def test_skip_setup_true_skips_color_picker(self, board_instance):
+        cp, wg, crp, isu, igb, igb2 = self._patched_run(board_instance, skip_setup=True)
+        cp.assert_not_called()
+
+    def test_skip_setup_true_skips_war_games(self, board_instance):
+        cp, wg, crp, isu, igb, igb2 = self._patched_run(board_instance, skip_setup=True)
+        wg.assert_not_called()
+
+    def test_skip_setup_true_skips_interactive_setup(self, board_instance):
+        cp, wg, crp, isu, igb, igb2 = self._patched_run(board_instance, skip_setup=True)
+        isu.assert_not_called()
+
+    def test_init_num_empty_calls_initialize_game_board(self, board_instance):
+        cp, wg, crp, isu, igb, igb2 = self._patched_run(board_instance, skip_setup=True, init_num="")
+        igb.assert_called_once()
+        igb2.assert_not_called()
+
+    def test_init_num_2_calls_initialize_game_board2(self, board_instance):
+        cp, wg, crp, isu, igb, igb2 = self._patched_run(board_instance, skip_setup=True, init_num="2")
+        igb2.assert_called_once()
+        igb.assert_not_called()
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# detect_mismatch() — red bg + yellow pieces + both teams (from origin/master)
+# ─────────────────────────────────────────────────────────────────────────────
+
+class TestDetectMismatch:
+    def test_uses_red_background_for_checker_town(self, board_instance):
+        b = board_instance
+        b.initialize_game_board()
+        # master returns 0 (OCCUPIED) so no mismatch — exits immediately
+        b.master.get_cell_state.return_value = 0
+        with patch.object(b, 'light_checker_town') as mock_lct:
+            b.detect_mismatch()
+        called_colors = [
+            kwargs.get('color') or args[1] if len(args) > 1 else kwargs.get('color')
+            for args, kwargs in mock_lct.call_args_list
+        ]
+        assert (255, 0, 0) in called_colors, "red background never passed to light_checker_town"
+
+    def test_mismatched_piece_lit_yellow(self, board_instance):
+        # Make one piece report EMPTY (state==1) on first poll, then OCCUPIED on subsequent
+        b = board_instance
+        b.initialize_game_board()
+        call_count = [0]
+
+        def _side_effect(row, col):
+            from core.constants import CellOccupancy
+            call_count[0] += 1
+            # First few reads: one cell is EMPTY → triggers mismatch
+            if call_count[0] <= 2:
+                return CellOccupancy.EMPTY.value
+            return CellOccupancy.OCCUPIED.value
+
+        b.master.get_cell_state.side_effect = _side_effect
+        canvas_mock = MagicMock()
+        b.canvas = canvas_mock
+        b.matrix.SwapOnVSync.return_value = canvas_mock
+        with patch.object(b, 'light_checker_town'):
+            b.detect_mismatch()
+        # Extract all RGB tuples passed to light_cell via SetPixel
+        set_pixel_calls = canvas_mock.SetPixel.call_args_list
+        colors_seen = {(args[2], args[3], args[4]) for args, _ in set_pixel_calls}
+        assert (255, 255, 0) in colors_seen, "yellow (255,255,0) never used for mismatched piece"
+
+    def test_checks_both_team_r_and_team_l_pieces(self, board_instance):
+        b = board_instance
+        b.initialize_game_board()
+        b.master.get_cell_state.return_value = 0
+        with patch.object(b, 'get_team_pieces', wraps=b.get_team_pieces) as mock_gtp:
+            b.detect_mismatch()
+        teams_queried = [call.args[0] for call in mock_gtp.call_args_list]
+        assert b.team_r in teams_queried, "team_r not checked in detect_mismatch"
+        assert b.team_l in teams_queried, "team_l not checked in detect_mismatch"
+
+    def test_returns_true_when_no_mismatch(self, board_instance):
+        b = board_instance
+        b.initialize_game_board()
+        b.master.get_cell_state.return_value = 0  # all pieces present
+        result = b.detect_mismatch()
+        assert result is True
