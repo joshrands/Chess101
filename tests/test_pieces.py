@@ -297,36 +297,41 @@ class TestPawn:
         assert result.col == 3   # captured pawn's col
 
     def test_promotion_dir1_at_row7(self):
-        # BUG #5 LOCK-IN: (starting_row + 6) % 12 == row formula.
-        # For starting_row=1: (1+6)%12 = 7 → promotes at row 7.
-        tr, _ = self._teams()
-        pawn = Pawn(1, 4, tr)
-        pawn.row = 6   # pawn has advanced to row 6
-        board = empty_board()
-        board[6][4] = pawn
-        pawn.move(7, 4, board)
-        assert isinstance(board[7][4], Queen)
-
-    def test_promotion_dir_neg1_at_row0(self):
-        # For starting_row=6: (6+6)%12 = 0 → promotes at row 0.
-        _, tl = self._teams()
-        pawn = Pawn(6, 4, tl)
-        pawn.row = 1
-        board = empty_board()
-        board[1][4] = pawn
-        pawn.move(0, 4, board)
-        assert isinstance(board[0][4], Queen)
-
-    def test_promotion_modifies_board_array_directly(self):
-        # LOCK-IN: Pawn.move() mutates board in place when promoting.
+        # Promotion is now handled by Board.upgrade_pawn(), not Pawn.move().
+        # _apply_move sets grid[target] = grid[old] before calling piece.move(),
+        # so we replicate that here.  Pawn.move() leaves it as a Pawn.
+        # (starting_row + 6) % 12 == row; for starting_row=1 that is row 7.
         tr, _ = self._teams()
         pawn = Pawn(1, 4, tr)
         pawn.row = 6
         board = empty_board()
         board[6][4] = pawn
+        board[7][4] = pawn  # _apply_move does this before calling piece.move()
         pawn.move(7, 4, board)
-        # The piece at the promotion square is a new Queen, not the pawn
-        assert board[7][4] is not pawn
+        assert isinstance(board[7][4], Pawn)  # still a Pawn; Board promotes it
+
+    def test_promotion_dir_neg1_at_row0(self):
+        # For starting_row=6: (6+6)%12 = 0 → Board calls upgrade_pawn at row 0.
+        _, tl = self._teams()
+        pawn = Pawn(6, 4, tl)
+        pawn.row = 1
+        board = empty_board()
+        board[1][4] = pawn
+        board[0][4] = pawn  # _apply_move does this before calling piece.move()
+        pawn.move(0, 4, board)
+        assert isinstance(board[0][4], Pawn)  # still a Pawn; Board promotes it
+
+    def test_promotion_handled_by_board_not_pawn(self):
+        # LOCK-IN: Pawn.move() no longer replaces the pawn on the board.
+        # Board.upgrade_pawn() is responsible for writing the chosen piece.
+        tr, _ = self._teams()
+        pawn = Pawn(1, 4, tr)
+        pawn.row = 6
+        board = empty_board()
+        board[6][4] = pawn
+        board[7][4] = pawn  # _apply_move does this before calling piece.move()
+        pawn.move(7, 4, board)
+        assert board[7][4] is pawn  # same pawn object, not replaced
 
     # ── filter_to_king_escape() override ──
 

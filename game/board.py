@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+from contextlib import contextmanager
 from typing import Optional
 
 from samplebase import SampleBase
@@ -67,6 +68,8 @@ class Board(SampleBase):
 
         self.checker_brightness = 0
         self.checker_brightness_dir = 2
+
+        self.counters: dict = {}
 
         self.game_over = False
         self.peace_time = 0
@@ -555,6 +558,11 @@ class Board(SampleBase):
                                 self.peace_time += 1
                             self.grid[target_row][target_col] = self.grid[row][col]
                             self._apply_move(row, col, target_row, target_col)
+                            moved = self.grid[target_row][target_col]
+                            if (isinstance(moved, Pawn)
+                                    and (moved.starting_row + 6) % 12 == target_row):
+                                self.upgrade_pawn(Cell(row, col),
+                                                  Cell(target_row, target_col), team)
                             self._on_local_move(row, col, target_row, target_col, pre_capture)
 
                     if not valid_move:
@@ -579,6 +587,46 @@ class Board(SampleBase):
         targets = piece.get_targets()
         for cell in targets:
             self.light_cell(self.canvas, cell.row, cell.col, r, g, b)
+
+    def blink_cell(
+        self,
+        canvas,
+        cell: Cell,
+        fps: float = 4,
+        duty_cycle: float = 50,
+        color: tuple[int, int, int] = (255, 255, 255),
+    ) -> None:
+        """Light a cell for the on-phase of a blink cycle, do nothing during off-phase.
+
+        Args:
+            canvas: The RGBMatrix frame canvas to draw onto.
+            cell: Board cell to blink.
+            fps: Blink frequency in flashes per second.
+            duty_cycle: Percentage of each period the cell is on (0–100).
+            color: RGB colour for the on-phase.
+        """
+        blink_time = 1000 / fps  # ms per cycle
+        on_time = (duty_cycle / 100) * blink_time
+        r, g, b = color
+        if ((time.time() - int(time.time())) * 1000) % blink_time > on_time:
+            self.light_cell(canvas, cell.row, cell.col, r, g, b)
+
+    def is_lifted(self, cells: list[Cell]) -> list[Cell]:
+        """Return the subset of *cells* whose reed switches report EMPTY.
+
+        Args:
+            cells: Board cells to check.
+
+        Returns:
+            List of cells that the sensor reports as unoccupied (piece lifted).
+        """
+        self.master.read_data()
+        lifted = []
+        for cell in cells:
+            state = self.master.get_cell_state(cell.row, cell.col)
+            if state:
+                lifted.append(cell)
+        return lifted
 
     def initialize_game_board(self):
         """Populate self.grid with the standard chess starting position.
@@ -1010,6 +1058,88 @@ class Board(SampleBase):
             piece.move(target_row, target_col, self.grid)
         self.grid[old_row][old_col] = None
 
+    @contextmanager
+    def canvas_swap(self):
+        """Context manager: clear canvas, yield it, then swap to display."""
+        self.canvas.Clear()
+        yield self.canvas
+        self.canvas = self.matrix.SwapOnVSync(self.canvas)
+
+    @contextmanager
+    def fresh_checker_town(self, color: tuple[int, int, int] = (255, 255, 255)):
+        """Context manager: clear, draw checker pattern in *color*, yield canvas, swap.
+
+        Args:
+            color: RGB colour for the checker squares (default white).
+        """
+        with self.canvas_swap() as canvas:
+            self.light_checker_town(canvas, color)
+            yield canvas
+
+    def upgrade_pawn(self, start_cell: Cell, end_cell: Cell, team) -> None:
+        """Interactive pawn promotion: let the player choose Queen/Knight/Bishop/Rook.
+
+        Waits for the player to lift the promoted pawn from end_cell, then
+        cycles through the four candidate pieces while the player holds the
+        piece over start_cell (the square it came from).  Placing the piece
+        back on end_cell confirms the selection and updates self.grid.
+
+        Args:
+            start_cell: The cell the pawn moved FROM (used as the cycle trigger).
+            end_cell: The cell the pawn moved TO (promotion square).
+            team: The team whose pawn was promoted.
+        """
+        candidates = [
+            Queen(end_cell.row, end_cell.col, team),
+            Knight(end_cell.row, end_cell.col, team),
+            Bishop(end_cell.row, end_cell.col, team),
+            Rook(end_cell.row, end_cell.col, team),
+        ]
+        index = 0
+
+        # Wait for player to lift pawn from promotion square to begin
+        while not self.is_lifted([end_cell]):
+            with self.fresh_checker_town() as canvas:
+                self.blink_cell(canvas, end_cell, fps=2,
+                                color=(team.r, team.g, team.b))
+
+        # Player has lifted the piece — cycle through candidates
+        test_grid: BoardGrid = [[None] * 8 for _ in range(8)]
+        examining = True
+        self.reset_counter("switch_trigger")
+        self.reset_counter("select_trigger")
+        while True:
+            with self.fresh_checker_town() as canvas:
+                pick = candidates[index]
+                test_grid[end_cell.row][end_cell.col] = pick
+                pick.calc_targets(test_grid)
+                if start_cell in pick.targets:
+                    pick.targets.remove(start_cell)
+                self.light_targets(pick)
+                self.light_cell(canvas, end_cell.row, end_cell.col,
+                                team.r, team.g, team.b)
+                if examining:
+                    self.blink_cell(canvas, start_cell,
+                                    color=(team.r, team.g, team.b))
+                else:
+                    self.light_cell(canvas, start_cell.row, start_cell.col,
+                                    team.r, team.g, team.b)
+
+            if not self.confident("switch_trigger",
+                                  self.is_lifted([start_cell]), True, threshold=2):
+                if examining:
+                    index = (index + 1) % len(candidates)
+                examining = False
+            elif not self.confident("select_trigger",
+                                    self.is_lifted([end_cell]), True, threshold=5):
+                break
+            else:
+                examining = True
+
+        self.grid[end_cell.row][end_cell.col] = candidates[index]
+        logger.info("Pawn promoted to %s at (%d,%d)",
+                    type(candidates[index]).__name__, end_cell.row, end_cell.col)
+
     def draw_board(self, board_state):
         """Render a board state to the LED matrix with a pulsing checker background.
 
@@ -1362,3 +1492,44 @@ class Board(SampleBase):
         """
         return _rules.check_threefold_repetition(
             self, team, board_state, days_since_injury, double_jeopardy)
+
+    # ── Counter helpers (used by upgrade_pawn for debouncing sensor reads) ────
+
+    def query_counter(self, name: str) -> tuple:
+        """Return (first_value, count) for *name*, or (None, 0) if unknown."""
+        if name in self.counters:
+            return self.counters[name][0], len(self.counters[name])
+        return None, 0
+
+    def update_counter(self, name: str, value) -> None:
+        """Append *value* to the run for *name* if equal to the last entry; else restart."""
+        if name not in self.counters:
+            self.counters[name] = [copy.copy(value)]
+            return
+        if self.counters[name] and self.counters[name][-1] == value:
+            self.counters[name].append(copy.copy(value))
+        else:
+            self.counters[name] = [copy.copy(value)]
+
+    def reset_counter(self, name: str) -> None:
+        """Clear the history for *name*."""
+        self.counters[name] = []
+
+    def confident(self, name: str, value, expected, threshold: int = 5):
+        """Return *value* once it has been stable for *threshold* consecutive reads.
+
+        Updates the counter for *name* with *value*.  If the run length has
+        reached *threshold*, returns the stable value; otherwise returns
+        *expected* (the "not yet confident" fallback).
+
+        Args:
+            name: Counter key.
+            value: Current sensor reading.
+            expected: Value to return until confidence is reached.
+            threshold: Number of consecutive identical reads required.
+        """
+        self.update_counter(name, value)
+        confident_value, count = self.query_counter(name)
+        if count >= threshold:
+            return confident_value
+        return expected

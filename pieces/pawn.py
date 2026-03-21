@@ -138,10 +138,11 @@ class Pawn(Piece):
         self.targets = new_targets
 
     def move(self, new_row: int, new_col: int, board: BoardGrid) -> Cell | None:
-        """Moves the pawn, handling promotion, en passant flag, and en passant capture.
+        """Moves the pawn, handling en passant flag and en passant capture.
 
-        If the pawn reaches the opposite back rank it is immediately replaced
-        on the board by a Queen of the same team.
+        Promotion is intentionally NOT handled here; Board.upgrade_pawn() is
+        called by do_turn() after this method returns when the pawn reaches the
+        back rank.
 
         If the pawn advances two squares from its starting position,
         self.en_passantable is set to True so adjacent enemy pawns can capture
@@ -154,19 +155,16 @@ class Pawn(Piece):
         Args:
             new_row: Destination row.
             new_col: Destination column.
-            board: The current 8x8 board state (mutated in-place on promotion).
+            board: The current 8x8 board state (unused after promotion removed).
 
         Returns:
             The Cell of the enemy pawn captured via en passant, or None if this
             was a normal move or advance.
         """
-        from pieces.queen import Queen
         old_row = self.row
         old_col = self.col
         self.row = new_row
         self.col = new_col
-        if (self.starting_row + 6) % 12 == self.row:
-            board[self.row][self.col] = Queen(self.row, self.col, self.team)
         if (old_row == self.starting_row
                 and old_col == self.starting_col
                 and (new_row - old_row) == 2 * self.direction):
