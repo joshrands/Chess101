@@ -1,7 +1,4 @@
-<<<<<<< HEAD
-__pycache__/*
-logs/*
-=======
+logs/
 __pycache__/
 *.pyc
 *.pyo
@@ -11,8 +8,4 @@ dist/
 build/
 .mypy_cache/
 .claude/
-<<<<<<< HEAD
->>>>>>> Add behavior lock-in test suite (188 tests)
-=======
 .venv/
->>>>>>> Added simulator
