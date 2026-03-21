@@ -4,6 +4,8 @@ import collections
 import copy
 import logging
 import random
+import sys
+import textwrap
 import threading
 from enum import Enum, auto
 from typing import Optional
@@ -133,7 +135,13 @@ class GameRunner:
         # Panel log handler — created once so it persists across resets
         self._panel_handler = _PanelLogHandler(maxlines=120)
         self._panel_handler.setLevel(logging.DEBUG)
-        logging.getLogger().addHandler(self._panel_handler)
+        _console = logging.StreamHandler(sys.stdout)
+        _console.setLevel(logging.DEBUG)
+        _console.setFormatter(logging.Formatter("%(levelname)s %(name)s: %(message)s"))
+        root_logger = logging.getLogger()
+        root_logger.setLevel(logging.DEBUG)
+        root_logger.addHandler(self._panel_handler)
+        root_logger.addHandler(_console)
         # Panel fonts — populated by _init_board after pygame.init()
         self._pfont_sm: Optional[pygame.font.Font] = None
         self._pfont_md: Optional[pygame.font.Font] = None
@@ -147,7 +155,10 @@ class GameRunner:
         game-over flags, duck-typed board attributes consumed by
         ``game/rules.py``, move counters, and WAR_GAMES animation counters.
         Does NOT destroy the ``_board`` instance or the panel log handler.
+        Clears the panel log so each new game starts with a fresh feed.
         """
+        if hasattr(self, "_panel_handler"):
+            self._panel_handler.records.clear()
         self.phase = Phase.COLOR_PICK
 
         # Color-pick transient state
@@ -1102,16 +1113,23 @@ class GameRunner:
         char_w   = pfont_sm.size("X")[0]
         max_chars = max(1, (w - pad * 2) // char_w)
 
-        records = list(self._panel_handler.records)[-max_lines:]
+        records = list(self._panel_handler.records)
+        # Collect all wrapped lines, then show the most recent ones that fit
+        all_lines: list[tuple[str, tuple[int, int, int]]] = []
         for rec in records:
-            src   = _LOG_SRC.get(rec.name, rec.name.split(".")[-1][:3])
-            lvl   = rec.levelname[0]
-            msg   = rec.getMessage()
-            line  = f"{lvl}[{src}] {msg}"
-            if len(line) > max_chars:
-                line = line[:max_chars - 1] + "…"
-            color = _P_LEVEL.get(rec.levelno, _P_TEXT)
-            surf  = pfont_sm.render(line, True, color)
+            src    = _LOG_SRC.get(rec.name, rec.name.split(".")[-1][:3])
+            prefix = f"{rec.levelname[0]}[{src}] "
+            msg    = rec.getMessage()
+            color  = _P_LEVEL.get(rec.levelno, _P_TEXT)
+            indent = " " * len(prefix)
+            for wrapped_line in textwrap.wrap(
+                msg, width=max_chars,
+                initial_indent=prefix,
+                subsequent_indent=indent,
+            ) or [prefix]:
+                all_lines.append((wrapped_line, color))
+        for line, color in all_lines[-max_lines:]:
+            surf = pfont_sm.render(line, True, color)
             screen.blit(surf, (x0 + pad, y))
             y += line_h
             if y >= h - pad:
