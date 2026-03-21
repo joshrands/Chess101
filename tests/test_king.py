@@ -50,7 +50,7 @@ class TestKingInit:
     def test_king_escape_cells_starts_empty(self):
         tr = Team(64, 180, 232)
         king = King(0, 4, tr)
-        assert king.king_escape_cells == []
+        assert king.god_save_the_king == []
 
     def test_touched_false_on_init(self):
         tr = Team(64, 180, 232)
@@ -68,7 +68,7 @@ class TestWalk:
         king = King(4, 4, tr)
         board = empty_board()
         board[4][4] = king
-        king._walk(board, 1, 0, 4, 4)
+        king._blade_walker(board, 1, 0, 4, 4)
         assert any(c.row == 5 and c.col == 4 for c in king.targets)
 
     def test_adds_enemy_adjacent_square(self):
@@ -79,7 +79,7 @@ class TestWalk:
         board = empty_board()
         board[4][4] = king
         board[5][4] = enemy
-        king._walk(board, 1, 0, 4, 4)
+        king._blade_walker(board, 1, 0, 4, 4)
         assert any(c.row == 5 and c.col == 4 for c in king.targets)
 
     def test_does_not_add_own_piece(self):
@@ -89,7 +89,7 @@ class TestWalk:
         board = empty_board()
         board[4][4] = king
         board[5][4] = ally
-        king._walk(board, 1, 0, 4, 4)
+        king._blade_walker(board, 1, 0, 4, 4)
         assert not any(c.row == 5 and c.col == 4 for c in king.targets)
 
     def test_respects_board_boundary(self):
@@ -97,8 +97,8 @@ class TestWalk:
         king = King(0, 0, tr)
         board = empty_board()
         board[0][0] = king
-        king._walk(board, -1, 0, 0, 0)  # would go to row -1
-        king._walk(board, 0, -1, 0, 0)  # would go to col -1
+        king._blade_walker(board, -1, 0, 0, 0)  # would go to row -1
+        king._blade_walker(board, 0, -1, 0, 0)  # would go to col -1
         assert king.targets == []
 
 
@@ -151,7 +151,7 @@ class TestCalcTargets:
         board[4][7] = enemy_rook
         king.calc_targets(board)
         # king_escape_cells should contain the path from rook to king
-        gstk = [(c.row, c.col) for c in king.king_escape_cells]
+        gstk = [(c.row, c.col) for c in king.god_save_the_king]
         assert (4, 7) in gstk  # attacker's square
         assert (4, 6) in gstk  # intermediate square
         assert (4, 5) in gstk  # intermediate square
@@ -180,7 +180,7 @@ class TestFindAttacker:
 
     def test_safe_returns_minus1_minus1(self):
         tr, tl, king, board = self._setup()
-        r, c = king.find_attacker(board)
+        r, c = king.am_i_gonna_die(board)
         assert r == -1
         assert c == -1
 
@@ -188,7 +188,7 @@ class TestFindAttacker:
         tr, tl, king, board = self._setup()
         enemy = Rook(4, 7, tl)
         board[4][7] = enemy
-        r, c = king.find_attacker(board)
+        r, c = king.am_i_gonna_die(board)
         assert r == 4
         assert c == 7
 
@@ -196,7 +196,7 @@ class TestFindAttacker:
         tr, tl, king, board = self._setup()
         enemy = Rook(0, 4, tl)
         board[0][4] = enemy
-        r, c = king.find_attacker(board)
+        r, c = king.am_i_gonna_die(board)
         assert r == 0
         assert c == 4
 
@@ -204,7 +204,7 @@ class TestFindAttacker:
         tr, tl, king, board = self._setup()
         enemy = Bishop(1, 7, tl)
         board[1][7] = enemy
-        r, c = king.find_attacker(board)
+        r, c = king.am_i_gonna_die(board)
         assert r == 1
         assert c == 7
 
@@ -212,7 +212,7 @@ class TestFindAttacker:
         tr, tl, king, board = self._setup()
         enemy = Queen(4, 0, tl)
         board[4][0] = enemy
-        r, c = king.find_attacker(board)
+        r, c = king.am_i_gonna_die(board)
         assert r == 4
         assert c == 0
 
@@ -220,7 +220,7 @@ class TestFindAttacker:
         tr, tl, king, board = self._setup()
         enemy = Queen(1, 1, tl)
         board[1][1] = enemy
-        r, c = king.find_attacker(board)
+        r, c = king.am_i_gonna_die(board)
         assert r == 1
         assert c == 1
 
@@ -229,7 +229,7 @@ class TestFindAttacker:
         # Knight at (2,5): L-shape from (4,4) → (4-2, 4+1) = (2,5)
         enemy = Knight(2, 5, tl)
         board[2][5] = enemy
-        r, c = king.find_attacker(board)
+        r, c = king.am_i_gonna_die(board)
         assert r == 2
         assert c == 5
 
@@ -239,7 +239,7 @@ class TestFindAttacker:
         enemy_pawn = Pawn(6, 5, tl)
         enemy_pawn.row = 5
         board[5][5] = enemy_pawn
-        r, c = king.find_attacker(board)
+        r, c = king.am_i_gonna_die(board)
         assert r == 5
         assert c == 5
 
@@ -249,7 +249,7 @@ class TestFindAttacker:
         enemy_pawn = Pawn(6, 5, tl)
         enemy_pawn.row = 3
         board[3][5] = enemy_pawn
-        r, c = king.find_attacker(board)
+        r, c = king.am_i_gonna_die(board)
         assert r == -1
         assert c == -1
 
@@ -257,7 +257,7 @@ class TestFindAttacker:
         tr, tl, king, board = self._setup()
         enemy_king = King(4, 5, tl)
         board[4][5] = enemy_king
-        r, c = king.find_attacker(board)
+        r, c = king.am_i_gonna_die(board)
         assert r == 4
         assert c == 5
 
@@ -265,7 +265,7 @@ class TestFindAttacker:
         tr, tl, king, board = self._setup()
         enemy_king = King(5, 5, tl)
         board[5][5] = enemy_king
-        r, c = king.find_attacker(board)
+        r, c = king.am_i_gonna_die(board)
         assert r == 5
         assert c == 5
 
@@ -277,7 +277,7 @@ class TestFindAttacker:
         enemy_bishop = Bishop(1, 1, tl)
         board[4][7] = enemy_rook
         board[1][1] = enemy_bishop
-        r, c = king.find_attacker(board)
+        r, c = king.am_i_gonna_die(board)
         assert (r, c) in [(4, 7), (1, 1)]
         assert not (r == 4 and c == 7 and False)
 
@@ -286,7 +286,7 @@ class TestFindAttacker:
         ally_rook = Rook(4, 2, tr)
         ally_rook.critical = True
         board[4][2] = ally_rook
-        king.find_attacker(board)
+        king.am_i_gonna_die(board)
         assert ally_rook.critical is False
 
     def test_marks_pinned_piece_as_critical(self):
@@ -295,7 +295,7 @@ class TestFindAttacker:
         enemy = Rook(4, 0, tl)
         board[4][2] = ally
         board[4][0] = enemy
-        king.find_attacker(board)
+        king.am_i_gonna_die(board)
         assert ally.critical is True
 
     def test_pinned_piece_gets_critical_targets(self):
@@ -304,7 +304,7 @@ class TestFindAttacker:
         enemy = Rook(4, 0, tl)
         board[4][2] = ally
         board[4][0] = enemy
-        king.find_attacker(board)
+        king.am_i_gonna_die(board)
         critical_positions = [(c.row, c.col) for c in ally.critical_targets]
         assert (4, 0) in critical_positions  # enemy square
         assert (4, 1) in critical_positions  # intermediate square
@@ -370,19 +370,19 @@ class TestBuildCheckEscapePath:
 
     def test_includes_attacker_cell(self):
         king = self._king()
-        result = king.build_check_escape_path(4, 7)
+        result = king.please_god_save_the_king(4, 7)
         positions = [(c.row, c.col) for c in result]
         assert (4, 7) in positions
 
     def test_includes_intermediate_cells(self):
         king = self._king()
-        result = king.build_check_escape_path(4, 7)
+        result = king.please_god_save_the_king(4, 7)
         assert any(c.row == 4 and c.col == 6 for c in result)
         assert any(c.row == 4 and c.col == 5 for c in result)
 
     def test_excludes_king_cell(self):
         king = self._king()
-        result = king.build_check_escape_path(4, 7)
+        result = king.please_god_save_the_king(4, 7)
         positions = [(c.row, c.col) for c in result]
         assert (4, 4) not in positions
 

@@ -35,7 +35,7 @@ class Knight(Piece):
                 if occupant is None or occupant.team != self.team:
                     self.targets.append(Cell(r, c))
         if self.critical:
-            super().filter_to_pin_ray()
+            super().critical_man()
 
     def get_value(self, board: BoardGrid) -> int:
         """Returns the heuristic value of this knight.

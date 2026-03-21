@@ -93,7 +93,7 @@ class Pawn(Piece):
                     self.en_passant_loc = Cell(self.row + self.direction, self.col + 1)
 
         if self.critical:
-            super().filter_to_pin_ray()
+            super().critical_man()
 
     def get_value(self, board: BoardGrid) -> int:
         """Returns the heuristic value of this pawn.
@@ -117,7 +117,7 @@ class Pawn(Piece):
                 total += 1
         return total
 
-    def filter_to_king_escape(self, king) -> None:
+    def sky_fall(self, king) -> None:
         """Restricts targets to squares that resolve a check, preserving en passant.
 
         Overrides Piece.filter_to_king_escape() to also keep the en passant
@@ -130,7 +130,7 @@ class Pawn(Piece):
         """
         new_targets = []
         for target in self.targets:
-            for saving_target in king.king_escape_cells:
+            for saving_target in king.god_save_the_king:
                 if target.row == saving_target.row and target.col == saving_target.col:
                     new_targets.append(target)
         if self.en_passant_loc is not None:

@@ -402,7 +402,7 @@ class Board(SampleBase):
                 activated_target = cell
         return valid, activated_target
 
-    def declare_victory(self, team):
+    def seth_victory(self, team):
         """Display the victory animation for the winning team.
 
         The border of the LED matrix is lit in the winner's colour and the
@@ -435,7 +435,7 @@ class Board(SampleBase):
                                     random.randint(0, 255))
             self.canvas = self.matrix.SwapOnVSync(self.canvas)
 
-    def declare_stalemate(self):
+    def stale_mate(self):
         """Display the stalemate animation splitting the board between both teams.
 
         The top four rows are lit in team_r's colour and the bottom four in
@@ -465,7 +465,7 @@ class Board(SampleBase):
         Args:
             team: The Team whose turn it is (team_r or team_l).
         """
-        if self.check_fifty_move_rule(team, self.grid):
+        if self.bob_ross(team, self.grid):
             return
 
         check = False
@@ -490,18 +490,18 @@ class Board(SampleBase):
                 if piece is not None and not isinstance(piece, King):
                     piece.calc_targets(self.grid)
                     if check:
-                        piece.filter_to_king_escape(self.grid[king_row][king_col])
+                        piece.sky_fall(self.grid[king_row][king_col])
                     if len(piece.get_targets()) > 0 and piece.team == team:
                         pieces_with_moves += 1
 
         if pieces_with_moves == 0:
             if not check:
                 self.game_over = True
-                self.declare_stalemate()
+                self.stale_mate()
                 return
             elif check:
                 self.game_over = True
-                self.declare_victory(team)
+                self.seth_victory(team)
                 return
 
         self.detect_mismatch()
@@ -830,7 +830,7 @@ class Board(SampleBase):
             team: The Team the AI is playing for (team_r or team_l).
             depth: Minimax search depth; defaults to 2.
         """
-        if self.check_fifty_move_rule(team, self.grid):
+        if self.bob_ross(team, self.grid):
             return
 
         check = False
@@ -856,18 +856,18 @@ class Board(SampleBase):
                 if piece is not None and not isinstance(piece, King):
                     piece.calc_targets(self.grid)
                     if check:
-                        piece.filter_to_king_escape(self.grid[king_row][king_col])
+                        piece.sky_fall(self.grid[king_row][king_col])
                     if len(piece.get_targets()) > 0 and piece.team == team:
                         pieces_with_moves += 1
 
         if pieces_with_moves == 0:
             if not check:
                 self.game_over = True
-                self.declare_stalemate()
+                self.stale_mate()
                 return
             elif check:
                 self.game_over = True
-                self.declare_victory(team)
+                self.seth_victory(team)
                 return
 
         root = Tree(copy.deepcopy(self.grid), None, None, self.team_r, self.team_l)
@@ -1264,7 +1264,7 @@ class Board(SampleBase):
         for piece in self.get_team_pieces(team, current_node.board_state):
             piece.calc_targets(current_node.board_state)
             if check and not isinstance(piece, King):
-                piece.filter_to_king_escape(team_king)
+                piece.sky_fall(team_king)
             for target in piece.targets:
                 new_board = copy.deepcopy(current_node.board_state)
                 new_piece = new_board[piece.row][piece.col]
@@ -1315,7 +1315,7 @@ class Board(SampleBase):
         else:
             return False
 
-    def check_fifty_move_rule(self, team, board_state):
+    def bob_ross(self, team, board_state):
         """Check whether the fifty-move rule triggers a draw.
 
         Delegates to the game.rules module. If the rule is triggered, the draw
@@ -1328,7 +1328,7 @@ class Board(SampleBase):
         Returns:
             True if the fifty-move rule ends the game, False otherwise.
         """
-        return _rules.check_fifty_move_rule(self, team, board_state)
+        return _rules.bob_ross(self, team, board_state)
 
     def check_threefold_repetition(self, team, board_state, days_since_injury, double_jeopardy):
         """Check whether the threefold repetition rule triggers a draw.

@@ -39,9 +39,9 @@ class King(Piece):
             self.direction = 1
         self.touched: bool = False
         self.critical: bool = False
-        self.king_escape_cells: list[Cell] = []
+        self.god_save_the_king: list[Cell] = []
 
-    def _walk(self, board: BoardGrid, dr: int, dc: int, row: int, col: int) -> None:
+    def _blade_walker(self, board: BoardGrid, dr: int, dc: int, row: int, col: int) -> None:
         """Adds the single adjacent square in direction (dr, dc) to self.targets if reachable.
 
         The square is considered reachable if it is on the board and either
@@ -83,14 +83,14 @@ class King(Piece):
         """
         from pieces.rook import Rook
         self.targets = []
-        self._walk(board, 1, 1, self.row, self.col)
-        self._walk(board, -1, 1, self.row, self.col)
-        self._walk(board, 1, -1, self.row, self.col)
-        self._walk(board, -1, -1, self.row, self.col)
-        self._walk(board, 1, 0, self.row, self.col)
-        self._walk(board, -1, 0, self.row, self.col)
-        self._walk(board, 0, 1, self.row, self.col)
-        self._walk(board, 0, -1, self.row, self.col)
+        self._blade_walker(board, 1, 1, self.row, self.col)
+        self._blade_walker(board, -1, 1, self.row, self.col)
+        self._blade_walker(board, 1, -1, self.row, self.col)
+        self._blade_walker(board, -1, -1, self.row, self.col)
+        self._blade_walker(board, 1, 0, self.row, self.col)
+        self._blade_walker(board, -1, 0, self.row, self.col)
+        self._blade_walker(board, 0, 1, self.row, self.col)
+        self._blade_walker(board, 0, -1, self.row, self.col)
 
         old_row = self.row
         old_col = self.col
@@ -128,7 +128,7 @@ class King(Piece):
             board[self.row][self.col] = None
             self.row = cell.row
             self.col = cell.col
-            threat_row, threat_col = self.find_attacker(board)
+            threat_row, threat_col = self.am_i_gonna_die(board)
             if threat_row != -1 and threat_col != -1:
                 if cell.row == old_row and cell.col == old_col - 2:
                     castle_left = False
@@ -145,7 +145,7 @@ class King(Piece):
             self.row = old_row
             self.col = old_col
 
-        _attacker_row, _attacker_col = self.find_attacker(board)
+        _attacker_row, _attacker_col = self.am_i_gonna_die(board)
         in_check = _attacker_row != -1 and _attacker_col != -1
 
         if castle_left and (not castle_left_step or in_check):
@@ -170,7 +170,7 @@ class King(Piece):
             Integer heuristic score for this king.
         """
         value = PieceValue.KING
-        if self.find_attacker(board):
+        if self.am_i_gonna_die(board):
             value = 0
         return value
 
@@ -204,7 +204,7 @@ class King(Piece):
         else:
             return None, None
 
-    def find_attacker(self, board: BoardGrid) -> tuple[int, int]:
+    def am_i_gonna_die(self, board: BoardGrid) -> tuple[int, int]:
         """Scans the board for any enemy piece currently giving check to this king.
 
         Also clears and resets the critical (pin) flags on all friendly pieces,
@@ -212,7 +212,7 @@ class King(Piece):
         friendly piece on a ray is marked critical (pinned) when an enemy
         sliding piece of the correct type lies further along the same ray.
 
-        Sets self.king_escape_cells to the squares that would block or capture
+        Sets self.god_save_the_king to the squares that would block or capture
         the checking piece if check is detected.
 
         Args:
@@ -238,7 +238,7 @@ class King(Piece):
                 if i == 0 and j == 0:
                     continue
 
-                enemy_row, enemy_col, scout_row, scout_col = self._scan_ray(
+                enemy_row, enemy_col, scout_row, scout_col = self._i_spy(
                     board, self.row + i, self.col + j, i, j)
 
                 if i == 0 or j == 0:
@@ -247,16 +247,16 @@ class King(Piece):
                             if isinstance(board[enemy_row][enemy_col], (Rook, Queen)):
                                 board[scout_row][scout_col].critical = True
                                 board[scout_row][scout_col].critical_targets = (
-                                    self.build_check_escape_path(enemy_row, enemy_col)
+                                    self.please_god_save_the_king(enemy_row, enemy_col)
                                 )
                     elif enemy_row != -1:
                         if isinstance(board[enemy_row][enemy_col], (Rook, Queen)):
-                            self.king_escape_cells = self.build_check_escape_path(
+                            self.god_save_the_king = self.please_god_save_the_king(
                                 enemy_row, enemy_col)
                             return enemy_row, enemy_col
                         elif isinstance(board[enemy_row][enemy_col], King):
                             if abs(enemy_row - self.row) + abs(enemy_col - self.col) == 1:
-                                self.king_escape_cells = self.build_check_escape_path(
+                                self.god_save_the_king = self.please_god_save_the_king(
                                     enemy_row, enemy_col)
                                 return enemy_row, enemy_col
                 else:
@@ -265,36 +265,36 @@ class King(Piece):
                             if isinstance(board[enemy_row][enemy_col], (Bishop, Queen)):
                                 board[scout_row][scout_col].critical = True
                                 board[scout_row][scout_col].critical_targets = (
-                                    self.build_check_escape_path(enemy_row, enemy_col)
+                                    self.please_god_save_the_king(enemy_row, enemy_col)
                                 )
                     elif enemy_row != -1:
                         if isinstance(board[enemy_row][enemy_col], (Bishop, Queen)):
-                            self.king_escape_cells = self.build_check_escape_path(
+                            self.god_save_the_king = self.please_god_save_the_king(
                                 enemy_row, enemy_col)
                             return enemy_row, enemy_col
                         elif isinstance(board[enemy_row][enemy_col], King):
                             if abs(enemy_row - self.row) + abs(enemy_col - self.col) == 2:
-                                self.king_escape_cells = self.build_check_escape_path(
+                                self.god_save_the_king = self.please_god_save_the_king(
                                     enemy_row, enemy_col)
                                 return enemy_row, enemy_col
                         elif isinstance(board[enemy_row][enemy_col], Pawn):
                             if enemy_row - self.row == self.direction:
-                                self.king_escape_cells = self.build_check_escape_path(
+                                self.god_save_the_king = self.please_god_save_the_king(
                                     enemy_row, enemy_col)
                                 return enemy_row, enemy_col
 
         row_deltas = [2, 2, -2, -2, 1, 1, -1, -1]
         col_deltas = [1, -1, 1, -1, 2, -2, 2, -2]
         for i in range(8):
-            knight_row, knight_col = self._check_knight(
+            knight_row, knight_col = self._knight_in_shining_armor(
                 board, row_deltas[i], col_deltas[i], self.row, self.col)
             if knight_row != -1 and knight_col != -1:
-                self.king_escape_cells = [Cell(knight_row, knight_col)]
+                self.god_save_the_king = [Cell(knight_row, knight_col)]
                 return knight_row, knight_col
 
         return -1, -1
 
-    def _scan_ray(
+    def _i_spy(
         self,
         board: BoardGrid,
         current_row: int,
@@ -336,16 +336,16 @@ class King(Piece):
                 if board[current_row][current_col].team != self.team:
                     return current_row, current_col, -1, -1
                 elif next_loc:
-                    scout_row, scout_col = board[current_row][current_col]._ray_cast(
+                    scout_row, scout_col = board[current_row][current_col]._kingsman(
                         board, current_row + dr, current_col + dc, dr, dc)
                     return scout_row, scout_col, current_row, current_col
             elif next_loc:
-                e_row, e_col, s_row, s_col = self._scan_ray(
+                e_row, e_col, s_row, s_col = self._i_spy(
                     board, current_row + dr, current_col + dc, dr, dc)
                 return e_row, e_col, s_row, s_col
         return -1, -1, -1, -1
 
-    def _check_knight(
+    def _knight_in_shining_armor(
         self,
         board: BoardGrid,
         dr: int,
@@ -372,7 +372,7 @@ class King(Piece):
                 return row + dr, col + dc
         return -1, -1
 
-    def build_check_escape_path(self, enemy_row: int, enemy_col: int) -> list[Cell]:
+    def please_god_save_the_king(self, enemy_row: int, enemy_col: int) -> list[Cell]:
         """Builds the list of squares a friendly piece can move to in order to resolve a check.
 
         Starts at the attacker's square and steps toward the king, collecting

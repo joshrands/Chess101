@@ -3,7 +3,7 @@ game/rules.py — Pure draw-detection logic for Chess101.
 
 Functions here receive a Board instance as their first argument so they
 can read/write game state (peace_time, game_over) and call
-board.declare_stalemate().  They contain no direct hardware I/O.
+board.stale_mate().  They contain no direct hardware I/O.
 """
 from __future__ import annotations
 
@@ -19,7 +19,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-def check_fifty_move_rule(board: Board, team: Team, board_state: BoardGrid) -> bool:
+def bob_ross(board: Board, team: Team, board_state: BoardGrid) -> bool:
     """Return True and trigger stalemate if 50 half-moves have passed without a capture or pawn move.
 
     Note: The threshold is intentionally 50 half-moves rather than the standard
@@ -31,7 +31,7 @@ def check_fifty_move_rule(board: Board, team: Team, board_state: BoardGrid) -> b
 
     Args:
         board: The active game board; ``board.peace_time`` is read and
-            ``board.game_over`` / ``board.declare_stalemate()`` may be set.
+            ``board.game_over`` / ``board.stale_mate()`` may be set.
         team: The team whose turn it is, used to select the correct
             repetition-history lists.
         board_state: Snapshot of the current 8x8 board grid.
@@ -43,7 +43,7 @@ def check_fifty_move_rule(board: Board, team: Team, board_state: BoardGrid) -> b
     logger.debug("peace_time=%s", board.peace_time)
     if board.peace_time >= 50:
         board.game_over = True
-        board.declare_stalemate()
+        board.stale_mate()
         return True
     else:
         if team == board.team_l:
@@ -74,7 +74,7 @@ def check_threefold_repetition(
 
     Args:
         board: The active game board; ``board.game_over`` /
-            ``board.declare_stalemate()`` may be set on repetition.
+            ``board.stale_mate()`` may be set on repetition.
         team: The team whose turn it is (unused directly but provided for
             symmetry with ``check_fifty_move_rule``).
         board_state: Snapshot of the current 8x8 board grid.
@@ -105,7 +105,7 @@ def check_threefold_repetition(
                 break
         if second_match:
             board.game_over = True
-            board.declare_stalemate()
+            board.stale_mate()
             return True
         else:
             first_match = False

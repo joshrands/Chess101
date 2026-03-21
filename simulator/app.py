@@ -338,7 +338,7 @@ class GameRunner:
         for piece in self._get_team_pieces(team, node.board_state):
             piece.calc_targets(node.board_state)
             if check and not isinstance(piece, King):
-                piece.filter_to_king_escape(team_king)
+                piece.sky_fall(team_king)
             for target in piece.targets:
                 new_board = copy.deepcopy(node.board_state)
                 new_piece = new_board[piece.row][piece.col]
@@ -387,7 +387,7 @@ class GameRunner:
         lines.append(f"    {b.team_r.name}=UPPER  {b.team_l.name}=lower")
         logger.info("\n".join(lines))
 
-    def declare_stalemate(self) -> None:
+    def stale_mate(self) -> None:
         """Called by game/rules.py on fifty-move / threefold-repetition."""
         self._is_draw = True
         self.phase = Phase.GAME_OVER
@@ -419,7 +419,7 @@ class GameRunner:
             team: The team whose turn is beginning.
         """
         b = self._board
-        if _rules.check_fifty_move_rule(self, team, b.grid):
+        if _rules.bob_ross(self, team, b.grid):
             return
 
         check = False
@@ -443,7 +443,7 @@ class GameRunner:
                 if piece is not None and not isinstance(piece, King):
                     piece.calc_targets(b.grid)
                     if check:
-                        piece.filter_to_king_escape(b.grid[king_row][king_col])
+                        piece.sky_fall(b.grid[king_row][king_col])
                     if len(piece.get_targets()) > 0 and piece.team.r == team.r:
                         pieces_with_moves += 1
 

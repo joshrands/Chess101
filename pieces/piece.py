@@ -79,7 +79,7 @@ class Piece(ABC):
         self.col = new_col
         self.touched = True
 
-    def _ray_cast(
+    def _kingsman(
         self,
         board: BoardGrid,
         current_row: int,
@@ -114,10 +114,10 @@ class Piece(ABC):
                 else:
                     return -1, -1
             elif next_loc:
-                return self._ray_cast(board, current_row + dr, current_col + dc, dr, dc)
+                return self._kingsman(board, current_row + dr, current_col + dc, dr, dc)
         return -1, -1
 
-    def _slide(self, board: BoardGrid, dr: int, dc: int, row: int, col: int) -> None:
+    def _blade_runner(self, board: BoardGrid, dr: int, dc: int, row: int, col: int) -> None:
         """Recursively appends reachable squares along a single ray to self.targets.
 
         Continues through empty squares and stops after adding a capturable
@@ -135,11 +135,11 @@ class Piece(ABC):
         if 0 <= row + dr <= 7 and 0 <= col + dc <= 7:
             if board[row + dr][col + dc] is None:
                 self.targets.append(Cell(row + dr, col + dc))
-                self._slide(board, dr, dc, row + dr, col + dc)
+                self._blade_runner(board, dr, dc, row + dr, col + dc)
             elif board[row + dr][col + dc].team != self.team:
                 self.targets.append(Cell(row + dr, col + dc))
 
-    def filter_to_pin_ray(self) -> None:
+    def critical_man(self) -> None:
         """Restricts self.targets to squares that lie on the current pin ray.
 
         Called after calc_targets() when self.critical is True. Retains only
@@ -152,11 +152,11 @@ class Piece(ABC):
                     new_targets.append(cell)
         self.targets = new_targets
 
-    def filter_to_king_escape(self, king: King) -> None:
+    def sky_fall(self, king: King) -> None:
         """Restricts self.targets to squares that resolve a check on the king.
 
         Called when the friendly king is in check. Only moves that block or
-        capture the attacker (i.e., squares in king.king_escape_cells) remain.
+        capture the attacker (i.e., squares in king.god_save_the_king) remain.
 
         Args:
             king: The friendly King whose king_escape_cells define the
@@ -164,7 +164,7 @@ class Piece(ABC):
         """
         new_targets = []
         for target in self.targets:
-            for saving_target in king.king_escape_cells:
+            for saving_target in king.god_save_the_king:
                 if target.row == saving_target.row and target.col == saving_target.col:
                     new_targets.append(target)
         self.targets = new_targets

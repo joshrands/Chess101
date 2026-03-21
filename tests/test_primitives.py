@@ -120,9 +120,9 @@ class TestPieceBase:
 
         from King import King
         king = King(4, 7, team)
-        king.king_escape_cells = [Cell(4, 2), Cell(4, 3)]
+        king.god_save_the_king = [Cell(4, 2), Cell(4, 3)]
 
-        rook.filter_to_king_escape(king)
+        rook.sky_fall(king)
         assert len(rook.targets) == 2
         cols = {c.col for c in rook.targets}
         assert cols == {2, 3}
@@ -134,9 +134,9 @@ class TestPieceBase:
 
         from King import King
         king = King(0, 7, team)
-        king.king_escape_cells = [Cell(3, 3)]
+        king.god_save_the_king = [Cell(3, 3)]
 
-        rook.filter_to_king_escape(king)
+        rook.sky_fall(king)
         assert rook.targets == []
 
     # ── filter_to_pin_ray() ──
@@ -145,7 +145,7 @@ class TestPieceBase:
         rook = self._rook()
         rook.targets = [Cell(0, 1), Cell(0, 2), Cell(0, 3)]
         rook.critical_targets = [Cell(0, 2), Cell(0, 5)]
-        rook.filter_to_pin_ray()
+        rook.critical_man()
         assert len(rook.targets) == 1
         assert rook.targets[0].col == 2
 
@@ -153,7 +153,7 @@ class TestPieceBase:
         rook = self._rook()
         rook.targets = [Cell(0, 1), Cell(0, 2)]
         rook.critical_targets = [Cell(5, 5)]
-        rook.filter_to_pin_ray()
+        rook.critical_man()
         assert rook.targets == []
 
     # ── _ray_cast() ──
@@ -167,7 +167,7 @@ class TestPieceBase:
         board[3][3] = rook
         board[3][6] = enemy
         # _ray_cast looks in dir (0,1) starting from (3,4)
-        row, col = rook._ray_cast(board, 3, 4, 0, 1)
+        row, col = rook._kingsman(board, 3, 4, 0, 1)
         assert row == 3
         assert col == 6
 
@@ -178,7 +178,7 @@ class TestPieceBase:
         board = [[None] * 8 for _ in range(8)]
         board[3][3] = rook
         board[3][5] = ally
-        row, col = rook._ray_cast(board, 3, 4, 0, 1)
+        row, col = rook._kingsman(board, 3, 4, 0, 1)
         assert row == -1
         assert col == -1
 
@@ -187,6 +187,6 @@ class TestPieceBase:
         rook = Rook(3, 3, team_r)
         board = [[None] * 8 for _ in range(8)]
         board[3][3] = rook
-        row, col = rook._ray_cast(board, 3, 4, 0, 1)
+        row, col = rook._kingsman(board, 3, 4, 0, 1)
         assert row == -1
         assert col == -1

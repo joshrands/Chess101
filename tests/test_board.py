@@ -169,8 +169,8 @@ class TestCheckFiftyMoveRule:
     def test_does_not_trigger_at_49(self, board_instance):
         b = board_instance
         b.peace_time = 49
-        with patch.object(b, 'declare_stalemate'):
-            result = b.check_fifty_move_rule(b.team_r, b.grid)
+        with patch.object(b, 'stale_mate'):
+            result = b.bob_ross(b.team_r, b.grid)
         assert result is False
         assert b.game_over is False
 
@@ -179,8 +179,8 @@ class TestCheckFiftyMoveRule:
         # Real chess 50-move rule uses 50 full moves (= 100 half-moves).
         b = board_instance
         b.peace_time = 50
-        with patch.object(b, 'declare_stalemate') as mock_stale:
-            result = b.check_fifty_move_rule(b.team_r, b.grid)
+        with patch.object(b, 'stale_mate') as mock_stale:
+            result = b.bob_ross(b.team_r, b.grid)
         assert result is True
         assert b.game_over is True
         mock_stale.assert_called_once()
@@ -188,8 +188,8 @@ class TestCheckFiftyMoveRule:
     def test_triggers_at_above_50(self, board_instance):
         b = board_instance
         b.peace_time = 99
-        with patch.object(b, 'declare_stalemate'):
-            result = b.check_fifty_move_rule(b.team_r, b.grid)
+        with patch.object(b, 'stale_mate'):
+            result = b.bob_ross(b.team_r, b.grid)
         assert result is True
 
 
@@ -201,7 +201,7 @@ class TestCheckThreefoldRepetition:
     def _call(self, board_instance, team, tron, days, double):
         """Direct call to check_threefold_repetition, patching declare_stalemate to avoid infinite loop."""
         b = board_instance
-        with patch.object(b, 'declare_stalemate'):
+        with patch.object(b, 'stale_mate'):
             return b.check_threefold_repetition(team, tron, days, double)
 
     def test_new_state_returns_false(self, board_instance):
@@ -242,7 +242,7 @@ class TestCheckThreefoldRepetition:
         # Put current state in doubleJeopardy already
         days = [snapshot]
         double = [snapshot]
-        with patch.object(b, 'declare_stalemate') as mock_stale:
+        with patch.object(b, 'stale_mate') as mock_stale:
             result = b.check_threefold_repetition(b.team_r, b.grid, days, double)
         assert result is True
         assert b.game_over is True

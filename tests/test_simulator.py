@@ -474,7 +474,7 @@ class TestPhaseTransitions:
 
     def test_stalemate_sets_game_over_phase(self, playing_hh):
         gr = playing_hh
-        gr.declare_stalemate()
+        gr.stale_mate()
         assert gr.phase == Phase.GAME_OVER
         assert gr._is_draw is True
 
@@ -637,7 +637,7 @@ class TestLogging:
         must emit an INFO log so the terminal reflects the game result."""
         gr = playing_hh
         with caplog.at_level(logging.INFO, logger="simulator.app"):
-            gr.declare_stalemate()
+            gr.stale_mate()
         messages = [r.message for r in caplog.records]
         assert any("stalemate" in m.lower() or "draw" in m.lower()
                    for m in messages), \

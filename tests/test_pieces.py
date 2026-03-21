@@ -346,9 +346,9 @@ class TestPawn:
 
         king = King(0, 4, tr)
         # king_escape_cells does NOT include the en passant target (5,3)
-        king.king_escape_cells = [Cell(3, 3)]
+        king.god_save_the_king = [Cell(3, 3)]
 
-        pawn.filter_to_king_escape(king)
+        pawn.sky_fall(king)
         targets = [(c.row, c.col) for c in pawn.targets]
         # En passant loc is still in targets despite not being a saving move
         assert (5, 3) in targets
@@ -362,8 +362,8 @@ class TestPawn:
         assert pawn.en_passant_loc is None
 
         king = King(0, 4, tr)
-        king.king_escape_cells = [Cell(4, 4)]
-        pawn.filter_to_king_escape(king)
+        king.god_save_the_king = [Cell(4, 4)]
+        pawn.sky_fall(king)
         # Only targets that are in king_escape_cells remain; no extra cells added
         targets = [(c.row, c.col) for c in pawn.targets]
         assert (4, 4) in targets

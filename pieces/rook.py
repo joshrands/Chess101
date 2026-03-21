@@ -23,12 +23,12 @@ class Rook(Piece):
             board: The current 8x8 board state.
         """
         self.targets = []
-        self._slide(board, 1, 0, self.row, self.col)
-        self._slide(board, 0, 1, self.row, self.col)
-        self._slide(board, -1, 0, self.row, self.col)
-        self._slide(board, 0, -1, self.row, self.col)
+        self._blade_runner(board, 1, 0, self.row, self.col)
+        self._blade_runner(board, 0, 1, self.row, self.col)
+        self._blade_runner(board, -1, 0, self.row, self.col)
+        self._blade_runner(board, 0, -1, self.row, self.col)
         if self.critical:
-            super().filter_to_pin_ray()
+            super().critical_man()
 
     def get_value(self, board: BoardGrid) -> int:
         """Returns the heuristic value of this rook.
