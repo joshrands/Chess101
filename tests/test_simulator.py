@@ -100,7 +100,7 @@ def _pygame():
 @pytest.fixture
 def fresh(_pygame):
     """GameRunner freshly initialised, in COLOR_PICK phase."""
-    gr = GameRunner()
+    gr = GameRunner(skip_lobby=True)
     gr._init_board()
     return gr
 

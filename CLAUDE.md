@@ -12,15 +12,31 @@ A Mac simulator (`run_simulator.py`) lets you develop and test without any Pi ha
 
 ```bash
 python3 -m venv .venv
-.venv/bin/pip install -r requirements.txt   # pygame, numpy
-.venv/bin/python run_simulator.py           # launch the simulator
+.venv/bin/pip install -r requirements.txt   # pygame, numpy, websockets
+.venv/bin/python run_simulator.py           # launch the simulator (Lobby screen)
 ```
 
 ## Running the Game
 
-**Simulator (Mac):**
+**Simulator (Mac) — local play:**
 ```bash
-.venv/bin/python run_simulator.py
+.venv/bin/python run_simulator.py           # Lobby screen (arrow keys / click to select)
+.venv/bin/python run_simulator.py --local   # skip Lobby, go straight to COLOR_PICK
+```
+
+**Simulator — networked play (Phase 1: LAN):**
+```bash
+# Machine A: host
+.venv/bin/python run_simulator.py --host
+
+# Machine B: join (IP auto-discovered via UDP beacon, or specify manually)
+.venv/bin/python run_simulator.py --join 192.168.1.42
+
+# Optional spectator
+.venv/bin/python run_simulator.py --spectate 192.168.1.42
+
+# Custom port (default 65101)
+.venv/bin/python run_simulator.py --host --port 65200
 ```
 
 **Raspberry Pi (requires sudo for LED matrix access):**
@@ -38,6 +54,7 @@ sudo python3 GameManager.py --led-gpio-mapping=adafruit-hat
 .venv/bin/python -m pytest tests/test_gameplay.py -v   # chess logic only
 .venv/bin/python -m pytest tests/test_simulator.py -v  # simulator only
 .venv/bin/python -m pytest tests/test_board.py -v      # Board-level tests
+.venv/bin/python -m pytest tests/test_network.py -v    # network protocol tests
 ```
 
 `conftest.py` stubs out `rgbmatrix` and `smbus` so all test files run on Mac without Pi hardware.
@@ -45,7 +62,7 @@ sudo python3 GameManager.py --led-gpio-mapping=adafruit-hat
 ## Type Checking
 
 ```bash
-.venv/bin/mypy pieces/ core/ ai/ game/ hardware/ ui/ simulator/
+.venv/bin/mypy pieces/ core/ ai/ game/ hardware/ ui/ simulator/ network/
 ```
 
 Config is in `setup.cfg` (`[mypy]` section). `ignore_missing_imports = True` is set so the Pi-only stubs (`rgbmatrix`, `smbus`) don't produce errors. The codebase should stay at **0 mypy errors**.
@@ -88,16 +105,34 @@ Chess101/
 ├── ui/
 │   └── renderer.py         # light_cell() — paints one 8×8 LED block per board cell
 │
+├── network/                # Phase 1 multiplayer — LAN WebSocket transport
+│   ├── __init__.py
+│   ├── protocol.py         # MoveFlags, encode_grid, decode_grid, board_hash, build_move_msg
+│   ├── server.py           # GameServer — asyncio WebSocket server in daemon thread
+│   ├── client.py           # GameClient — asyncio WebSocket client in daemon thread
+│   └── discovery.py        # BeaconBroadcaster + BeaconListener — UDP LAN discovery
+│
 ├── simulator/
-│   ├── app.py              # GameRunner: Pygame event loop, phase state machine
+│   ├── app.py              # GameRunner: Pygame event loop, phase state machine + Lobby
+│   ├── networked_runner.py # NetworkedGameRunner: multiplayer extension of GameRunner
 │   ├── fake_rgbmatrix.py   # FakeFrameCanvas / FakeRGBMatrix backed by pygame.Surface
 │   └── sensor.py           # SimSensor(BoardSensor) — click-driven, no I2C
+│
+├── plans/multiplayer/      # Design docs for all multiplayer phases
+│   ├── README.md           # Overview, 7 modes, 3-phase roadmap
+│   ├── protocol.md         # Full wire protocol spec (all message types + board hash)
+│   ├── architecture.md     # Code structure and class design
+│   ├── ux.md               # UX flows for all modes
+│   ├── phase-1-lan-sim.md  # Phase 1 step-by-step (COMPLETE)
+│   ├── phase-2-physical.md # Phase 2: Pi + physical board support
+│   └── phase-3-internet.md # Phase 3: relay server + internet play
 │
 └── tests/
     ├── conftest.py          # Stubs rgbmatrix and smbus for all non-Pi tests
     ├── test_gameplay.py     # Pure chess logic + GameRunner integration (headless)
     ├── test_simulator.py    # Simulator-specific bug regression tests
-    └── test_board.py        # Board-level tests (runs on Mac via conftest stubs)
+    ├── test_board.py        # Board-level tests (runs on Mac via conftest stubs)
+    └── test_network.py      # Network protocol, beacon, and transport tests
 ```
 
 ## Architecture
@@ -105,7 +140,7 @@ Chess101/
 ### Entry Points
 
 - **`GameManager.py`** — Pi entry point. Loops `Board().process()` indefinitely. Catches SIGINT/SIGTERM for graceful shutdown after the current game.
-- **`run_simulator.py`** — Mac entry point. Injects `FakeRGBMatrix` and a stub `smbus` into `sys.modules` before importing game code, then calls `GameRunner().run()`.
+- **`run_simulator.py`** — Mac entry point. Injects `FakeRGBMatrix` and a stub `smbus` into `sys.modules` before importing game code. Parses CLI flags (`--local`, `--host`, `--join`, `--spectate`, `--port`) and launches `GameRunner` (local) or `NetworkedGameRunner` (networked).
 
 ### Game Controller (`game/board.py`)
 
@@ -120,19 +155,43 @@ Chess101/
 
 ### Mac Simulator (`simulator/app.py`)
 
-`GameRunner` reimplements the same logical flow without blocking calls. It runs a 60-fps Pygame loop through four phases:
+`GameRunner` reimplements the same logical flow without blocking calls. It runs a 60-fps Pygame loop through five phases:
 
 ```
-COLOR_PICK → WAR_GAMES → PLAYING → GAME_OVER
-                                        ↑
-                              N key resets to COLOR_PICK
+LOBBY → COLOR_PICK → WAR_GAMES → PLAYING → GAME_OVER
+                                                ↑
+                                      N key resets to LOBBY
 ```
 
-Each phase has a `_handle_*` method (click/key events) and a `_render_*` method (draws to the LED canvas). `_render()` calls `blit_to_screen()` then `_render_panel()` then a single `pygame.display.flip()`.
+Pass `skip_lobby=True` (or `--local` CLI flag) to start directly at COLOR_PICK. Each phase has a `_handle_*` method (click/key events) and a `_render_*` method (draws to the LED canvas). `_render()` calls `blit_to_screen()` then `_render_panel()` then a single `pygame.display.flip()`.
 
-**Side panel** (`_render_panel`): shows current phase, active team with colour swatch, move count, peace-time bar, check/AI alerts, and a scrolling log feed capturing all Python `logging` records via `_PanelLogHandler`.
+**Lobby** (`Phase.LOBBY`): 4 options shown as colored row pairs — Play Locally / Host a Game / Join a Game / Watch a Game. Arrow keys or mouse to select, Enter/click to confirm. "Play Locally" advances to COLOR_PICK; the network options are wired to `NetworkedGameRunner`.
+
+**Side panel** (`_render_panel`): shows current phase, active team with colour swatch, move count, peace-time bar, check/AI alerts, and a scrolling log feed capturing all Python `logging` records via `_PanelLogHandler`. Subclasses can inject extra rows via `_render_panel_extra()`.
 
 **AI threading**: `_execute_ai_move` launches the alpha-beta search in a `daemon` thread. The Pygame loop stays responsive. Mouse input is blocked during AI thinking. `_add_nodes` updates `_ai_display_board` under a lock so the board animates through candidate positions while the AI thinks.
+
+### Networked Play (`simulator/networked_runner.py`)
+
+`NetworkedGameRunner(GameRunner)` adds WebSocket multiplayer on top of `GameRunner`. The asyncio event loop runs in a daemon thread; the Pygame loop stays on the main thread. Thread-safe communication via an `_incoming` deque (network → main) and `send()` queues (main → network).
+
+**Roles**: `NetworkRole.HOST` (binds server, broadcasts UDP beacon), `NetworkRole.GUEST` / `NetworkRole.SPECTATOR` (connect to host IP).
+
+**Message flow**:
+1. Connect → `hello` (both sides exchange version + name)
+2. HOST sends `game_setup` → both advance to COLOR_PICK
+3. COLOR_PICK: each side clicks their row, sends `color_chosen`; both advance on receipt
+4. WAR_GAMES: each side sends `war_games_choice`; HOST sends `game_start` when both received
+5. PLAYING: moves sent as `move` + `board_hash`; receiver sends `move_ack` (ok / desync); on desync, `board_sync_request` / `board_sync` recovery
+6. Keepalive: `ping` every 10 s; no `pong` in 30 s → disconnect overlay shown
+
+**Thread safety**: all inbound messages are queued in `_incoming` and drained on the main thread in `_update()`. Outbound messages use `asyncio.run_coroutine_threadsafe` to the daemon loop.
+
+### Network Layer (`network/`)
+
+- **`protocol.py`** — `MoveFlags` (en passant, castling, promotion flags), `encode_grid` / `decode_grid` (JSON-serialisable 8×8 grid), `board_hash` (SHA-256 of canonical piece string for desync detection), `build_move_msg`.
+- **`server.py`** / **`client.py`** — `GameServer` / `GameClient`: asyncio WebSocket transport in daemon threads. Both expose `send(msg: dict)` and `set_message_handler(cb)`.
+- **`discovery.py`** — `BeaconBroadcaster` sends a UDP broadcast every 2 s on port 65102. `BeaconListener` receives beacons, maintains a `games` dict, and prunes stale entries after 10 s.
 
 ### Hardware Interface
 

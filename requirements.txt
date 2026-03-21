@@ -1,6 +1,7 @@
 # Mac simulator — install these in the venv for local development
 pygame>=2.5
 numpy
+websockets>=12.0
 
 # Pi hardware stack — only installable on Raspberry Pi (omit on Mac)
 # smbus2

@@ -107,16 +107,34 @@ class Phase(Enum):
     """Finite-state-machine phases that govern the simulator's game loop.
 
     Attributes:
+        LOBBY: Pre-game menu — choose local/network play mode.
         COLOR_PICK: Players are choosing team colours on the LED grid.
         WAR_GAMES: Players are selecting Human vs. AI for each side.
         PLAYING: The chess game is in progress.
         GAME_OVER: The game has ended (checkmate, stalemate, or draw).
     """
 
+    LOBBY = auto()
     COLOR_PICK = auto()
     WAR_GAMES = auto()
     PLAYING = auto()
     GAME_OVER = auto()
+
+
+# Lobby option constants
+_LOBBY_OPTIONS = [
+    "Play Locally",
+    "Host a Game",
+    "Join a Game",
+    "Watch a Game",
+]
+# LED colors for each lobby option (one per pair of rows)
+_LOBBY_COLORS = [
+    (64,  180, 232),   # Blue  — Play Locally
+    (25,  200, 35),    # Green — Host a Game
+    (245, 125, 0),     # Orange — Join a Game
+    (190, 25,  255),   # Purple — Watch a Game
+]
 
 
 class GameRunner:
@@ -124,13 +142,18 @@ class GameRunner:
 
     # ── Lifecycle ──────────────────────────────────────────────────────────────
 
-    def __init__(self) -> None:
+    def __init__(self, skip_lobby: bool = False) -> None:
         """Set up the persistent panel log handler and perform the first reset.
 
         The panel log handler is attached to the root logger here so it
         survives across game resets. All other mutable state is delegated
         to `_reset()`.
+
+        Args:
+            skip_lobby: If True, start directly at COLOR_PICK instead of
+                showing the Lobby menu (equivalent to the ``--local`` flag).
         """
+        self._skip_lobby = skip_lobby
         self._board: Optional[Board] = None
         # Panel log handler — created once so it persists across resets
         self._panel_handler = _PanelLogHandler(maxlines=120)
@@ -159,7 +182,10 @@ class GameRunner:
         """
         if hasattr(self, "_panel_handler"):
             self._panel_handler.records.clear()
-        self.phase = Phase.COLOR_PICK
+        self.phase = Phase.COLOR_PICK if getattr(self, "_skip_lobby", False) else Phase.LOBBY
+
+        # Lobby transient state
+        self._lobby_selected: int = 0   # 0=Play Locally, 1=Host, 2=Join, 3=Watch
 
         # Color-pick transient state
         self._selected_r_idx: Optional[int] = None
@@ -532,6 +558,24 @@ class GameRunner:
 
     # ── Rendering ──────────────────────────────────────────────────────────────
 
+    def _render_lobby(self) -> None:
+        """Render the lobby menu onto the LED canvas.
+
+        Each of the 4 options occupies two rows of 8 cells.  The selected
+        option is shown at full brightness; others are dimmed to one-third.
+        """
+        b = self._b
+        b.canvas.Clear()
+        for opt_idx, (r, g, bl) in enumerate(_LOBBY_COLORS):
+            row_a = opt_idx * 2
+            row_b = opt_idx * 2 + 1
+            dim = opt_idx != self._lobby_selected
+            fr, fg, fb = (r // 3, g // 3, bl // 3) if dim else (r, g, bl)
+            for col in range(8):
+                b.light_cell(b.canvas, row_a, col, fr, fg, fb)
+                b.light_cell(b.canvas, row_b, col, fr, fg, fb)
+        b.matrix.blit_to_screen()
+
     def _render_color_pick(self) -> None:
         """Render the colour-selection screen to the LED canvas.
 
@@ -782,6 +826,50 @@ class GameRunner:
 
     # ── Event handlers ─────────────────────────────────────────────────────────
 
+    def _handle_lobby(self, event: pygame.event.Event) -> None:
+        """Handle input events in the LOBBY phase.
+
+        Arrow keys or W/S navigate the option list.  Enter or mouse click
+        on a row selects the highlighted option.
+
+        Args:
+            event: The Pygame event to process.
+        """
+        if event.type == pygame.KEYDOWN:
+            if event.key in (pygame.K_UP, pygame.K_w):
+                self._lobby_selected = (self._lobby_selected - 1) % len(_LOBBY_OPTIONS)
+            elif event.key in (pygame.K_DOWN, pygame.K_s):
+                self._lobby_selected = (self._lobby_selected + 1) % len(_LOBBY_OPTIONS)
+            elif event.key in (pygame.K_RETURN, pygame.K_KP_ENTER):
+                self._lobby_select(self._lobby_selected)
+
+        elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            px, py = event.pos
+            if px < _BOARD_W:
+                cell = self._px_to_cell(px, py)
+                if cell is not None:
+                    opt_idx = cell[0] // 2   # two rows per option
+                    self._lobby_selected = opt_idx
+                    self._lobby_select(opt_idx)
+
+    def _lobby_select(self, opt_idx: int) -> None:
+        """Execute the lobby option at *opt_idx*.
+
+        Option 0 (Play Locally) advances directly to COLOR_PICK.
+        Options 1-3 (Host / Join / Watch) will be wired to
+        NetworkedGameRunner in a future task; for now they fall back to
+        local play with a log message.
+
+        Args:
+            opt_idx: Index into ``_LOBBY_OPTIONS`` (0–3).
+        """
+        label = _LOBBY_OPTIONS[opt_idx]
+        if opt_idx == 0:
+            logger.info("Lobby: Play Locally selected")
+            self.phase = Phase.COLOR_PICK
+        else:
+            logger.info("Lobby: '%s' selected — network play not yet implemented", label)
+
     def _handle_color_pick(self, event: pygame.event.Event) -> None:
         """Handle mouse clicks during the COLOR_PICK phase.
 
@@ -936,7 +1024,9 @@ class GameRunner:
         Args:
             event: The Pygame event to dispatch.
         """
-        if self.phase == Phase.COLOR_PICK:
+        if self.phase == Phase.LOBBY:
+            self._handle_lobby(event)
+        elif self.phase == Phase.COLOR_PICK:
             self._handle_color_pick(event)
         elif self.phase == Phase.WAR_GAMES:
             self._handle_war_games(event)
@@ -985,6 +1075,13 @@ class GameRunner:
                 self._ai_thinking = False
                 self._next_turn()
 
+    def _render_panel_extra(self, text, sep, pfont_sm, pfont_md) -> None:
+        """Hook for subclasses to inject extra panel rows before the log.
+
+        Called at the end of ``_render_panel`` just before the log separator.
+        The default implementation is a no-op.
+        """
+
     def _render_panel(self) -> None:
         """Draw the telemetry / log side panel to the right of the board."""
         if self._pfont_sm is None or self._pfont_md is None or self._pfont_lg is None:
@@ -1032,7 +1129,14 @@ class GameRunner:
         b = self._b
 
         # ── Phase-specific status ─────────────────────────────────────────────
-        if self.phase == Phase.COLOR_PICK:
+        if self.phase == Phase.LOBBY:
+            for i, opt in enumerate(_LOBBY_OPTIONS):
+                prefix = "> " if i == self._lobby_selected else "  "
+                col = _LOBBY_COLORS[i]
+                text(f"{prefix}{opt}", pfont_md,
+                     col if i == self._lobby_selected else _P_DIM)
+
+        elif self.phase == Phase.COLOR_PICK:
             text("Row 2 → Right team colour", pfont_sm, _P_DIM)
             text("Row 5 → Left  team colour", pfont_sm, _P_DIM)
             if self._selected_r_idx is not None:
@@ -1102,6 +1206,8 @@ class GameRunner:
                          pfont_lg, (wt.r, wt.g, wt.b))
                 text("Press N to play again", pfont_sm, _P_DIM)
 
+        self._render_panel_extra(text, sep, pfont_sm, pfont_md)
+
         sep()
 
         # ── Log feed ─────────────────────────────────────────────────────────
@@ -1141,7 +1247,9 @@ class GameRunner:
         Calls the appropriate ``_render_*`` method for the active phase,
         then draws the side panel and flips the Pygame display buffer.
         """
-        if self.phase == Phase.COLOR_PICK:
+        if self.phase == Phase.LOBBY:
+            self._render_lobby()
+        elif self.phase == Phase.COLOR_PICK:
             self._render_color_pick()
         elif self.phase == Phase.WAR_GAMES:
             self._render_war_games()

@@ -38,7 +38,48 @@ _smbus.SMBus = _SMBus
 sys.modules["smbus"] = _smbus
 
 # ── 3. Now safe to import Board-dependent code ─────────────────────────────
+import argparse  # noqa: E402
+
 from simulator.app import GameRunner  # noqa: E402
 
 if __name__ == "__main__":
-    GameRunner().run()
+    parser = argparse.ArgumentParser(description="Chess101 Simulator")
+    parser.add_argument("--local",    action="store_true",
+                        help="Skip Lobby and go straight to COLOR_PICK")
+    parser.add_argument("--host",     action="store_true",
+                        help="Host a networked game immediately")
+    parser.add_argument("--join",     metavar="IP",
+                        help="Join a networked game at the given IP")
+    parser.add_argument("--spectate", metavar="IP",
+                        help="Spectate a networked game at the given IP")
+    parser.add_argument("--port",     type=int, default=65101,
+                        help="WebSocket port (default 65101)")
+    args = parser.parse_args()
+
+    if args.local:
+        GameRunner(skip_lobby=True).run()
+    elif args.host:
+        from simulator.networked_runner import NetworkedGameRunner, NetworkRole
+        NetworkedGameRunner(
+            role=NetworkRole.HOST,
+            port=args.port,
+            player_name="Host",
+        ).run()
+    elif args.join:
+        from simulator.networked_runner import NetworkedGameRunner, NetworkRole
+        NetworkedGameRunner(
+            role=NetworkRole.GUEST,
+            host_ip=args.join,
+            port=args.port,
+            player_name="Guest",
+        ).run()
+    elif args.spectate:
+        from simulator.networked_runner import NetworkedGameRunner, NetworkRole
+        NetworkedGameRunner(
+            role=NetworkRole.SPECTATOR,
+            host_ip=args.spectate,
+            port=args.port,
+            player_name="Spectator",
+        ).run()
+    else:
+        GameRunner().run()
