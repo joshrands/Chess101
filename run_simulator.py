@@ -40,11 +40,12 @@ sys.modules["smbus"] = _smbus
 # ── 3. Now safe to import Board-dependent code ─────────────────────────────
 import argparse  # noqa: E402
 import time      # noqa: E402
+from typing import Optional  # noqa: E402
 
 from simulator.app import GameRunner  # noqa: E402
 
 
-def _auto_discover(port: int, timeout: float = 8.0) -> str | None:
+def _auto_discover(port: int, timeout: float = 8.0) -> Optional[str]:
     """Block until a game beacon is found on the LAN, then return its IP.
 
     Prints progress to stderr so the user knows something is happening.

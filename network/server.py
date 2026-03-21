@@ -57,6 +57,7 @@ class GameServer:
         self._send_queue: asyncio.Queue = None  # type: ignore[assignment]
         self._thread: Optional[threading.Thread] = None
         self._started = threading.Event()
+        self._bound = False
 
     # ------------------------------------------------------------------
     # Public API (called from the main / Pygame thread)
@@ -81,11 +82,18 @@ class GameServer:
             self._send_queue.put(json.dumps(msg)), self._loop
         )
 
-    def start(self) -> None:
-        """Start the asyncio server in a daemon thread and wait until bound."""
+    def start(self) -> bool:
+        """Start the asyncio server in a daemon thread and wait until bound.
+
+        Returns:
+            True if the server successfully bound to the port, False otherwise.
+        """
         self._thread = threading.Thread(target=self._run, daemon=True, name="GameServer")
         self._thread.start()
-        self._started.wait(timeout=5.0)
+        bound = self._started.wait(timeout=5.0)
+        if not bound:
+            logger.error("GameServer failed to start within 5 s — is the port in use?")
+        return bound and self._bound
 
     def stop(self) -> None:
         """Signal the server to stop."""
@@ -114,10 +122,16 @@ class GameServer:
             )
             self._started.set()
             return
-        async with websockets.serve(self._accept, self._host, self._port):  # type: ignore[attr-defined]
+        try:
+            server_cm = websockets.serve(self._accept, self._host, self._port)  # type: ignore[attr-defined]
+            async with server_cm:
+                self._bound = True
+                self._started.set()
+                logger.info("GameServer listening on %s:%d", self._host, self._port)
+                await asyncio.Future()  # run forever
+        except OSError as exc:
+            logger.error("GameServer could not bind to %s:%d — %s", self._host, self._port, exc)
             self._started.set()
-            logger.info("GameServer listening on %s:%d", self._host, self._port)
-            await asyncio.Future()  # run forever
 
     async def _accept(self, ws) -> None:
         """Handle an incoming WebSocket connection."""

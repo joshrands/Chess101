@@ -166,6 +166,7 @@ class NetworkedGameRunner(GameRunner):
             "ping":              self._on_ping,
             "pong":              self._on_pong,
             "error":             self._on_error,
+            "_peer_lost":        self._on_peer_lost,
         }
         handler = handlers.get(t)
         if handler:
@@ -203,6 +204,10 @@ class NetworkedGameRunner(GameRunner):
             self._incoming.append({"type": "_peer_lost"})
 
     # ── Message handlers (called on main thread) ───────────────────────────────
+
+    def _on_peer_lost(self, msg: dict) -> None:  # noqa: ARG002
+        """Internal: peer disconnected, show overlay."""
+        self._peer_disconnected = True
 
     def _on_hello(self, msg: dict) -> None:
         remote_ver = msg.get("version", "")
@@ -764,7 +769,9 @@ class NetworkedGameRunner(GameRunner):
                 on_disconnected=self._on_disconnected,
             )
             self._server.set_message_handler(self._on_network_message)
-            self._server.start()
+            if not self._server.start():
+                logger.error("Server failed to bind — check that port %d is free", self._port)
+                return
             self._broadcaster = BeaconBroadcaster(
                 host_name=self._player_name,
                 port=self._port,
