@@ -58,6 +58,7 @@ class MoveFlags:
     is_en_passant: bool = False
     is_castling: bool = False
     is_promotion: bool = False
+    promoted_to: Optional[str] = None   # class name of chosen piece, e.g. "Queen"
     captured_at: Optional[tuple[int, int]] = None
     rook_from: Optional[tuple[int, int]] = None
     rook_to: Optional[tuple[int, int]] = None
@@ -69,6 +70,7 @@ class MoveFlags:
             "is_en_passant": self.is_en_passant,
             "is_castling": self.is_castling,
             "is_promotion": self.is_promotion,
+            "promoted_to": self.promoted_to,
             "captured_at": list(self.captured_at) if self.captured_at else None,
             "rook_from": list(self.rook_from) if self.rook_from else None,
             "rook_to": list(self.rook_to) if self.rook_to else None,
@@ -82,6 +84,7 @@ class MoveFlags:
             is_en_passant=d.get("is_en_passant", False),
             is_castling=d.get("is_castling", False),
             is_promotion=d.get("is_promotion", False),
+            promoted_to=d.get("promoted_to"),
             captured_at=tuple(d["captured_at"]) if d.get("captured_at") else None,  # type: ignore[arg-type]
             rook_from=tuple(d["rook_from"]) if d.get("rook_from") else None,  # type: ignore[arg-type]
             rook_to=tuple(d["rook_to"]) if d.get("rook_to") else None,  # type: ignore[arg-type]

@@ -579,6 +579,10 @@ class NetworkedGameRunner(GameRunner):
             assert self._current_team is not None
             # current_team is still the team that JUST moved (before parent swaps it)
             team_key = "r" if self._current_team.r == b.team_r.r else "l"
+            # If a promotion just finished, the chosen piece is already on the board —
+            # stamp its class name so the remote side can apply the same promotion.
+            if pm["flags"].is_promotion:
+                pm["flags"].promoted_to = type(b.grid[pm["tr"]][pm["tc"]]).__name__
             h = board_hash(b.grid, self.peace_time, team_key, b.team_r)
             self._net_seq += 1
             msg = build_move_msg(
@@ -642,6 +646,24 @@ class NetworkedGameRunner(GameRunner):
         b.grid[tr][tc] = b.grid[fr][fc]
         self._apply_move(fr, fc, tr, tc)
         self._move_count += 1
+
+        # If the remote player promoted a pawn, apply their chosen piece directly
+        # and suppress the local promotion picker (_promoting_pawn set by _apply_move).
+        if flags.is_promotion and self._promoting_pawn is not None:
+            from pieces.queen import Queen as _Queen
+            from pieces.knight import Knight as _Knight
+            from pieces.bishop import Bishop as _Bishop
+            from pieces.rook import Rook as _Rook
+            _promo_map: dict[str, type] = {
+                "Queen": _Queen, "Knight": _Knight,
+                "Bishop": _Bishop, "Rook": _Rook,
+            }
+            piece_name = flags.promoted_to or "Queen"
+            cls = _promo_map.get(piece_name, _Queen)
+            pawn = b.grid[tr][tc]
+            if pawn is not None:
+                b.grid[tr][tc] = cls(tr, tc, pawn.team)
+            self._promoting_pawn = None
 
         # Compute local hash and compare
         assert self._current_team is not None

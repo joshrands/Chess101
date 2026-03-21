@@ -1,5 +1,5 @@
 # Mac simulator — install these in the venv for local development
-pygame>=2.5
+pygame>=2.5,<2.6
 numpy
 websockets>=12.0
 zeroconf>=0.131
