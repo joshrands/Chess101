@@ -1,30 +1,34 @@
 """WebSocket game client for Chess101 LAN multiplayer.
 
-Mirrors the GameServer interface so NetworkedGameRunner can treat both
-host and guest symmetrically.
+Uses ``websockets.sync.client`` (blocking sockets, no asyncio) so the
+connection works reliably on macOS where asyncio's kqueue selector can
+return EHOSTUNREACH for non-blocking connects even when the host is
+reachable via blocking sockets.
 
-The asyncio loop runs in a daemon thread.  The main (Pygame) thread
-communicates via ``send()`` and the registered message handler callback.
+The receive loop runs in the daemon thread started by ``connect()``.
+A second daemon thread drains the outbound queue.  The main (Pygame)
+thread communicates via ``send()`` and the registered message handler.
 """
 from __future__ import annotations
 
-import asyncio
 import json
 import logging
+import queue
 import threading
 from typing import Callable, Optional
 
 logger = logging.getLogger(__name__)
 
 try:
-    import websockets
-    import websockets.exceptions
+    from websockets.sync.client import connect as _ws_connect
+    import websockets.exceptions as _ws_exc
 except ImportError:  # pragma: no cover
-    websockets = None  # type: ignore[assignment]
+    _ws_connect = None  # type: ignore[assignment]
+    _ws_exc = None      # type: ignore[assignment]
 
 
 class GameClient:
-    """Async WebSocket client that connects to a GameServer.
+    """Blocking WebSocket client that connects to a GameServer.
 
     Args:
         host_ip: IP address or hostname of the server.
@@ -46,8 +50,8 @@ class GameClient:
         self._on_disconnected = on_disconnected
 
         self._handler: Optional[Callable[[dict], None]] = None
-        self._loop: Optional[asyncio.AbstractEventLoop] = None
-        self._send_queue: asyncio.Queue = None  # type: ignore[assignment]
+        self._ws: Optional[object] = None
+        self._send_queue: queue.Queue = queue.Queue()
         self._thread: Optional[threading.Thread] = None
         self._connected = threading.Event()
 
@@ -61,11 +65,7 @@ class GameClient:
 
     def send(self, msg: dict) -> None:
         """Queue a message to be sent to the server. Thread-safe."""
-        if self._loop is None or self._send_queue is None:
-            return
-        asyncio.run_coroutine_threadsafe(
-            self._send_queue.put(json.dumps(msg)), self._loop
-        )
+        self._send_queue.put(json.dumps(msg))
 
     def connect(self, timeout: float = 10.0) -> bool:
         """Start the client thread and wait until connected.
@@ -79,63 +79,73 @@ class GameClient:
 
     def stop(self) -> None:
         """Signal the client to disconnect."""
-        if self._loop is not None:
-            self._loop.call_soon_threadsafe(self._loop.stop)
+        ws = self._ws
+        if ws is not None:
+            try:
+                ws.close()  # type: ignore[attr-defined]
+            except Exception:
+                pass
 
     # ------------------------------------------------------------------
-    # Internal asyncio implementation
+    # Internal (runs in daemon thread)
     # ------------------------------------------------------------------
 
     def _run(self) -> None:
-        self._loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(self._loop)
-        self._send_queue = asyncio.Queue()
-        self._loop.run_until_complete(self._connect())
-
-    async def _connect(self) -> None:
-        if websockets is None:
+        if _ws_connect is None:
             logger.error(
                 "websockets library not installed. "
                 "Run: pip install 'websockets>=12.0'"
             )
+            self._connected.set()
             return
+
         uri = f"ws://{self._host_ip}:{self._port}"
         try:
-            async with websockets.connect(uri) as ws:  # type: ignore[attr-defined]
+            with _ws_connect(uri, open_timeout=10.0) as ws:
+                self._ws = ws
                 self._connected.set()
                 logger.info("Connected to server at %s", uri)
                 if self._on_connected:
                     self._on_connected()
-                try:
-                    await asyncio.gather(
-                        self._recv_loop(ws),
-                        self._send_loop(ws),
-                    )
-                except Exception:
-                    pass
+
+                # Drain the outbound queue in a second daemon thread
+                send_thread = threading.Thread(
+                    target=self._send_loop, args=(ws,), daemon=True, name="GameClientSend"
+                )
+                send_thread.start()
+
+                # Block here receiving messages until the connection closes
+                self._recv_loop(ws)
+
         except Exception as exc:
             logger.error("Connection to %s failed: %s", uri, exc)
         finally:
-            self._connected.set()  # unblock connect() even on failure
+            self._ws = None
+            self._connected.set()   # unblock connect() even on failure
             logger.info("Disconnected from server")
             if self._on_disconnected:
                 self._on_disconnected()
 
-    async def _recv_loop(self, ws) -> None:
-        async for raw in ws:
-            try:
-                msg = json.loads(raw)
-            except json.JSONDecodeError:
-                logger.warning("Received non-JSON message: %r", raw)
-                continue
-            if self._handler:
-                self._handler(msg)
+    def _recv_loop(self, ws) -> None:
+        try:
+            while True:
+                raw = ws.recv()
+                try:
+                    msg = json.loads(raw)
+                except json.JSONDecodeError:
+                    logger.warning("Received non-JSON message: %r", raw)
+                    continue
+                if self._handler:
+                    self._handler(msg)
+        except Exception:
+            pass  # connection closed — exit loop
 
-    async def _send_loop(self, ws) -> None:
-        while True:
-            raw = await self._send_queue.get()
-            try:
-                await ws.send(raw)
-            except Exception as exc:
-                logger.warning("Send failed: %s", exc)
-                break
+    def _send_loop(self, ws) -> None:
+        try:
+            while True:
+                raw = self._send_queue.get()
+                if raw is None:     # stop signal
+                    break
+                ws.send(raw)
+        except Exception as exc:
+            logger.warning("Send failed: %s", exc)
