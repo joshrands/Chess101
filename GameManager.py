@@ -1,6 +1,6 @@
 # GameManager file
 
-from Board import Board
+from game.board import Board
 
 while True:
     board = Board()

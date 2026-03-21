@@ -1,7 +1,3 @@
-from dataclasses import dataclass
+from core.cell import Cell
 
-
-@dataclass(frozen=True)
-class Cell:
-    row: int = 0
-    col: int = 0
+__all__ = ["Cell"]

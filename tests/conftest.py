@@ -25,10 +25,11 @@ sys.modules.setdefault("smbus", _mock_smbus)
 sys.modules.setdefault("RPi", MagicMock())
 sys.modules.setdefault("RPi.GPIO", MagicMock())
 
-# Stub the entire Master module so Board.py's "from Master import Master"
-# resolves to a MagicMock class without touching real smbus at all.
+# Stub the Master modules so imports of Master resolve to MagicMock
+# without touching real smbus at all.
 _mock_master_mod = MagicMock()
 sys.modules.setdefault("Master", _mock_master_mod)
+sys.modules.setdefault("hardware.master", _mock_master_mod)
 
 # ── Chess module imports (safe now that stubs are in place) ───────────────────
 
