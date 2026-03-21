@@ -43,7 +43,7 @@ class Rook(Piece):
         Returns:
             Integer heuristic score for this rook.
         """
-        total = PieceValue.ROOK
+        total: int = PieceValue.ROOK
         self.calc_targets(board)
         for cell in self.targets:
             total += 1

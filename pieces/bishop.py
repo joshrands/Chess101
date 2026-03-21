@@ -38,7 +38,7 @@ class Bishop(Piece):
         Returns:
             Integer heuristic score for this bishop.
         """
-        total = PieceValue.BISHOP
+        total: int = PieceValue.BISHOP
         self.calc_targets(board)
         for cell in self.targets:
             total += 1

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+from typing import Optional
 
 from samplebase import SampleBase
 
@@ -16,6 +17,7 @@ from pieces.king import King
 from pieces.queen import Queen
 import time
 from core.cell import Cell
+from pieces.piece import BoardGrid
 import random
 from hardware.master import Master
 from hardware.sensor import BoardSensor
@@ -58,20 +60,20 @@ class Board(SampleBase):
 
         self.team_r = Team(64, 180, 232)
         self.team_l = Team(255, 140, 0)
-        self.grid = []
+        self.grid: BoardGrid = []
         self.master: BoardSensor = sensor if sensor is not None else Master()
-        self.computer_player_r = False
-        self.computer_player_l = False
+        self.computer_player_r: Optional[bool] = False
+        self.computer_player_l: Optional[bool] = False
 
         self.checker_brightness = 0
         self.checker_brightness_dir = 2
 
         self.game_over = False
         self.peace_time = 0
-        self.days_left_since_injury = []
-        self.days_right_since_injury = []
-        self.double_left_jeopardy = []
-        self.double_right_jeopardy = []
+        self.days_left_since_injury: list = []
+        self.days_right_since_injury: list = []
+        self.double_left_jeopardy: list = []
+        self.double_right_jeopardy: list = []
 
         self.team_array = []
         self.team_array.append(Team(64, 180, 232))    # Blue

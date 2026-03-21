@@ -50,7 +50,7 @@ class Knight(Piece):
         Returns:
             Integer heuristic score for this knight.
         """
-        total = PieceValue.KNIGHT
+        total: int = PieceValue.KNIGHT
         self.calc_targets(board)
         for cell in self.targets:
             total += 1

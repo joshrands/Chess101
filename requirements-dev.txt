@@ -1,3 +1,4 @@
 # Test / dev tooling
 -r requirements.txt
 pytest>=7
+mypy>=1.0

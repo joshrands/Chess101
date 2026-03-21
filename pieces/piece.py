@@ -8,6 +8,7 @@ from core.cell import Cell
 
 if TYPE_CHECKING:
     from pieces.king import King
+    from pieces.pawn import Pawn as _Pawn
 
 
 class Piece(ABC):
@@ -41,7 +42,7 @@ class Piece(ABC):
         self.critical_targets: list[Cell] = []
 
     @abstractmethod
-    def calc_targets(self, board: BoardGrid) -> None:
+    def calc_targets(self, board: BoardGrid) -> Optional[bool]:
         """Populates self.targets with all legal destination squares.
 
         Implementations must also apply pin filtering via filter_to_pin_ray()
@@ -49,6 +50,10 @@ class Piece(ABC):
 
         Args:
             board: The current 8x8 board state.
+
+        Returns:
+            None for most pieces; King returns True if in check, False
+            otherwise.
         """
         raise NotImplementedError()
 
@@ -66,7 +71,7 @@ class Piece(ABC):
         """
         raise NotImplementedError()
 
-    def move(self, new_row: int, new_col: int, board: BoardGrid) -> None:
+    def move(self, new_row: int, new_col: int, board: BoardGrid):
         """Moves the piece to the target square and marks it as touched.
 
         Args:
@@ -74,10 +79,16 @@ class Piece(ABC):
             new_col: Destination column.
             board: The current 8x8 board state (unused in the base
                 implementation but available to subclass overrides).
+
+        Returns:
+            None in the base implementation; Pawn overrides may return a
+            Cell for en-passant captured pawn removal; King returns a
+            (rook_from, rook_to) cell tuple on castling.
         """
         self.row = new_row
         self.col = new_col
         self.touched = True
+        return None
 
     def _kingsman(
         self,
@@ -108,8 +119,9 @@ class Piece(ABC):
             next_loc = (
                 0 <= current_row + dr < 8 and 0 <= current_col + dc < 8
             )
-            if board[current_row][current_col] is not None:
-                if board[current_row][current_col].team != self.team:
+            occupant = board[current_row][current_col]
+            if occupant is not None:
+                if occupant.team != self.team:
                     return current_row, current_col
                 else:
                     return -1, -1
@@ -133,10 +145,11 @@ class Piece(ABC):
                 on the initial call).
         """
         if 0 <= row + dr <= 7 and 0 <= col + dc <= 7:
-            if board[row + dr][col + dc] is None:
+            neighbor = board[row + dr][col + dc]
+            if neighbor is None:
                 self.targets.append(Cell(row + dr, col + dc))
                 self._blade_runner(board, dr, dc, row + dr, col + dc)
-            elif board[row + dr][col + dc].team != self.team:
+            elif neighbor.team != self.team:
                 self.targets.append(Cell(row + dr, col + dc))
 
     def critical_man(self) -> None:
@@ -169,7 +182,7 @@ class Piece(ABC):
                     new_targets.append(target)
         self.targets = new_targets
 
-    def print_piece(self, board: BoardGrid) -> None:
+    def print_piece(self) -> None:
         """Prints the piece type and current position to stdout."""
         print("Piece at", self.row, ",", self.col)
 

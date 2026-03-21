@@ -56,9 +56,10 @@ class King(Piece):
             col: The king's current column.
         """
         if 0 <= row + dr <= 7 and 0 <= col + dc <= 7:
-            if board[row + dr][col + dc] is None:
+            neighbor = board[row + dr][col + dc]
+            if neighbor is None:
                 self.targets.append(Cell(row + dr, col + dc))
-            elif board[row + dr][col + dc].team != self.team:
+            elif neighbor.team != self.team:
                 self.targets.append(Cell(row + dr, col + dc))
 
     def calc_targets(self, board: BoardGrid) -> bool:
@@ -96,14 +97,14 @@ class King(Piece):
         old_col = self.col
 
         if not self.touched:
-            if (isinstance(board[self.row][self.col - 4], Rook)
-                    and not board[self.row][self.col - 4].touched):
+            left_rook = board[self.row][self.col - 4]
+            if isinstance(left_rook, Rook) and not left_rook.touched:
                 if (board[self.row][self.col - 1] is None
                         and board[self.row][self.col - 2] is None
                         and board[self.row][self.col - 3] is None):
                     self.targets.append(Cell(self.row, self.col - 2))
-            if (isinstance(board[self.row][self.col + 3], Rook)
-                    and not board[self.row][self.col + 3].touched):
+            right_rook = board[self.row][self.col + 3]
+            if isinstance(right_rook, Rook) and not right_rook.touched:
                 if board[self.row][self.col + 1] is None and board[self.row][self.col + 2] is None:
                     self.targets.append(Cell(self.row, self.col + 2))
 
@@ -169,7 +170,7 @@ class King(Piece):
         Returns:
             Integer heuristic score for this king.
         """
-        value = PieceValue.KING
+        value: int = PieceValue.KING
         if self.am_i_gonna_die(board):
             value = 0
         return value
@@ -245,10 +246,12 @@ class King(Piece):
                     if scout_row != -1:
                         if enemy_row != -1:
                             if isinstance(board[enemy_row][enemy_col], (Rook, Queen)):
-                                board[scout_row][scout_col].critical = True
-                                board[scout_row][scout_col].critical_targets = (
-                                    self.please_god_save_the_king(enemy_row, enemy_col)
-                                )
+                                scout_piece = board[scout_row][scout_col]
+                                if scout_piece is not None:
+                                    scout_piece.critical = True
+                                    scout_piece.critical_targets = (
+                                        self.please_god_save_the_king(enemy_row, enemy_col)
+                                    )
                     elif enemy_row != -1:
                         if isinstance(board[enemy_row][enemy_col], (Rook, Queen)):
                             self.god_save_the_king = self.please_god_save_the_king(
@@ -263,10 +266,12 @@ class King(Piece):
                     if scout_row != -1:
                         if enemy_row != -1:
                             if isinstance(board[enemy_row][enemy_col], (Bishop, Queen)):
-                                board[scout_row][scout_col].critical = True
-                                board[scout_row][scout_col].critical_targets = (
-                                    self.please_god_save_the_king(enemy_row, enemy_col)
-                                )
+                                scout_piece = board[scout_row][scout_col]
+                                if scout_piece is not None:
+                                    scout_piece.critical = True
+                                    scout_piece.critical_targets = (
+                                        self.please_god_save_the_king(enemy_row, enemy_col)
+                                    )
                     elif enemy_row != -1:
                         if isinstance(board[enemy_row][enemy_col], (Bishop, Queen)):
                             self.god_save_the_king = self.please_god_save_the_king(
@@ -332,11 +337,12 @@ class King(Piece):
             0 <= current_row + dr < 8 and 0 <= current_col + dc < 8
         )
         if 0 <= current_row < 8 and 0 <= current_col < 8:
-            if board[current_row][current_col] is not None:
-                if board[current_row][current_col].team != self.team:
+            cur_piece = board[current_row][current_col]
+            if cur_piece is not None:
+                if cur_piece.team != self.team:
                     return current_row, current_col, -1, -1
                 elif next_loc:
-                    scout_row, scout_col = board[current_row][current_col]._kingsman(
+                    scout_row, scout_col = cur_piece._kingsman(
                         board, current_row + dr, current_col + dc, dr, dc)
                     return scout_row, scout_col, current_row, current_col
             elif next_loc:
@@ -367,8 +373,8 @@ class King(Piece):
         """
         from pieces.knight import Knight
         if 0 <= row + dr <= 7 and 0 <= col + dc <= 7:
-            if (isinstance(board[row + dr][col + dc], Knight)
-                    and board[row + dr][col + dc].team != self.team):
+            candidate = board[row + dr][col + dc]
+            if isinstance(candidate, Knight) and candidate.team != self.team:
                 return row + dr, col + dc
         return -1, -1
 
@@ -390,10 +396,12 @@ class King(Piece):
         """
         dr, dc = self.determine_direction_from_enemy_towards_king(enemy_row, enemy_col)
         save_the_king: list[Cell] = []
-        while not (enemy_row == self.row and enemy_col == self.col):
-            save_the_king.append(Cell(enemy_row, enemy_col))
-            enemy_row = enemy_row + dr
-            enemy_col = enemy_col + dc
+        r: float = enemy_row
+        c: float = enemy_col
+        while not (r == self.row and c == self.col):
+            save_the_king.append(Cell(int(r), int(c)))
+            r = r + dr
+            c = c + dc
         return save_the_king
 
     def determine_direction_from_enemy_towards_king(

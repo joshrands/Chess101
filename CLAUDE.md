@@ -42,6 +42,14 @@ sudo python3 GameManager.py --led-gpio-mapping=adafruit-hat
 
 `conftest.py` stubs out `rgbmatrix` and `smbus` so all test files run on Mac without Pi hardware.
 
+## Type Checking
+
+```bash
+.venv/bin/mypy pieces/ core/ ai/ game/ hardware/ ui/ simulator/
+```
+
+Config is in `setup.cfg` (`[mypy]` section). `ignore_missing_imports = True` is set so the Pi-only stubs (`rgbmatrix`, `smbus`) don't produce errors. The codebase should stay at **0 mypy errors**.
+
 ## Package Structure
 
 ```

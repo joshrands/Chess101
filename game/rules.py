@@ -9,17 +9,16 @@ from __future__ import annotations
 
 import copy
 import logging
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from Board import Board
-    from Piece import BoardGrid
-    from Team import Team
+    from pieces.piece import BoardGrid
+    from core.team import Team
 
 logger = logging.getLogger(__name__)
 
 
-def bob_ross(board: Board, team: Team, board_state: BoardGrid) -> bool:
+def bob_ross(board: Any, team: "Team", board_state: "BoardGrid") -> bool:
     """Return True and trigger stalemate if 50 half-moves have passed without a capture or pawn move.
 
     Note: The threshold is intentionally 50 half-moves rather than the standard
@@ -57,9 +56,9 @@ def bob_ross(board: Board, team: Team, board_state: BoardGrid) -> bool:
 
 
 def check_threefold_repetition(
-    board: Board,
-    team: Team,
-    board_state: BoardGrid,
+    board: Any,
+    team: "Team",
+    board_state: "BoardGrid",
     days_since_injury: list,
     double_jeopardy: list,
 ) -> bool:

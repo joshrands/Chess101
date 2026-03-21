@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 
 from ai.tree import Tree
 from core.team import Team
@@ -45,12 +45,14 @@ class AI:
         beta = infinity
 
         successors = self.get_successors(self.game_tree)
-        best_state = None
+        best_state: Optional[Tree] = None
         for state in successors:
             value = self.min_value(state, best_val, beta)
             if value > best_val:
                 best_val = value
                 best_state = state
+        assert best_state is not None, "alpha_beta_search called with no successors"
+        assert best_state.old_cell is not None and best_state.new_cell is not None
         logger.debug("AlphaBeta:  Best Piece to move is located at: %s%s", best_state.old_cell.row, best_state.old_cell.col)
         logger.debug("AlphaBeta:  This piece should be moved to: %s%s", best_state.new_cell.row, best_state.new_cell.col)
         return best_state

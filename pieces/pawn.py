@@ -62,12 +62,14 @@ class Pawn(Piece):
         self.en_passant_loc = None
         self.targets = []
         if self.row != 0 and self.row != 7:
-            if self.col != 0 and isinstance(board[self.row + self.direction][self.col - 1], Piece):
-                if board[self.row + self.direction][self.col - 1].team != self.team:
+            diag_left = board[self.row + self.direction][self.col - 1] if self.col != 0 else None
+            if diag_left is not None and isinstance(diag_left, Piece):
+                if diag_left.team != self.team:
                     self.targets.append(Cell(self.row + self.direction, self.col - 1))
 
-            if self.col != 7 and isinstance(board[self.row + self.direction][self.col + 1], Piece):
-                if board[self.row + self.direction][self.col + 1].team != self.team:
+            diag_right = board[self.row + self.direction][self.col + 1] if self.col != 7 else None
+            if diag_right is not None and isinstance(diag_right, Piece):
+                if diag_right.team != self.team:
                     self.targets.append(Cell(self.row + self.direction, self.col + 1))
 
             if board[self.row + self.direction][self.col] is None:
@@ -78,17 +80,15 @@ class Pawn(Piece):
                         and board[self.row + self.direction][self.col] is None):
                     self.targets.append(Cell(self.row + 2 * self.direction, self.col))
 
-            if (self.col != 0
-                    and isinstance(board[self.row][self.col - 1], Pawn)
-                    and board[self.row][self.col - 1].team != self.team):
-                if board[self.row][self.col - 1].en_passantable:
+            left_neighbor = board[self.row][self.col - 1] if self.col != 0 else None
+            if isinstance(left_neighbor, Pawn) and left_neighbor.team != self.team:
+                if left_neighbor.en_passantable:
                     self.targets.append(Cell(self.row + self.direction, self.col - 1))
                     self.en_passant_loc = Cell(self.row + self.direction, self.col - 1)
 
-            if (self.col != 7
-                    and isinstance(board[self.row][self.col + 1], Pawn)
-                    and board[self.row][self.col + 1].team != self.team):
-                if board[self.row][self.col + 1].en_passantable:
+            right_neighbor = board[self.row][self.col + 1] if self.col != 7 else None
+            if isinstance(right_neighbor, Pawn) and right_neighbor.team != self.team:
+                if right_neighbor.en_passantable:
                     self.targets.append(Cell(self.row + self.direction, self.col + 1))
                     self.en_passant_loc = Cell(self.row + self.direction, self.col + 1)
 
@@ -109,7 +109,7 @@ class Pawn(Piece):
             Integer heuristic score for this pawn.
         """
         self.calc_targets(board)
-        total = PieceValue.PAWN
+        total: int = PieceValue.PAWN
         total = total + len(self.targets)
         for cell in self.targets:
             total += 1

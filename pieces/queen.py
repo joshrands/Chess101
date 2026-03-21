@@ -46,7 +46,7 @@ class Queen(Piece):
         Returns:
             Integer heuristic score for this queen.
         """
-        total = PieceValue.QUEEN
+        total: int = PieceValue.QUEEN
         self.calc_targets(board)
         for cell in self.targets:
             total += 1

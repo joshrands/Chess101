@@ -22,6 +22,7 @@ from pieces.bishop import Bishop
 from pieces.king import King
 from pieces.knight import Knight
 from pieces.pawn import Pawn
+from pieces.piece import Piece
 from pieces.queen import Queen
 from pieces.rook import Rook
 from simulator.sensor import SimSensor
@@ -154,14 +155,14 @@ class GameRunner:
         self._selected_l_idx: Optional[int] = None
 
         # Playing transient state
-        self._selected_piece = None
+        self._selected_piece: Optional[Piece] = None
         self._in_check = False
         self._king_check_pos: Optional[tuple[int, int]] = None
         self._ai_thinking = False
         self._current_team: Optional[Team] = None
         self._ai_thread: Optional[threading.Thread] = None
-        self._ai_result = None
-        self._ai_display_board = None
+        self._ai_result: Optional[Tree] = None
+        self._ai_display_board: Optional[list] = None
         self._ai_display_lock = threading.Lock()
 
         # Game-over transient state
@@ -194,13 +195,13 @@ class GameRunner:
         self._board = Board(sensor=SimSensor())
         matrix = FakeRGBMatrix()
         matrix._screen = pygame.display.get_surface()
-        self._board.matrix = matrix
-        self._board.canvas = matrix.CreateFrameCanvas()
-        self._board.checker_brightness = 0
-        self._board.checker_brightness_dir = 2
+        self._b.matrix = matrix
+        self._b.canvas = matrix.CreateFrameCanvas()
+        self._b.checker_brightness = 0
+        self._b.checker_brightness_dir = 2
         # Not yet decided — need None so WAR_GAMES knows nothing is selected yet
-        self._board.computer_player_r = None
-        self._board.computer_player_l = None
+        self._b.computer_player_r = None
+        self._b.computer_player_l = None
         # Font for piece overlay — try fonts with good Unicode chess-symbol coverage
         font_size = int(_CELL_PX * 0.52)
         for _fname in ("applesymbols", "arial", "dejavusans", None):
@@ -212,6 +213,14 @@ class GameRunner:
         self._pfont_md = pygame.font.SysFont("monospace", 15)
         self._pfont_lg = pygame.font.SysFont("monospace", 18, bold=True)
 
+    # ── Internal narrowing helpers ─────────────────────────────────────────────
+
+    @property
+    def _b(self) -> "Board":
+        """Return self._board, asserting it has been initialised."""
+        assert self._board is not None, "_board accessed before _init_board()"
+        return self._board
+
     # ── Properties that game/rules.py needs via the duck-type 'board' arg ─────
 
     @property
@@ -221,7 +230,7 @@ class GameRunner:
         Returns:
             The Team instance for the right-hand player.
         """
-        return self._board.team_r
+        return self._b.team_r
 
     @property
     def team_l(self) -> Team:
@@ -230,7 +239,7 @@ class GameRunner:
         Returns:
             The Team instance for the left-hand player.
         """
-        return self._board.team_l
+        return self._b.team_l
 
     # ── Coordinate helpers ─────────────────────────────────────────────────────
 
@@ -265,7 +274,7 @@ class GameRunner:
         Returns:
             A flat list of ``Piece`` instances owned by ``team``.
         """
-        b = self._board
+        b = self._b
         if grid is None:
             grid = b.grid
         return [p for row in grid for p in row
@@ -288,7 +297,7 @@ class GameRunner:
             target_row: Row index the piece moved to.
             target_col: Column index the piece moved to.
         """
-        b = self._board
+        b = self._b
         piece = b.grid[target_row][target_col]
         if isinstance(piece, Pawn):
             self.peace_time = 0
@@ -297,14 +306,16 @@ class GameRunner:
                 b.grid[enemy.row][enemy.col] = None
         elif isinstance(piece, King):
             rook_loc, rook_tgt = piece.move(target_row, target_col, b.grid)
-            if rook_loc is not None:
+            if rook_loc is not None and rook_tgt is not None:
                 b.grid[rook_tgt.row][rook_tgt.col] = (
                     b.grid[rook_loc.row][rook_loc.col])
                 b.grid[rook_loc.row][rook_loc.col] = None
-                b.grid[rook_tgt.row][rook_tgt.col].move(
-                    rook_tgt.row, rook_tgt.col, b.grid)
+                rook_piece = b.grid[rook_tgt.row][rook_tgt.col]
+                if rook_piece is not None:
+                    rook_piece.move(rook_tgt.row, rook_tgt.col, b.grid)
         else:
-            piece.move(target_row, target_col, b.grid)
+            if piece is not None:
+                piece.move(target_row, target_col, b.grid)
         b.grid[old_row][old_col] = None
 
     def _add_nodes(self, node: Tree, team: Team, depth: int = 2) -> None:
@@ -326,7 +337,7 @@ class GameRunner:
             depth: Remaining half-moves (plies) to expand. Expansion stops
                 when this reaches zero.
         """
-        b = self._board
+        b = self._b
         if depth == 0:
             return
         team_king = None
@@ -372,7 +383,7 @@ class GameRunner:
         Lowercase letters = team_l pieces (rows 6–7 at game start).
         '·' = empty square.
         """
-        b = self._board
+        b = self._b
         lines = ["", "    0 1 2 3 4 5 6 7", "  ┌─────────────────┐"]
         for r, row in enumerate(b.grid):
             cells = []
@@ -401,7 +412,7 @@ class GameRunner:
             losing_team: The team that has been checkmated; the opponent is
                 stored as the winner.
         """
-        b = self._board
+        b = self._b
         self._winner_team = b.team_r if losing_team.r == b.team_l.r else b.team_l
         self.phase = Phase.GAME_OVER
 
@@ -418,7 +429,7 @@ class GameRunner:
         Args:
             team: The team whose turn is beginning.
         """
-        b = self._board
+        b = self._b
         if _rules.bob_ross(self, team, b.grid):
             return
 
@@ -443,7 +454,9 @@ class GameRunner:
                 if piece is not None and not isinstance(piece, King):
                     piece.calc_targets(b.grid)
                     if check:
-                        piece.sky_fall(b.grid[king_row][king_col])
+                        king_piece = b.grid[king_row][king_col]
+                        if isinstance(king_piece, King):
+                            piece.sky_fall(king_piece)
                     if len(piece.get_targets()) > 0 and piece.team.r == team.r:
                         pieces_with_moves += 1
 
@@ -456,7 +469,8 @@ class GameRunner:
                 logger.info("The only winning move is not to play")
             else:
                 self._declare_victory(team)
-                logger.info("Checkmate! %s wins.", self._winner_team.name)
+                winner = self._winner_team
+                logger.info("Checkmate! %s wins.", winner.name if winner is not None else "?")
             return
 
         self._in_check = check
@@ -481,11 +495,13 @@ class GameRunner:
 
     def _run_ai(self) -> None:
         """Runs in a background thread — builds tree and stores best move."""
-        b = self._board
+        b = self._b
+        assert self._current_team is not None, "_current_team not set before AI run"
+        current_team = self._current_team
         root = Tree(copy.deepcopy(b.grid), None, None, b.team_r, b.team_l)
-        self._add_nodes(root, self._current_team, depth=2)
+        self._add_nodes(root, current_team, depth=2)
         if root.children:
-            self._ai_result = AI(root, self._current_team).alpha_beta_search()
+            self._ai_result = AI(root, current_team).alpha_beta_search()
 
     def _next_turn(self) -> None:
         """Clear per-turn state and hand control to the opposing team.
@@ -493,11 +509,12 @@ class GameRunner:
         Resets the selected piece, check indicators, and AI flag, then
         swaps the active team and calls ``_begin_turn`` for the new side.
         """
-        b = self._board
+        b = self._b
         self._selected_piece = None
         self._in_check = False
         self._king_check_pos = None
         self._ai_thinking = False
+        assert self._current_team is not None, "_current_team not set before _next_turn"
         self._current_team = (
             b.team_l if self._current_team.r == b.team_r.r else b.team_r)
         self._begin_turn(self._current_team)
@@ -511,7 +528,7 @@ class GameRunner:
         row 5 for the left player. Once a side has made a selection, all
         other colour cells on that row are dimmed to a quarter brightness.
         """
-        b = self._board
+        b = self._b
         b.canvas.Clear()
         r_sel = self._selected_r_idx
         l_sel = self._selected_l_idx
@@ -538,7 +555,7 @@ class GameRunner:
         AI choices show a sweeping dot, confirmed Human choices show a solid
         team-colour fill.
         """
-        b = self._board
+        b = self._b
         b.canvas.Clear()
         think = self._think
 
@@ -604,14 +621,14 @@ class GameRunner:
         Pass a custom grid (e.g. AI's considered board) to visualize that instead;
         selection highlights are suppressed when a custom grid is used.
         """
-        screen = self._board.matrix._screen
+        screen = self._b.matrix._screen
         if screen is None:
             return
         show_selection = grid is None
         if grid is None:
-            grid = self._board.grid
+            grid = self._b.grid
 
-        b = self._board
+        b = self._b
         team_r_r = b.team_r.r  # used to pick which Unicode glyph variant
 
         r_circle = int(_CELL_PX * 0.38)    # piece circle radius
@@ -657,7 +674,7 @@ class GameRunner:
         # Highlight selected piece with a pulsing bright ring
         if self._selected_piece is not None:
             p = self._selected_piece
-            for row_idx, row in enumerate(self._board.grid):
+            for row_idx, row in enumerate(self._b.grid):
                 for col_idx, gp in enumerate(row):
                     if gp is p:
                         cx = col_idx * _CELL_PX + _CELL_PX // 2
@@ -675,7 +692,7 @@ class GameRunner:
         target squares for the selected piece, blinks the selected piece's
         cell, and overlays all pieces as Unicode-symbol circles.
         """
-        b = self._board
+        b = self._b
         b.canvas.Clear()
 
         if self._ai_thinking:
@@ -718,7 +735,7 @@ class GameRunner:
         through random colours at roughly 20 fps, matching the Pi's
         ``time.sleep(0.05)`` animation.
         """
-        b = self._board
+        b = self._b
         b.canvas.Clear()
         if self._is_draw:
             for i in range(4):
@@ -731,6 +748,7 @@ class GameRunner:
                                  b.team_l.r, b.team_l.g, b.team_l.b)
         else:
             w = self._winner_team
+            assert w is not None, "_winner_team accessed before being set"
             # Regenerate random inner-square colors at 20 fps — matches Pi's time.sleep(0.05)
             now = pygame.time.get_ticks()
             if not self._game_over_colors or now - self._last_game_over_ms >= 50:
@@ -770,7 +788,7 @@ class GameRunner:
         if cell is None:
             return
         row, col = cell
-        b = self._board
+        b = self._b
         if row == 2:
             self._selected_r_idx = col
             t = b.team_array[col]
@@ -802,7 +820,7 @@ class GameRunner:
         if cell is None:
             return
         row, col = cell
-        b = self._board
+        b = self._b
         if row == 3:
             b.computer_player_r = col >= 4   # cols 4-7 = AI, 0-3 = Human
         elif row == 4:
@@ -817,7 +835,7 @@ class GameRunner:
         the active team to ``team_r``, transitions to the PLAYING phase, and
         delegates to ``_begin_turn``.
         """
-        b = self._board
+        b = self._b
         b.initialize_game_board()
         self._current_team = b.team_r
         self.phase = Phase.PLAYING
@@ -853,7 +871,9 @@ class GameRunner:
             self._selected_piece = None
             return
         row, col = cell
-        b = self._board
+        b = self._b
+        assert self._current_team is not None, "_current_team not set in _handle_playing"
+        current_team = self._current_team
 
         if self._selected_piece is not None:
             for target in self._selected_piece.targets:
@@ -877,13 +897,13 @@ class GameRunner:
             if piece is self._selected_piece:
                 # Clicking the already-selected piece puts it back down
                 self._selected_piece = None
-            elif piece is not None and piece.team.r == self._current_team.r:
+            elif piece is not None and piece.team.r == current_team.r:
                 self._selected_piece = piece
             else:
                 self._selected_piece = None
         else:
             piece = b.grid[row][col]
-            if piece is not None and piece.team.r == self._current_team.r:
+            if piece is not None and piece.team.r == current_team.r:
                 self._selected_piece = piece
 
     def _handle_game_over(self, event: pygame.event.Event) -> None:
@@ -937,8 +957,8 @@ class GameRunner:
             elif not self._ai_thread.is_alive():
                 self._ai_thread = None
                 best = self._ai_result
-                if best is not None:
-                    b = self._board
+                if best is not None and best.old_cell is not None and best.new_cell is not None:
+                    b = self._b
                     old_r, old_c = best.old_cell.row, best.old_cell.col
                     tgt_r, tgt_c = best.new_cell.row, best.new_cell.col
                     logger.debug(
@@ -956,9 +976,12 @@ class GameRunner:
 
     def _render_panel(self) -> None:
         """Draw the telemetry / log side panel to the right of the board."""
-        if self._pfont_sm is None:
+        if self._pfont_sm is None or self._pfont_md is None or self._pfont_lg is None:
             return  # fonts not ready (before _init_board)
-        screen = self._board.matrix._screen
+        pfont_sm = self._pfont_sm
+        pfont_md = self._pfont_md
+        pfont_lg = self._pfont_lg
+        screen = self._b.matrix._screen
         if screen is None:
             return
 
@@ -989,36 +1012,36 @@ class GameRunner:
             pygame.draw.circle(screen, _P_SEP, (cx, cy), r, 1)
 
         # ── Title ────────────────────────────────────────────────────────────
-        text("Chess 101", self._pfont_lg, _P_TEXT)
+        text("Chess 101", pfont_lg, _P_TEXT)
         sep()
 
         # ── Phase ────────────────────────────────────────────────────────────
-        text(f"Phase   {self.phase.name}", self._pfont_md, _P_DIM)
+        text(f"Phase   {self.phase.name}", pfont_md, _P_DIM)
 
-        b = self._board
+        b = self._b
 
         # ── Phase-specific status ─────────────────────────────────────────────
         if self.phase == Phase.COLOR_PICK:
-            text("Row 2 → Right team colour", self._pfont_sm, _P_DIM)
-            text("Row 5 → Left  team colour", self._pfont_sm, _P_DIM)
+            text("Row 2 → Right team colour", pfont_sm, _P_DIM)
+            text("Row 5 → Left  team colour", pfont_sm, _P_DIM)
             if self._selected_r_idx is not None:
                 tc = b.team_r
-                text(f"Right  {tc.name}", self._pfont_sm,
+                text(f"Right  {tc.name}", pfont_sm,
                      (tc.r, tc.g, tc.b))
             if self._selected_l_idx is not None:
                 tc = b.team_l
-                text(f"Left   {tc.name}", self._pfont_sm,
+                text(f"Left   {tc.name}", pfont_sm,
                      (tc.r, tc.g, tc.b))
 
         elif self.phase == Phase.WAR_GAMES:
-            text("Row 3 left=Human right=AI", self._pfont_sm, _P_DIM)
-            text("Row 4 left=AI    right=Human", self._pfont_sm, _P_DIM)
+            text("Row 3 left=Human right=AI", pfont_sm, _P_DIM)
+            text("Row 4 left=AI    right=Human", pfont_sm, _P_DIM)
 
         elif self.phase in (Phase.PLAYING, Phase.GAME_OVER):
             # ── Current team ──────────────────────────────────────────────
             if self._current_team is not None:
                 tc = self._current_team
-                surf_t = self._pfont_md.render(
+                surf_t = pfont_md.render(
                     f"Turn    {tc.name}", True, (tc.r, tc.g, tc.b))
                 screen.blit(surf_t, (x0 + pad, y))
                 swatch_x = x0 + pad + surf_t.get_width() + 10
@@ -1026,11 +1049,11 @@ class GameRunner:
                 color_swatch((tc.r, tc.g, tc.b), swatch_x, swatch_y)
                 y += surf_t.get_height() + 3
 
-            text(f"Move    #{self._move_count}", self._pfont_md, _P_TEXT)
+            text(f"Move    #{self._move_count}", pfont_md, _P_TEXT)
 
             # ── Peace-time progress bar ───────────────────────────────────
             peace = self.peace_time
-            text(f"Peace   {peace} / 50", self._pfont_sm, _P_DIM)
+            text(f"Peace   {peace} / 50", pfont_sm, _P_DIM)
             bar_w  = w - pad * 2
             bar_h  = 9
             pygame.draw.rect(screen, _P_SEP,
@@ -1051,32 +1074,32 @@ class GameRunner:
             if self._in_check:
                 blink = (pygame.time.get_ticks() // 380) % 2
                 text("!! KING IN CHECK",
-                     self._pfont_md, _P_BAD if blink else _P_WARN)
+                     pfont_md, _P_BAD if blink else _P_WARN)
 
             if self._ai_thinking:
                 dots = "." * ((pygame.time.get_ticks() // 320) % 4 + 1)
-                text(f"AI thinking{dots}", self._pfont_md, _P_WARN)
+                text(f"AI thinking{dots}", pfont_md, _P_WARN)
 
             # ── Game-over result ──────────────────────────────────────────
             if self.phase == Phase.GAME_OVER:
                 sep()
                 if self._is_draw:
-                    text("  DRAW", self._pfont_lg, _P_WARN)
+                    text("  DRAW", pfont_lg, _P_WARN)
                 elif self._winner_team:
                     wt = self._winner_team
                     text(f"  {wt.name} wins!",
-                         self._pfont_lg, (wt.r, wt.g, wt.b))
-                text("Press N to play again", self._pfont_sm, _P_DIM)
+                         pfont_lg, (wt.r, wt.g, wt.b))
+                text("Press N to play again", pfont_sm, _P_DIM)
 
         sep()
 
         # ── Log feed ─────────────────────────────────────────────────────────
-        text("LOG", self._pfont_md, _P_DIM)
+        text("LOG", pfont_md, _P_DIM)
 
-        line_h   = self._pfont_sm.get_height() + 2
+        line_h   = pfont_sm.get_height() + 2
         avail_h  = h - y - pad
         max_lines = max(1, avail_h // line_h)
-        char_w   = self._pfont_sm.size("X")[0]
+        char_w   = pfont_sm.size("X")[0]
         max_chars = max(1, (w - pad * 2) // char_w)
 
         records = list(self._panel_handler.records)[-max_lines:]
@@ -1088,7 +1111,7 @@ class GameRunner:
             if len(line) > max_chars:
                 line = line[:max_chars - 1] + "…"
             color = _P_LEVEL.get(rec.levelno, _P_TEXT)
-            surf  = self._pfont_sm.render(line, True, color)
+            surf  = pfont_sm.render(line, True, color)
             screen.blit(surf, (x0 + pad, y))
             y += line_h
             if y >= h - pad:
