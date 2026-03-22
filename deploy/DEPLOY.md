@@ -31,9 +31,10 @@ by default. No path-based routing is needed — they are separate hostnames.
 
 ---
 
-### 2. Configure environment variables for `chess101-relay`
+### 2. Configure environment variables
 
-In the Render dashboard → `chess101-relay` → **Environment**, add the following.
+#### `chess101-relay` — Render dashboard → `chess101-relay` → **Environment**
+
 All three are required for the relay to start correctly.
 
 | Variable | Value | Description |
@@ -41,6 +42,12 @@ All three are required for the relay to start correctly.
 | `RELAY_PORT` | `8765` | Port the relay listens on inside the container |
 | `RELAY_MAX_ROOMS` | `200` | Maximum concurrent active rooms |
 | `RELAY_ROOM_TIMEOUT` | `900` | Seconds of inactivity before a room is deleted |
+
+#### `chess101-spectator` — Render dashboard → `chess101-spectator` → **Environment**
+
+| Variable | Value | Description |
+|---|---|---|
+| `SKIP_INSTALL_DEPS` | `true` | Prevents Render from auto-detecting and running `requirements.txt` (which would fail trying to build `pygame` for a server with no SDL). The static site is plain HTML and needs no Python dependencies. |
 
 ---
 

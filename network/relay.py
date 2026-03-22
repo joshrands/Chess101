@@ -29,6 +29,7 @@ Run behind Nginx for wss:// (TLS) — see deploy/nginx.conf.
 from __future__ import annotations
 
 import asyncio
+import http
 import json
 import logging
 import os
@@ -385,6 +386,22 @@ async def _cleanup_loop() -> None:
             logger.info("Room %s expired and removed", code)
 
 
+# ── Health check ──────────────────────────────────────────────────────────────
+
+async def _process_request(connection, request) -> None:  # type: ignore[return]
+    """Respond to HTTP health checks before the WebSocket handshake runs.
+
+    Render (and other hosting platforms) probe the service with HTTP GET
+    requests to confirm it is alive.  The websockets library only speaks
+    WebSocket, so we intercept plain HTTP GETs here and return 200 OK.
+    HEAD requests are rejected by the websockets HTTP parser before this hook
+    is called; configure your hosting provider to use GET health checks
+    (render.yaml: healthCheckPath: /health).
+    """
+    if request.path == "/health":
+        return connection.respond(http.HTTPStatus.OK, "OK\n")
+
+
 # ── Server entry point ────────────────────────────────────────────────────────
 
 async def _main() -> None:
@@ -395,7 +412,9 @@ async def _main() -> None:
 
     asyncio.create_task(_cleanup_loop())
 
-    async with websockets.serve(_handle, "0.0.0.0", _PORT):
+    async with websockets.serve(
+        _handle, "0.0.0.0", _PORT, process_request=_process_request
+    ):
         logger.info("Chess101 relay listening on ws://0.0.0.0:%d", _PORT)
         await asyncio.Future()   # run forever
 
