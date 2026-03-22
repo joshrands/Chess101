@@ -35,13 +35,13 @@ by default. No path-based routing is needed — they are separate hostnames.
 
 #### `chess101-relay` — Render dashboard → `chess101-relay` → **Environment**
 
-All three are required for the relay to start correctly.
+| Variable | Required | Value | Description |
+|---|---|---|---|
+| `RELAY_PORT` | No | — | Render injects `PORT` automatically (e.g. `10000`); the relay falls back to it. Only set `RELAY_PORT` if you need to override the port. |
+| `RELAY_MAX_ROOMS` | Yes | `200` | Maximum concurrent active rooms |
+| `RELAY_ROOM_TIMEOUT` | Yes | `900` | Seconds of inactivity before a room is deleted |
 
-| Variable | Value | Description |
-|---|---|---|
-| `RELAY_PORT` | `8765` | Port the relay listens on inside the container |
-| `RELAY_MAX_ROOMS` | `200` | Maximum concurrent active rooms |
-| `RELAY_ROOM_TIMEOUT` | `900` | Seconds of inactivity before a room is deleted |
+> **Note:** Do not set `RELAY_PORT` on Render. The relay reads Render's `PORT` env var automatically. Setting `RELAY_PORT=8765` will cause the health check to fail because Render routes traffic to its own `PORT` (typically `10000`), not `8765`.
 
 #### `chess101-spectator` — Render dashboard → `chess101-spectator` → **Environment**
 
@@ -218,6 +218,6 @@ docker run -d --name chess101-relay --restart unless-stopped \
 
 | Variable | Default | Description |
 |---|---|---|
-| `RELAY_PORT` | `8765` | Port the relay listens on. Must be set explicitly on Render. |
+| `RELAY_PORT` | `PORT` env → `8765` | Port the relay listens on. On Render, omit this — `PORT` is used automatically. On VPS, set to `8765` (or whichever port Nginx proxies to). |
 | `RELAY_MAX_ROOMS` | `100` | Maximum concurrent active rooms |
 | `RELAY_ROOM_TIMEOUT` | `600` | Seconds of inactivity before a room is deleted |

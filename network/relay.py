@@ -50,7 +50,7 @@ except ImportError:
     websockets = None  # type: ignore[assignment]
 
 # ── Configuration ─────────────────────────────────────────────────────────────
-_PORT         = int(os.environ.get("RELAY_PORT",         "8765"))
+_PORT         = int(os.environ.get("RELAY_PORT") or os.environ.get("PORT") or "8765")
 _MAX_ROOMS    = int(os.environ.get("RELAY_MAX_ROOMS",    "100"))
 _ROOM_TIMEOUT = int(os.environ.get("RELAY_ROOM_TIMEOUT", "600"))
 _HISTORY_LEN  = 50    # messages buffered per room for reconnect replay
@@ -419,9 +419,24 @@ async def _main() -> None:
         await asyncio.Future()   # run forever
 
 
+class _SuppressHandshakeErrors(logging.Filter):
+    """Drop 'opening handshake failed' records from the websockets server logger.
+
+    Render (and other platforms) probe the port with HTTP HEAD requests before
+    the healthCheckPath is evaluated.  The websockets HTTP parser rejects HEAD
+    at the protocol level, which produces a noisy ERROR log every second.
+    These are harmless — the real health check (GET /health) works fine — so
+    we suppress them here rather than let them obscure real errors.
+    """
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        return "opening handshake failed" not in record.getMessage()
+
+
 if __name__ == "__main__":
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s %(levelname)s %(name)s: %(message)s",
     )
+    logging.getLogger("websockets.server").addFilter(_SuppressHandshakeErrors())
     asyncio.run(_main())
