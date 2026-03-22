@@ -11,6 +11,7 @@ services:
   - type: web
     name: chess101-spectator
     env: static
+    buildCommand: ""
     staticPublishPath: ./web
     headers:
       - path: /*
