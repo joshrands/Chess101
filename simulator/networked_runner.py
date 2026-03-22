@@ -187,6 +187,7 @@ class NetworkedGameRunner(GameRunner):
             "move_ack":          self._on_move_ack,
             "board_sync_request": self._on_board_sync_request,
             "board_sync":        self._on_board_sync,
+            "rejoin_sync":       self._on_rejoin_sync,
             "game_event":        self._on_game_event,
             "setup_status":      self._on_setup_status,
             "ping":              self._on_ping,
@@ -274,6 +275,12 @@ class NetworkedGameRunner(GameRunner):
                 if self.phase == Phase.PLAYING:
                     self._send_board_sync()
                 logger.info("Sent game_setup (spectator_view)")
+            elif self.phase == Phase.PLAYING:
+                # Guest is rejoining an in-progress game — skip setup, sync state.
+                self._waiting_for_ack = False
+                self._net_seq = 0
+                self._net_send(self._build_rejoin_sync())
+                logger.info("Sent rejoin_sync to reconnecting guest")
             else:
                 self._net_send({
                     "type": "game_setup",
@@ -428,6 +435,58 @@ class NetworkedGameRunner(GameRunner):
         logger.error("Network error from peer: %r", msg.get("code"))
 
     # ── Board sync helper ──────────────────────────────────────────────────────
+
+    def _build_rejoin_sync(self) -> dict:
+        """Build a rejoin_sync message encoding the full current game state."""
+        b = self._b
+        assert self._current_team is not None
+        team_key = "r" if self._current_team.r == b.team_r.r else "l"
+        return {
+            "type": "rejoin_sync",
+            "grid": encode_grid(b.grid, b.team_r),
+            "peace_time": self.peace_time,
+            "current_team_key": team_key,
+            "move_count": self._move_count,
+            "team_r": {"r": b.team_r.r, "g": b.team_r.g, "b": b.team_r.b,
+                        "name": b.team_r.name},
+            "team_l": {"r": b.team_l.r, "g": b.team_l.g, "b": b.team_l.b,
+                        "name": b.team_l.name},
+            "computer_player_r": bool(b.computer_player_r),
+            "computer_player_l": bool(b.computer_player_l),
+        }
+
+    def _on_rejoin_sync(self, msg: dict) -> None:
+        """GUEST receives rejoin_sync — restore full game state and resume."""
+        b = self._b
+
+        tr = msg.get("team_r", {})
+        tl = msg.get("team_l", {})
+        b.team_r.r, b.team_r.g, b.team_r.b = tr["r"], tr["g"], tr["b"]
+        b.team_r.name = tr.get("name", "Right")
+        b.team_l.r, b.team_l.g, b.team_l.b = tl["r"], tl["g"], tl["b"]
+        b.team_l.name = tl.get("name", "Left")
+
+        decoded = decode_grid(msg["grid"], b.team_r, b.team_l)
+        for r in range(8):
+            for c in range(8):
+                b.grid[r][c] = decoded[r][c]
+
+        self.peace_time = msg.get("peace_time", 0)
+        self._move_count = msg.get("move_count", 0)
+        b.computer_player_r = msg.get("computer_player_r", False)
+        b.computer_player_l = msg.get("computer_player_l", False)
+
+        current_key = msg.get("current_team_key", "r")
+        self._current_team = b.team_r if current_key == "r" else b.team_l
+
+        # Reset sequence so move numbering starts fresh for both sides.
+        self._net_seq = 0
+        self._waiting_for_ack = False
+        self._pending_remote_move = None
+
+        self.phase = Phase.PLAYING
+        self._begin_turn(self._current_team)
+        logger.info("Rejoined in-progress game — %s's turn", self._current_team.name)
 
     def _send_board_sync(self) -> None:
         b = self._b

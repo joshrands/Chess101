@@ -54,6 +54,7 @@ class GameClient:
         self._send_queue: queue.Queue = queue.Queue()
         self._thread: Optional[threading.Thread] = None
         self._connected = threading.Event()
+        self._stop = threading.Event()
 
     # ------------------------------------------------------------------
     # Public API
@@ -78,7 +79,8 @@ class GameClient:
         return self._connected.wait(timeout=timeout)
 
     def stop(self) -> None:
-        """Signal the client to disconnect."""
+        """Signal the client to disconnect and stop reconnecting."""
+        self._stop.set()
         ws = self._ws
         if ws is not None:
             try:
@@ -100,31 +102,61 @@ class GameClient:
             return
 
         uri = f"ws://{self._host_ip}:{self._port}"
+
+        # Initial connect — give up immediately on failure (host not found).
         try:
-            with _ws_connect(uri, open_timeout=10.0) as ws:
-                self._ws = ws
-                self._connected.set()
-                logger.info("Connected to server at %s", uri)
-                if self._on_connected:
-                    self._on_connected()
-
-                # Drain the outbound queue in a second daemon thread
-                send_thread = threading.Thread(
-                    target=self._send_loop, args=(ws,), daemon=True, name="GameClientSend"
-                )
-                send_thread.start()
-
-                # Block here receiving messages until the connection closes
-                self._recv_loop(ws)
-
+            ws = _ws_connect(uri, open_timeout=10.0)
         except Exception as exc:
             logger.error("Connection to %s failed: %s", uri, exc)
-        finally:
+            self._connected.set()
+            return
+
+        self._ws = ws
+        self._connected.set()
+
+        # Session loop — reconnect automatically after drops.
+        while not self._stop.is_set():
+            logger.info("Connected to server at %s", uri)
+            if self._on_connected:
+                self._on_connected()
+
+            send_thread = threading.Thread(
+                target=self._send_loop, args=(ws,), daemon=True, name="GameClientSend"
+            )
+            send_thread.start()
+            self._recv_loop(ws)  # blocks until connection drops
+
             self._ws = None
-            self._connected.set()   # unblock connect() even on failure
+            try:
+                ws.close()  # type: ignore[attr-defined]
+            except Exception:
+                pass
+
             logger.info("Disconnected from server")
             if self._on_disconnected:
                 self._on_disconnected()
+
+            if self._stop.is_set():
+                break
+
+            # Drain stale outbound messages before the new session starts.
+            while not self._send_queue.empty():
+                try:
+                    self._send_queue.get_nowait()
+                except Exception:
+                    break
+
+            # Retry until reconnected or stopped.
+            self._stop.wait(2.0)
+            while not self._stop.is_set():
+                try:
+                    ws = _ws_connect(uri, open_timeout=5.0)
+                    self._ws = ws
+                    logger.info("Reconnected to %s", uri)
+                    break
+                except Exception:
+                    logger.debug("Reconnect to %s failed, retrying in 2s", uri)
+                    self._stop.wait(2.0)
 
     def _recv_loop(self, ws) -> None:
         try:

@@ -155,6 +155,12 @@ class GameServer:
             pass
         finally:
             self._ws = None
+            # Drain send queue so stale messages aren't delivered to the next client.
+            while not self._send_queue.empty():
+                try:
+                    self._send_queue.get_nowait()
+                except asyncio.QueueEmpty:
+                    break
             logger.info("Opponent disconnected")
             if self._on_disconnected:
                 self._on_disconnected()
