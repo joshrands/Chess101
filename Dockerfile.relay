@@ -1,0 +1,19 @@
+FROM python:3.12-slim
+
+WORKDIR /app
+
+# Install only what the relay needs
+RUN pip install --no-cache-dir "websockets>=12.0"
+
+# Copy source packages used by the relay and its move validator
+COPY network/ network/
+COPY pieces/  pieces/
+COPY core/    core/
+
+ENV RELAY_PORT=8765
+ENV RELAY_MAX_ROOMS=100
+ENV RELAY_ROOM_TIMEOUT=600
+
+EXPOSE 8765
+
+CMD ["python", "-m", "network.relay"]

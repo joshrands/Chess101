@@ -31,6 +31,7 @@ from core.team import Team
 from network.client import GameClient
 from network.discovery import BeaconBroadcaster, BeaconListener
 from network.protocol import MoveFlags, board_hash, build_move_msg, decode_grid, encode_grid
+from network.relay_client import RelayClient, _DEFAULT_RELAY_URL
 from network.server import GameServer
 from pieces.king import King
 from pieces.pawn import Pawn
@@ -46,9 +47,13 @@ _RECONNECT_TIMEOUT_S = 60.0
 
 class NetworkRole(Enum):
     """Which side of the connection this instance occupies."""
-    HOST      = auto()
-    GUEST     = auto()
-    SPECTATOR = auto()
+    LOCAL           = auto()   # local two-player play (no network)
+    HOST            = auto()   # LAN host (GameServer)
+    GUEST           = auto()   # LAN guest (GameClient)
+    SPECTATOR       = auto()   # LAN spectator (receive-only)
+    ONLINE_HOST     = auto()   # internet host via relay
+    ONLINE_GUEST    = auto()   # internet guest via relay
+    ONLINE_SPECTATOR = auto()  # internet spectator via relay
 
 
 class NetworkedGameRunner(GameRunner):
@@ -67,15 +72,20 @@ class NetworkedGameRunner(GameRunner):
         host_ip: Optional[str] = None,
         port: int = 65101,
         player_name: str = "Player",
+        relay_url: str = _DEFAULT_RELAY_URL,
+        room_code: Optional[str] = None,
     ) -> None:
         self._role = role
         self._host_ip = host_ip
         self._port = port
         self._player_name = player_name
+        self._relay_url = relay_url
+        self._room_code: Optional[str] = room_code.upper() if room_code else None
 
         # Network objects (created in run())
         self._server: Optional[GameServer] = None
         self._client: Optional[GameClient] = None
+        self._relay_client: Optional[RelayClient] = None
         self._broadcaster: Optional[BeaconBroadcaster] = None
         self._listener: Optional[BeaconListener] = None
 
@@ -106,11 +116,14 @@ class NetworkedGameRunner(GameRunner):
         self._last_ping_s: float = 0.0
         self._last_pong_s: float = time.time()
 
-        # HOST controls team_r (key "r"), GUEST controls team_l (key "l"),
-        # SPECTATOR has no team so _is_my_turn() always returns False.
+        # LOCAL: "both" — always the player's turn.
+        # HOST / ONLINE_HOST: team_r ("r").
+        # GUEST / ONLINE_GUEST: team_l ("l").
+        # SPECTATOR / ONLINE_SPECTATOR: receive-only ("spectator").
         self._local_team_key = (
-            "r" if role == NetworkRole.HOST else
-            "spectator" if role == NetworkRole.SPECTATOR else
+            "both"      if role == NetworkRole.LOCAL else
+            "r"         if role in (NetworkRole.HOST, NetworkRole.ONLINE_HOST) else
+            "spectator" if role in (NetworkRole.SPECTATOR, NetworkRole.ONLINE_SPECTATOR) else
             "l"
         )
 
@@ -120,11 +133,85 @@ class NetworkedGameRunner(GameRunner):
         self._physical_setup_r_complete = False
         self._physical_setup_l_complete = False
 
-        # Call parent AFTER setting our attrs so _reset() can reference them
-        super().__init__(skip_lobby=True)
-        # Show name-entry screen first so the player can edit their default name
-        self._player_name = player_name
-        self.phase = Phase.NAME_ENTRY
+        # Room-code entry sub-state (Join Online from Lobby)
+        self._entering_room_code = False
+        self._room_code_input    = ""
+
+        # Call parent AFTER setting our attrs so _reset() can reference them.
+        # LOCAL role shows the Lobby so the player can choose a mode;
+        # network roles skip the Lobby and go straight to NAME_ENTRY.
+        if role == NetworkRole.LOCAL:
+            super().__init__(skip_lobby=False)
+            self._player_name = player_name
+            # phase is already LOBBY from super().__init__
+        else:
+            super().__init__(skip_lobby=True)
+            self._player_name = player_name
+            self.phase = Phase.NAME_ENTRY
+
+    # ── Lobby overrides ────────────────────────────────────────────────────────
+
+    def _handle_lobby(self, event: pygame.event.Event) -> None:
+        """Handle room-code entry sub-state; otherwise delegate to parent."""
+        if self._entering_room_code:
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_BACKSPACE:
+                    self._room_code_input = self._room_code_input[:-1]
+                elif event.key in (pygame.K_RETURN, pygame.K_KP_ENTER):
+                    code = self._room_code_input.upper().strip()
+                    if len(code) == 6:
+                        self._room_code = code
+                        self._entering_room_code = False
+                        self._role = NetworkRole.ONLINE_GUEST
+                        self._local_team_key = "l"
+                        self.phase = Phase.NAME_ENTRY
+                elif event.unicode and event.unicode.isalnum() and len(self._room_code_input) < 6:
+                    self._room_code_input += event.unicode.upper()
+            return
+        super()._handle_lobby(event)
+
+    def _lobby_select(self, opt_idx: int) -> None:
+        """Handle all 6 lobby options including online modes."""
+        if opt_idx == 0:
+            # Play Locally — no networking needed
+            self._role = NetworkRole.LOCAL
+            self._local_team_key = "both"
+            self.phase = Phase.COLOR_PICK
+            logger.info("Lobby: Play Locally selected")
+
+        elif opt_idx == 1:
+            # Host LAN — set role then collect name
+            self._role = NetworkRole.HOST
+            self._local_team_key = "r"
+            self.phase = Phase.NAME_ENTRY
+            logger.info("Lobby: Host LAN selected")
+
+        elif opt_idx == 2:
+            # Join LAN — auto-discover; if no host_ip set, scan beacon
+            self._role = NetworkRole.GUEST
+            self._local_team_key = "l"
+            self.phase = Phase.NAME_ENTRY
+            logger.info("Lobby: Join LAN selected (will auto-discover)")
+
+        elif opt_idx == 3:
+            # Watch LAN
+            self._role = NetworkRole.SPECTATOR
+            self._local_team_key = "spectator"
+            self.phase = Phase.NAME_ENTRY
+            logger.info("Lobby: Watch LAN selected (will auto-discover)")
+
+        elif opt_idx == 4:
+            # Host Online — set role then collect name; relay room created after name
+            self._role = NetworkRole.ONLINE_HOST
+            self._local_team_key = "r"
+            self.phase = Phase.NAME_ENTRY
+            logger.info("Lobby: Host Online selected (relay: %s)", self._relay_url)
+
+        elif opt_idx == 5:
+            # Join Online — prompt for room code first
+            self._entering_room_code = True
+            self._room_code_input    = ""
+            logger.info("Lobby: Join Online selected — awaiting room code")
 
     # ── Name entry ─────────────────────────────────────────────────────────────
 
@@ -149,6 +236,8 @@ class NetworkedGameRunner(GameRunner):
         self._waiting_for_ack = False
         self._pending_remote_move = None
         self._remote_last_move: Optional[tuple[int, int, int, int]] = None
+        self._entering_room_code = False
+        self._room_code_input    = ""
         super()._reset()
 
     def _net_send(self, msg: dict) -> None:
@@ -157,6 +246,8 @@ class NetworkedGameRunner(GameRunner):
             self._server.send(msg)
         elif self._client:
             self._client.send(msg)
+        elif self._relay_client:
+            self._relay_client.send(msg)
 
     def _on_network_message(self, msg: dict) -> None:
         """Called from the network daemon thread for every inbound message.
@@ -193,6 +284,7 @@ class NetworkedGameRunner(GameRunner):
             "ping":              self._on_ping,
             "pong":              self._on_pong,
             "error":             self._on_error,
+            "relay_error":       self._on_relay_error,
             "_peer_lost":        self._on_peer_lost,
             "new_game":          self._on_new_game,
         }
@@ -203,12 +295,16 @@ class NetworkedGameRunner(GameRunner):
             logger.debug("Unknown message type: %r", t)
 
     def _local_team(self) -> Team:
+        if self._local_team_key in ("both", "spectator"):
+            return self._b.team_r   # arbitrary reference for non-networked / spectator
         return self._b.team_r if self._local_team_key == "r" else self._b.team_l
 
     def _remote_team(self) -> Team:
         return self._b.team_l if self._local_team_key == "r" else self._b.team_r
 
     def _is_my_turn(self) -> bool:
+        if self._local_team_key == "both":
+            return True   # LOCAL: always the player's turn
         if self._current_team is None:
             return False
         return self._current_team.r == self._local_team().r
@@ -218,11 +314,17 @@ class NetworkedGameRunner(GameRunner):
     def _on_connected(self) -> None:
         """Peer connected — send hello."""
         self._peer_connected = True
+        # Translate online roles to their wire-protocol equivalents
+        wire_role = {
+            NetworkRole.ONLINE_HOST:      "host",
+            NetworkRole.ONLINE_GUEST:     "guest",
+            NetworkRole.ONLINE_SPECTATOR: "spectator",
+        }.get(self._role, self._role.name.lower())
         self._net_send({
             "type": "hello",
             "version": _PROTOCOL_VERSION,
             "player_name": self._player_name,
-            "role": self._role.name.lower(),
+            "role": wire_role,
         })
         logger.info("Connected to peer — sent hello (role=%s)", self._role.name)
 
@@ -262,7 +364,7 @@ class NetworkedGameRunner(GameRunner):
         peer_role = msg.get("role", "guest")
         logger.info("Hello from %r (role=%s)", self._peer_name, peer_role)
 
-        if self._role == NetworkRole.HOST:
+        if self._role in (NetworkRole.HOST, NetworkRole.ONLINE_HOST):
             if peer_role == "spectator":
                 # Send spectator a view of the current board state
                 self._net_send({
@@ -356,7 +458,7 @@ class NetworkedGameRunner(GameRunner):
         b = self._b
         if b.computer_player_r is None or b.computer_player_l is None:
             return
-        if self._role == NetworkRole.HOST:
+        if self._role in (NetworkRole.HOST, NetworkRole.ONLINE_HOST):
             logger.info("Both war_games choices received — sending game_start")
             self._net_send({"type": "game_start"})
             self._start_game()
@@ -433,6 +535,17 @@ class NetworkedGameRunner(GameRunner):
 
     def _on_error(self, msg: dict) -> None:
         logger.error("Network error from peer: %r", msg.get("code"))
+
+    def _on_relay_error(self, msg: dict) -> None:
+        code = msg.get("code", "unknown")
+        if code == "illegal_move":
+            logger.error(
+                "Relay rejected our move as illegal: %s→%s",
+                (msg.get("from_row"), msg.get("from_col")),
+                (msg.get("to_row"),   msg.get("to_col")),
+            )
+        else:
+            logger.error("Relay error: %s", code)
 
     # ── Board sync helper ──────────────────────────────────────────────────────
 
@@ -931,15 +1044,43 @@ class NetworkedGameRunner(GameRunner):
         from simulator.app import _P_DIM, _P_GOOD, _P_BAD, _P_WARN, _P_TEXT
 
         sep()
-        if self._role == NetworkRole.SPECTATOR:
-            role_label = "Spectating"
-        elif self._is_physical_host_mode:
+
+        _ROLE_LABELS = {
+            NetworkRole.LOCAL:            "Local",
+            NetworkRole.HOST:             "LAN Host",
+            NetworkRole.GUEST:            "LAN Guest",
+            NetworkRole.SPECTATOR:        "Spectating (LAN)",
+            NetworkRole.ONLINE_HOST:      "Online Host",
+            NetworkRole.ONLINE_GUEST:     "Online Guest",
+            NetworkRole.ONLINE_SPECTATOR: "Spectating (Online)",
+        }
+        if self._is_physical_host_mode:
             role_label = "Network (Physical-host)"
         else:
-            role_label = f"Network ({self._role.name.capitalize()})"
+            role_label = _ROLE_LABELS.get(self._role, self._role.name)
         text(f"Mode    {role_label}", pfont_md, _P_DIM)
 
-        if self.phase == Phase.PLAYING and self._role != NetworkRole.SPECTATOR:
+        # Room code display for online host (share with opponent)
+        if self._role == NetworkRole.ONLINE_HOST and self._room_code:
+            sep()
+            text("Share this code:", pfont_md, _P_TEXT)
+            text(f"  {self._room_code}", pfont_md, _P_GOOD)
+            sep()
+
+        # Room code entry hint (join online from lobby)
+        if self._entering_room_code:
+            sep()
+            text("Enter room code:", pfont_md, _P_TEXT)
+            display = self._room_code_input + "_" * (6 - len(self._room_code_input))
+            text(f"  {display}", pfont_md, _P_GOOD)
+            sep()
+
+        if self._role == NetworkRole.LOCAL:
+            return   # no peer info for local play
+
+        if self.phase == Phase.PLAYING and self._role not in (
+            NetworkRole.SPECTATOR, NetworkRole.ONLINE_SPECTATOR
+        ):
             if self._peer_disconnected:
                 pass   # shown below
             elif self._is_my_turn():
@@ -948,7 +1089,7 @@ class NetworkedGameRunner(GameRunner):
                 text(f"Waiting for {self._peer_name or 'opponent'}...", pfont_sm, _P_DIM)
 
         if self._peer_name:
-            bars = "●" * 4   # static for now; could use ping RTT in future
+            bars = "●" * 4
             text(f"Peer    {self._peer_name}  {bars}", pfont_sm, _P_GOOD)
         elif self._peer_disconnected:
             text("Peer    DISCONNECTED", pfont_sm, _P_BAD)
@@ -985,7 +1126,10 @@ class NetworkedGameRunner(GameRunner):
 
     def _start_network(self) -> None:
         """Create and start the server or client based on role."""
-        if self._role == NetworkRole.HOST:
+        if self._role == NetworkRole.LOCAL:
+            return   # no networking for local play
+
+        elif self._role == NetworkRole.HOST:
             self._server = GameServer(
                 port=self._port,
                 on_connected=self._on_connected,
@@ -1004,7 +1148,23 @@ class NetworkedGameRunner(GameRunner):
             logger.info("Hosting on port %d — waiting for opponent", self._port)
 
         elif self._role in (NetworkRole.GUEST, NetworkRole.SPECTATOR):
-            assert self._host_ip is not None, "host_ip required for GUEST/SPECTATOR"
+            # Auto-discover host on LAN if no IP was provided
+            if self._host_ip is None:
+                logger.info("LAN: scanning for host...")
+                from network.discovery import BeaconListener as _BL
+                _listener = _BL()
+                _listener.start()
+                import time as _time
+                deadline = _time.time() + 8.0
+                while _time.time() < deadline and not _listener.games:
+                    _time.sleep(0.25)
+                for game in _listener.games.values():
+                    self._host_ip = game.ip
+                    break
+                _listener.stop()
+                if self._host_ip is None:
+                    logger.error("No LAN host found — use --join IP to specify one")
+                    return
             self._client = GameClient(
                 host_ip=self._host_ip,
                 port=self._port,
@@ -1015,15 +1175,49 @@ class NetworkedGameRunner(GameRunner):
             connected = self._client.connect(timeout=10.0)
             if not connected:
                 logger.error("Could not connect to %s:%d", self._host_ip, self._port)
-            # Listener for Lobby panel
-            self._listener = BeaconListener()
-            self._listener.start()
+
+        elif self._role == NetworkRole.ONLINE_HOST:
+            relay = RelayClient(
+                relay_url=self._relay_url,
+                role="host",
+                player_name=self._player_name,
+                on_peer_connected=self._on_connected,
+                on_peer_disconnected=self._on_disconnected,
+            )
+            relay.set_message_handler(self._on_network_message)
+            code = relay.create_room(timeout=15.0)
+            if code:
+                self._relay_client = relay
+                self._room_code = code
+                logger.info("Online room created: %s — waiting for opponent", code)
+            else:
+                logger.error("Failed to create relay room at %s", self._relay_url)
+
+        elif self._role in (NetworkRole.ONLINE_GUEST, NetworkRole.ONLINE_SPECTATOR):
+            ws_role = "spectator" if self._role == NetworkRole.ONLINE_SPECTATOR else "guest"
+            relay = RelayClient(
+                relay_url=self._relay_url,
+                role=ws_role,
+                player_name=self._player_name,
+                on_peer_connected=self._on_connected,
+                on_peer_disconnected=self._on_disconnected,
+            )
+            relay.set_message_handler(self._on_network_message)
+            room = self._room_code or ""
+            ok = relay.join_room(room, timeout=15.0) if ws_role == "guest" else relay.spectate_room(room, timeout=15.0)
+            if ok:
+                self._relay_client = relay
+                logger.info("Joined online room %s as %s", room, ws_role)
+            else:
+                logger.error("Failed to join relay room %s", room)
 
     def _stop_network(self) -> None:
         if self._server:
             self._server.stop()
         if self._client:
             self._client.stop()
+        if self._relay_client:
+            self._relay_client.stop()
         if self._broadcaster:
             self._broadcaster.stop()
         if self._listener:

@@ -1,0 +1,526 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Chess101 — Live Spectator</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: #12161f;
+    color: #c0c8d8;
+    font-family: 'Courier New', monospace;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-height: 100vh;
+    padding: 20px;
+  }
+
+  h1 {
+    font-size: 1.4rem;
+    color: #e0e8f0;
+    margin-bottom: 6px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+  }
+
+  #status {
+    font-size: 0.85rem;
+    color: #6a7a9a;
+    margin-bottom: 16px;
+    min-height: 1.2em;
+  }
+
+  #layout {
+    display: flex;
+    gap: 24px;
+    align-items: flex-start;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  /* Board */
+  #board-wrap {
+    position: relative;
+  }
+
+  canvas#board {
+    border: 2px solid #2a3048;
+    border-radius: 4px;
+    display: block;
+  }
+
+  /* Coordinate labels */
+  #col-labels, #row-labels {
+    display: flex;
+    font-size: 0.72rem;
+    color: #4a5570;
+  }
+  #col-labels {
+    margin-left: 20px;
+    margin-bottom: 2px;
+  }
+  #col-labels span { width: 60px; text-align: center; }
+  #row-labels {
+    position: absolute;
+    left: 2px;
+    top: 22px;
+    flex-direction: column;
+  }
+  #row-labels span { height: 60px; display: flex; align-items: center; }
+
+  /* Side panel */
+  #panel {
+    width: 240px;
+    background: #161c2a;
+    border: 1px solid #2a3048;
+    border-radius: 6px;
+    padding: 14px;
+    font-size: 0.82rem;
+    line-height: 1.7;
+  }
+
+  #panel h2 {
+    font-size: 0.9rem;
+    color: #90a0c0;
+    margin-bottom: 10px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    border-bottom: 1px solid #2a3048;
+    padding-bottom: 6px;
+  }
+
+  .stat-row { display: flex; justify-content: space-between; margin-bottom: 4px; }
+  .stat-label { color: #5a6a88; }
+  .stat-val   { color: #c0cce0; font-weight: bold; }
+
+  .team-swatch {
+    display: inline-block;
+    width: 12px; height: 12px;
+    border-radius: 2px;
+    vertical-align: middle;
+    margin-right: 5px;
+  }
+
+  #move-log {
+    margin-top: 12px;
+    border-top: 1px solid #2a3048;
+    padding-top: 8px;
+    max-height: 260px;
+    overflow-y: auto;
+    font-size: 0.75rem;
+    color: #8090a8;
+  }
+  #move-log div { padding: 1px 0; }
+  #move-log div.latest { color: #c0d0e8; }
+
+  /* Connection form */
+  #connect-form {
+    background: #161c2a;
+    border: 1px solid #2a3048;
+    border-radius: 6px;
+    padding: 20px;
+    text-align: center;
+    width: 320px;
+  }
+  #connect-form p { color: #6a7a9a; margin-bottom: 14px; font-size: 0.85rem; }
+  #connect-form input {
+    width: 100%;
+    background: #0e1220;
+    border: 1px solid #3a4060;
+    color: #c0c8d8;
+    border-radius: 4px;
+    padding: 8px 10px;
+    font-family: inherit;
+    font-size: 0.9rem;
+    margin-bottom: 10px;
+    text-transform: uppercase;
+    letter-spacing: 3px;
+  }
+  #connect-form button {
+    background: #1a6fa8;
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    padding: 9px 22px;
+    font-family: inherit;
+    font-size: 0.9rem;
+    cursor: pointer;
+    width: 100%;
+  }
+  #connect-form button:hover { background: #2280be; }
+</style>
+</head>
+<body>
+
+<h1>Chess101 &mdash; Live Spectator</h1>
+<div id="status">Connecting&hellip;</div>
+
+<!-- Connection form shown when no room= param -->
+<div id="connect-form" style="display:none">
+  <p>Enter the 6-character room code to spectate a game.</p>
+  <input id="code-input" type="text" maxlength="6" placeholder="XXXXXX" autocomplete="off">
+  <button id="connect-btn">Watch Game</button>
+</div>
+
+<div id="layout" style="display:none">
+  <div id="board-wrap">
+    <div id="col-labels"></div>
+    <div style="display:flex">
+      <div id="row-labels"></div>
+      <canvas id="board" width="480" height="480"></canvas>
+    </div>
+  </div>
+
+  <div id="panel">
+    <h2>Game Info</h2>
+    <div class="stat-row">
+      <span class="stat-label">Room</span>
+      <span class="stat-val" id="p-room">—</span>
+    </div>
+    <div class="stat-row">
+      <span class="stat-label">Turn</span>
+      <span class="stat-val" id="p-turn">—</span>
+    </div>
+    <div class="stat-row">
+      <span class="stat-label">Moves</span>
+      <span class="stat-val" id="p-moves">0</span>
+    </div>
+    <div class="stat-row">
+      <span class="stat-label">Team R</span>
+      <span class="stat-val">
+        <span class="team-swatch" id="swatch-r"></span>
+        <span id="p-team-r">—</span>
+      </span>
+    </div>
+    <div class="stat-row">
+      <span class="stat-label">Team L</span>
+      <span class="stat-val">
+        <span class="team-swatch" id="swatch-l"></span>
+        <span id="p-team-l">—</span>
+      </span>
+    </div>
+    <div id="move-log"><em style="color:#4a5570">Waiting for moves&hellip;</em></div>
+  </div>
+</div>
+
+<script>
+// ── Constants ──────────────────────────────────────────────────────────────
+const CELL  = 60;   // px per board cell
+const COLS  = 'abcdefgh';
+const ROWS  = '87654321';
+
+const PIECE_SYMS = {
+  Pawn:   ['♙','♟'], Rook:   ['♖','♜'],
+  Knight: ['♘','♞'], Bishop: ['♗','♝'],
+  Queen:  ['♕','♛'], King:   ['♔','♚'],
+};
+
+// ── State ──────────────────────────────────────────────────────────────────
+let grid       = Array.from({length:8}, () => Array(8).fill(null));
+let teamR      = {r:64,  g:180, b:232, name:'Team R'};
+let teamL      = {r:255, g:140, b:0,   name:'Team L'};
+let currentKey = 'r';
+let moveCount  = 0;
+let lastMove   = null;   // {fr,fc,tr,tc}
+let ws         = null;
+let roomCode   = '';
+
+// ── Canvas setup ───────────────────────────────────────────────────────────
+const canvas = document.getElementById('board');
+const ctx    = canvas.getContext('2d');
+
+(function buildLabels() {
+  const cols = document.getElementById('col-labels');
+  COLS.split('').forEach(c => {
+    const s = document.createElement('span');
+    s.textContent = c;
+    cols.appendChild(s);
+  });
+  const rows = document.getElementById('row-labels');
+  ROWS.split('').forEach(r => {
+    const s = document.createElement('span');
+    s.textContent = r;
+    rows.appendChild(s);
+  });
+})();
+
+// ── Drawing ────────────────────────────────────────────────────────────────
+function rgbStr(t) { return `rgb(${t.r},${t.g},${t.b})`; }
+
+function dimRgb(t, f) {
+  return `rgb(${Math.round(t.r*f)},${Math.round(t.g*f)},${Math.round(t.b*f)})`;
+}
+
+function drawBoard() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  for (let r = 0; r < 8; r++) {
+    for (let c = 0; c < 8; c++) {
+      const checker = (r + c) % 2 === 0;
+      const x = c * CELL, y = r * CELL;
+
+      // Checker background
+      ctx.fillStyle = checker ? '#1e2438' : '#14192a';
+      ctx.fillRect(x, y, CELL, CELL);
+
+      // Last-move highlight
+      if (lastMove) {
+        const {fr, fc, tr, tc} = lastMove;
+        if ((r === fr && c === fc) || (r === tr && c === tc)) {
+          ctx.fillStyle = 'rgba(255,220,60,0.18)';
+          ctx.fillRect(x, y, CELL, CELL);
+          if (r === tr && c === tc) {
+            ctx.strokeStyle = 'rgba(255,220,60,0.7)';
+            ctx.lineWidth = 2.5;
+            ctx.strokeRect(x+1.25, y+1.25, CELL-2.5, CELL-2.5);
+          }
+        }
+      }
+
+      // Piece
+      const piece = grid[r][c];
+      if (piece) {
+        const isR = piece.team_r;
+        const team = isR ? teamR : teamL;
+        const sym  = PIECE_SYMS[piece.type] ? PIECE_SYMS[piece.type][isR ? 0 : 1] : '?';
+        ctx.font = `${Math.round(CELL * 0.62)}px serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        // Shadow for contrast
+        ctx.fillStyle = 'rgba(0,0,0,0.55)';
+        ctx.fillText(sym, x + CELL/2 + 1.5, y + CELL/2 + 1.5);
+        ctx.fillStyle = rgbStr(team);
+        ctx.fillText(sym, x + CELL/2, y + CELL/2);
+      }
+    }
+  }
+}
+
+// ── Grid decode ────────────────────────────────────────────────────────────
+// grid JSON from protocol.encode_grid: list of 8 rows, each 8 entries of
+// null | {type: "Pawn", team_r: true/false}
+function applyGrid(encodedGrid) {
+  for (let r = 0; r < 8; r++) {
+    for (let c = 0; c < 8; c++) {
+      const cell = encodedGrid[r][c];
+      grid[r][c] = cell || null;
+    }
+  }
+}
+
+// Apply a single move to the local grid (without full re-sync)
+function applyMove(fr, fc, tr, tc, flags) {
+  const piece = grid[fr][fc];
+  if (!piece) return;
+
+  grid[tr][tc] = piece;
+  grid[fr][fc] = null;
+
+  // En passant: captured pawn is not at tr,tc
+  if (flags && flags.is_en_passant && flags.captured_at) {
+    const [er, ec] = flags.captured_at;
+    grid[er][ec] = null;
+  }
+  // Castling: move the rook
+  if (flags && flags.is_castling && flags.rook_from && flags.rook_to) {
+    const [rfr, rfc] = flags.rook_from;
+    const [rtr, rtc] = flags.rook_to;
+    grid[rtr][rtc] = grid[rfr][rfc];
+    grid[rfr][rfc] = null;
+  }
+  // Promotion: auto queen
+  if (flags && flags.is_promotion) {
+    const promoted = flags.promoted_to || 'Queen';
+    grid[tr][tc] = {type: promoted, team_r: piece.team_r};
+  }
+}
+
+// ── Panel updates ──────────────────────────────────────────────────────────
+function updatePanel() {
+  document.getElementById('p-room').textContent  = roomCode || '—';
+  document.getElementById('p-moves').textContent = moveCount;
+  document.getElementById('p-turn').textContent  =
+    currentKey === 'r' ? teamR.name : teamL.name;
+
+  const swR = document.getElementById('swatch-r');
+  swR.style.background = rgbStr(teamR);
+  document.getElementById('p-team-r').textContent = teamR.name;
+
+  const swL = document.getElementById('swatch-l');
+  swL.style.background = rgbStr(teamL);
+  document.getElementById('p-team-l').textContent = teamL.name;
+}
+
+function logMove(text) {
+  const log = document.getElementById('move-log');
+  const prev = log.querySelector('.latest');
+  if (prev) prev.classList.remove('latest');
+  const div = document.createElement('div');
+  div.className = 'latest';
+  div.textContent = text;
+  log.appendChild(div);
+  log.scrollTop = log.scrollHeight;
+  // Clear placeholder if present
+  const em = log.querySelector('em');
+  if (em) em.remove();
+}
+
+// ── Message handling ───────────────────────────────────────────────────────
+function handleMessage(msg) {
+  const t = msg.type;
+
+  if (t === 'board_sync' || t === 'rejoin_sync') {
+    if (msg.grid)   applyGrid(msg.grid);
+    if (msg.team_r) Object.assign(teamR, msg.team_r);
+    if (msg.team_l) Object.assign(teamL, msg.team_l);
+    if (msg.current_team_key) currentKey = msg.current_team_key;
+    if (msg.move_count != null) moveCount = msg.move_count;
+    updatePanel();
+    drawBoard();
+    setStatus('Spectating live game');
+  }
+
+  else if (t === 'move') {
+    const fr = msg.from_row, fc = msg.from_col;
+    const tr = msg.to_row,   tc = msg.to_col;
+    const flags = msg.flags || {};
+    applyMove(fr, fc, tr, tc, flags);
+    lastMove = {fr, fc, tr, tc};
+    moveCount++;
+    currentKey = (currentKey === 'r') ? 'l' : 'r';
+    updatePanel();
+    drawBoard();
+
+    const piece = flags.promoted_to
+      ? `${flags.promoted_to}(=Q)` : (grid[tr][tc]?.type ?? 'Piece');
+    const who = msg.seq ? `#${msg.seq}` : '';
+    logMove(`${who} ${piece} ${COLS[fc]}${8-fr}→${COLS[tc]}${8-tr}`);
+  }
+
+  else if (t === 'game_setup') {
+    setStatus('Game starting…');
+  }
+
+  else if (t === 'game_start') {
+    setStatus('Game in progress');
+    // Initialize starting position if no grid yet
+    if (!grid[0][4]) initStartingPosition();
+    drawBoard();
+  }
+
+  else if (t === 'game_event') {
+    const ev = msg.event;
+    if (ev === 'checkmate') {
+      setStatus('Checkmate!');
+      logMove('*** Checkmate! ***');
+    } else if (ev === 'stalemate') {
+      setStatus('Stalemate / Draw');
+      logMove('*** Stalemate ***');
+    }
+  }
+
+  else if (t === 'color_chosen') {
+    const key = msg.team_key, idx = msg.color_idx;
+    if (key === 'r') Object.assign(teamR, PALETTES[idx]);
+    else             Object.assign(teamL, PALETTES[idx]);
+    updatePanel();
+  }
+}
+
+// Colour palette matching Board.team_array order
+const PALETTES = [
+  {r:65,  g:180, b:232, name:'Blue'},
+  {r:190, g:25,  b:255, name:'Purple'},
+  {r:255, g:215, b:0,   name:'Yellow'},
+  {r:255, g:105, b:180, name:'Pink'},
+  {r:50,  g:205, b:50,  name:'Green'},
+  {r:255, g:140, b:0,   name:'Orange'},
+  {r:30,  g:30,  b:200, name:'Dark Blue'},
+  {r:0,   g:255, b:220, name:'Cyan'},
+];
+
+function initStartingPosition() {
+  const tr = true, tl = false;
+  grid[0] = [
+    {type:'Rook',tr},{type:'Knight',tr},{type:'Bishop',tr},{type:'Queen',tr},
+    {type:'King',tr},{type:'Bishop',tr},{type:'Knight',tr},{type:'Rook',tr},
+  ].map(p => ({type:p.type, team_r:p.tr}));
+  for (let c=0;c<8;c++) grid[1][c] = {type:'Pawn', team_r:true};
+  for (let r=2;r<6;r++) for (let c=0;c<8;c++) grid[r][c] = null;
+  for (let c=0;c<8;c++) grid[6][c] = {type:'Pawn', team_r:false};
+  grid[7] = [
+    {type:'Rook',tl:true},{type:'Knight',tl:true},{type:'Bishop',tl:true},{type:'Queen',tl:true},
+    {type:'King',tl:true},{type:'Bishop',tl:true},{type:'Knight',tl:true},{type:'Rook',tl:true},
+  ].map(p => ({type:p.type, team_r:false}));
+}
+
+// ── WebSocket ──────────────────────────────────────────────────────────────
+function setStatus(msg) {
+  document.getElementById('status').textContent = msg;
+}
+
+function connect(relayUrl, code) {
+  roomCode = code.toUpperCase();
+  document.getElementById('p-room').textContent = roomCode;
+
+  setStatus(`Connecting to ${relayUrl}…`);
+  ws = new WebSocket(relayUrl);
+
+  ws.onopen = () => {
+    ws.send(JSON.stringify({type: 'relay_spectate', room_code: roomCode}));
+    setStatus(`Joined room ${roomCode} — waiting for board state…`);
+  };
+
+  ws.onmessage = (ev) => {
+    let msg;
+    try { msg = JSON.parse(ev.data); } catch { return; }
+    const t = msg.type || '';
+
+    if (t === 'relay_spectating') {
+      setStatus(`Spectating room ${roomCode}`);
+      document.getElementById('layout').style.display = 'flex';
+      document.getElementById('connect-form').style.display = 'none';
+      initStartingPosition();
+      updatePanel();
+      drawBoard();
+    } else if (t === 'relay_error') {
+      setStatus(`Error: ${msg.code}`);
+    } else if (!t.startsWith('relay_')) {
+      handleMessage(msg);
+    }
+  };
+
+  ws.onclose  = () => setStatus('Disconnected');
+  ws.onerror  = () => setStatus('Connection error');
+}
+
+// ── Entry point ────────────────────────────────────────────────────────────
+(function init() {
+  const params = new URLSearchParams(window.location.search);
+  const relayUrl = params.get('relay') || 'wss://chess101.net';
+  const code     = params.get('room')  || '';
+
+  if (code) {
+    connect(relayUrl, code);
+  } else {
+    document.getElementById('connect-form').style.display = 'block';
+    setStatus('Enter a room code to start spectating');
+
+    document.getElementById('connect-btn').addEventListener('click', () => {
+      const c = document.getElementById('code-input').value.trim();
+      if (c.length === 6) {
+        document.getElementById('connect-form').style.display = 'none';
+        connect(relayUrl, c);
+      }
+    });
+    document.getElementById('code-input').addEventListener('keydown', e => {
+      if (e.key === 'Enter') document.getElementById('connect-btn').click();
+    });
+  }
+})();
+</script>
+</body>
+</html>

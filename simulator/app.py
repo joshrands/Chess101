@@ -125,16 +125,20 @@ class Phase(Enum):
 # Lobby option constants
 _LOBBY_OPTIONS = [
     "Play Locally",
-    "Host a Game",
-    "Join a Game",
-    "Watch a Game",
+    "Host LAN Game",
+    "Join LAN Game",
+    "Watch LAN Game",
+    "Host Online",
+    "Join Online",
 ]
-# LED colors for each lobby option (one per pair of rows)
+# LED colors for each lobby option (one row per option, rows 0-5)
 _LOBBY_COLORS = [
-    (64,  180, 232),   # Blue  — Play Locally
-    (25,  200, 35),    # Green — Host a Game
-    (245, 125, 0),     # Orange — Join a Game
-    (190, 25,  255),   # Purple — Watch a Game
+    (64,  180, 232),   # Blue   — Play Locally
+    (25,  200, 35),    # Green  — Host LAN Game
+    (245, 125, 0),     # Orange — Join LAN Game
+    (190, 25,  255),   # Purple — Watch LAN Game
+    (255, 215, 0),     # Gold   — Host Online
+    (232, 62,  140),   # Pink   — Join Online
 ]
 
 
@@ -613,19 +617,17 @@ class GameRunner:
     def _render_lobby(self) -> None:
         """Render the lobby menu onto the LED canvas.
 
-        Each of the 4 options occupies two rows of 8 cells.  The selected
-        option is shown at full brightness; others are dimmed to one-third.
+        Each of the 6 options occupies one row of 8 cells (rows 0-5).
+        Rows 6-7 are left dark.  The selected option is shown at full
+        brightness; others are dimmed to one-third.
         """
         b = self._b
         b.canvas.Clear()
         for opt_idx, (r, g, bl) in enumerate(_LOBBY_COLORS):
-            row_a = opt_idx * 2
-            row_b = opt_idx * 2 + 1
             dim = opt_idx != self._lobby_selected
             fr, fg, fb = (r // 3, g // 3, bl // 3) if dim else (r, g, bl)
             for col in range(8):
-                b.light_cell(b.canvas, row_a, col, fr, fg, fb)
-                b.light_cell(b.canvas, row_b, col, fr, fg, fb)
+                b.light_cell(b.canvas, opt_idx, col, fr, fg, fb)
         b.matrix.blit_to_screen()
 
     def _render_color_pick(self) -> None:
@@ -946,20 +948,21 @@ class GameRunner:
             if px < _BOARD_W:
                 cell = self._px_to_cell(px, py)
                 if cell is not None:
-                    opt_idx = cell[0] // 2   # two rows per option
-                    self._lobby_selected = opt_idx
-                    self._lobby_select(opt_idx)
+                    opt_idx = cell[0]   # one row per option
+                    if opt_idx < len(_LOBBY_OPTIONS):
+                        self._lobby_selected = opt_idx
+                        self._lobby_select(opt_idx)
 
     def _lobby_select(self, opt_idx: int) -> None:
         """Execute the lobby option at *opt_idx*.
 
         Option 0 (Play Locally) advances directly to COLOR_PICK.
-        Options 1-3 (Host / Join / Watch) will be wired to
-        NetworkedGameRunner in a future task; for now they fall back to
-        local play with a log message.
+        Options 1-5 are network modes handled by NetworkedGameRunner's
+        override of this method; the base implementation logs them as
+        unimplemented so GameRunner works correctly in --local mode.
 
         Args:
-            opt_idx: Index into ``_LOBBY_OPTIONS`` (0–3).
+            opt_idx: Index into ``_LOBBY_OPTIONS`` (0–5).
         """
         label = _LOBBY_OPTIONS[opt_idx]
         if opt_idx == 0:

@@ -72,16 +72,25 @@ def _auto_discover(port: int, timeout: float = 8.0) -> Optional[str]:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Chess101 Simulator")
-    parser.add_argument("--local",    action="store_true",
+    parser.add_argument("--local",         action="store_true",
                         help="Skip Lobby and go straight to COLOR_PICK")
-    parser.add_argument("--host",     action="store_true",
-                        help="Host a networked game immediately")
-    parser.add_argument("--join",     nargs="?", const="", metavar="IP",
-                        help="Join a networked game (auto-discover if no IP given)")
-    parser.add_argument("--spectate", metavar="IP",
-                        help="Spectate a networked game at the given IP")
-    parser.add_argument("--port",     type=int, default=65101,
-                        help="WebSocket port (default 65101)")
+    parser.add_argument("--host",          action="store_true",
+                        help="Host a LAN networked game immediately")
+    parser.add_argument("--join",          nargs="?", const="", metavar="IP",
+                        help="Join a LAN networked game (auto-discover if no IP given)")
+    parser.add_argument("--spectate",      metavar="IP",
+                        help="Spectate a LAN networked game at the given IP")
+    parser.add_argument("--port",          type=int, default=65101,
+                        help="WebSocket port for LAN play (default 65101)")
+    parser.add_argument("--online-host",   action="store_true",
+                        help="Host an internet game via the relay server")
+    parser.add_argument("--online-join",   metavar="CODE",
+                        help="Join an internet game with the given 6-character room code")
+    parser.add_argument("--online-spectate", metavar="CODE",
+                        help="Spectate an internet game with the given 6-character room code")
+    parser.add_argument("--relay",         default="wss://chess101.net",
+                        metavar="URL",
+                        help="Relay server URL (default wss://chess101.net)")
     args = parser.parse_args()
 
     if args.local:
@@ -115,5 +124,33 @@ if __name__ == "__main__":
             port=args.port,
             player_name="Spectator",
         ).run()
+    elif args.online_host:
+        from simulator.networked_runner import NetworkedGameRunner, NetworkRole
+        NetworkedGameRunner(
+            role=NetworkRole.ONLINE_HOST,
+            relay_url=args.relay,
+            player_name="Player",
+        ).run()
+    elif args.online_join:
+        from simulator.networked_runner import NetworkedGameRunner, NetworkRole
+        NetworkedGameRunner(
+            role=NetworkRole.ONLINE_GUEST,
+            relay_url=args.relay,
+            room_code=args.online_join,
+            player_name="Player",
+        ).run()
+    elif args.online_spectate:
+        from simulator.networked_runner import NetworkedGameRunner, NetworkRole
+        NetworkedGameRunner(
+            role=NetworkRole.ONLINE_SPECTATOR,
+            relay_url=args.relay,
+            room_code=args.online_spectate,
+            player_name="Spectator",
+        ).run()
     else:
-        GameRunner().run()
+        # Default: show Lobby so the player can choose any mode
+        from simulator.networked_runner import NetworkedGameRunner, NetworkRole
+        NetworkedGameRunner(
+            role=NetworkRole.LOCAL,
+            relay_url=args.relay,
+        ).run()
