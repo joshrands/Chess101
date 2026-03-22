@@ -309,6 +309,32 @@ class TestFindAttacker:
         assert (4, 0) in critical_positions  # enemy square
         assert (4, 1) in critical_positions  # intermediate square
 
+    def test_pin_detected_when_in_check_from_different_direction(self):
+        # Regression for the am_i_gonna_die early-return bug:
+        # Before the fix, finding check in one direction returned immediately,
+        # skipping scan of other directions — so the pinned piece never got
+        # critical=True and could illegally capture the checker.
+        #
+        # Setup: king at (4,4)
+        #   Diagonal (-1,-1): enemy bishop at (1,1) → check
+        #   Horizontal (0,+1): ally rook at (4,6) pinned by enemy queen at (4,7)
+        #
+        # The diagonal direction is scanned before the horizontal ones in the
+        # loop order, so the old code returned before marking the rook critical.
+        tr, tl, king, board = self._setup()
+        enemy_bishop = Bishop(1, 1, tl)
+        ally_rook    = Rook(4, 6, tr)
+        enemy_queen  = Queen(4, 7, tl)
+        board[1][1] = enemy_bishop
+        board[4][6] = ally_rook
+        board[4][7] = enemy_queen
+        attacker_row, attacker_col = king.am_i_gonna_die(board)
+        # King must be in check
+        assert (attacker_row, attacker_col) != (-1, -1), "King should be in check"
+        # Ally rook must also be marked critical (pinned by queen)
+        assert ally_rook.critical is True, \
+            "Pinned rook must be critical even when king is simultaneously in check"
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # determine_direction_from_enemy_towards_king (float-return bug)
