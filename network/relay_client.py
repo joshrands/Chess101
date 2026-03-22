@@ -84,6 +84,10 @@ class RelayClient:
         self._room_ready  = threading.Event()   # set when relay_created received
         self._peer_joined = threading.Event()   # set when relay_peer_connected
 
+        # Set to the relay error code when relay_error is received; lets reconnect()
+        # distinguish a server-side rejection from a network timeout.
+        self._last_relay_error: Optional[str] = None
+
         self._thread: Optional[threading.Thread] = None
 
     # ── Properties ─────────────────────────────────────────────────────────────
@@ -122,7 +126,7 @@ class RelayClient:
 
     # ── Blocking connect methods (call from main thread before game starts) ────
 
-    def create_room(self, timeout: float = 15.0) -> Optional[str]:
+    def create_room(self, timeout: float = 60.0) -> Optional[str]:
         """Connect to the relay and create a new room.
 
         Blocks until the room code is assigned or *timeout* seconds elapse.
@@ -136,7 +140,7 @@ class RelayClient:
         logger.error("Timed out waiting for relay room creation")
         return None
 
-    def join_room(self, room_code: str, timeout: float = 15.0) -> bool:
+    def join_room(self, room_code: str, timeout: float = 60.0) -> bool:
         """Connect to the relay and join an existing room.
 
         Args:
@@ -153,7 +157,7 @@ class RelayClient:
             logger.error("Timed out joining relay room %s", room_code)
         return ok
 
-    def spectate_room(self, room_code: str, timeout: float = 15.0) -> bool:
+    def spectate_room(self, room_code: str, timeout: float = 60.0) -> bool:
         """Connect to the relay as a spectator of an existing room."""
         self._room_code = room_code.upper()
         self._start_thread()
@@ -187,10 +191,32 @@ class RelayClient:
             self._room_ready.set()
             return
 
-        try:
-            ws = _ws_connect(self._relay_url, open_timeout=15.0)
-        except Exception as exc:
-            logger.error("Relay connection to %s failed: %s", self._relay_url, exc)
+        # Retry with backoff to tolerate cold starts on the free hosting tier
+        # (a spun-down relay can take ~30 s to wake up).
+        _MAX_ATTEMPTS  = 5
+        _RETRY_DELAYS  = (3, 5, 10, 15)   # seconds between attempts
+
+        ws = None
+        for attempt in range(_MAX_ATTEMPTS):
+            if self._stop.is_set():
+                self._room_ready.set()
+                return
+            try:
+                ws = _ws_connect(self._relay_url, open_timeout=15.0)
+                break
+            except Exception as exc:
+                if attempt < _MAX_ATTEMPTS - 1:
+                    delay = _RETRY_DELAYS[attempt]
+                    logger.warning(
+                        "Relay connect attempt %d/%d failed (%s) — retrying in %ds",
+                        attempt + 1, _MAX_ATTEMPTS, exc, delay,
+                    )
+                    self._stop.wait(timeout=delay)
+        else:
+            logger.error(
+                "Relay connection to %s failed after %d attempts",
+                self._relay_url, _MAX_ATTEMPTS,
+            )
             self._room_ready.set()
             return
 
@@ -295,6 +321,7 @@ class RelayClient:
         elif t == "relay_error":
             code = msg.get("code", "unknown")
             logger.error("Relay error: %s", code)
+            self._last_relay_error = code
             # Unblock any waiting caller so they can surface the error.
             self._room_ready.set()
 
@@ -317,6 +344,7 @@ class RelayClient:
             return False
 
         self._room_ready.clear()
+        self._last_relay_error = None
         self._stop.clear()
 
         def _reconnect_run() -> None:
@@ -352,7 +380,12 @@ class RelayClient:
 
         thread = threading.Thread(target=_reconnect_run, daemon=True, name="RelayClientReconnect")
         thread.start()
-        ok = self._room_ready.wait(timeout=timeout)
-        if not ok:
+        if not self._room_ready.wait(timeout=timeout):
             logger.error("Relay reconnect timed out")
-        return ok
+            return False
+        if self._last_relay_error:
+            # relay_error means the server restarted and the room is gone —
+            # not a transient network blip.
+            logger.error("Relay reconnect rejected: %s", self._last_relay_error)
+            return False
+        return True

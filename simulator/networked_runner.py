@@ -98,6 +98,8 @@ class NetworkedGameRunner(GameRunner):
         self._peer_connected = False
         self._peer_disconnected = False
         self._disconnect_time_ms: Optional[int] = None
+        self._reconnect_attempted = False   # True once a relay reconnect thread is running
+        self._session_lost = False          # True when relay restarted and room is gone
 
         # Negotiation state
         self._local_color_sent = False
@@ -286,6 +288,7 @@ class NetworkedGameRunner(GameRunner):
             "error":             self._on_error,
             "relay_error":       self._on_relay_error,
             "_peer_lost":        self._on_peer_lost,
+            "_reconnect_result": self._on_reconnect_result,
             "new_game":          self._on_new_game,
         }
         handler = handlers.get(t)
@@ -339,6 +342,18 @@ class NetworkedGameRunner(GameRunner):
         """Internal: peer disconnected, show overlay."""
         self._peer_disconnected = True
 
+    def _on_reconnect_result(self, msg: dict) -> None:
+        """Internal: result of a background relay reconnect attempt."""
+        if msg.get("ok"):
+            logger.info("Relay reconnect succeeded")
+            self._peer_disconnected = False
+            self._reconnect_attempted = False
+            self._disconnect_time_ms = None
+            self._session_lost = False
+        else:
+            logger.warning("Relay reconnect failed — relay likely restarted, session is gone")
+            self._session_lost = True
+
     def _on_new_game(self, msg: dict) -> None:  # noqa: ARG002
         """Peer pressed N — reset without re-broadcasting."""
         self._reset()
@@ -360,6 +375,8 @@ class NetworkedGameRunner(GameRunner):
         self._peer_name = msg.get("player_name", "Opponent")
         self._peer_disconnected = False   # clear any stale flag from handshake hiccup
         self._disconnect_time_ms = None
+        self._reconnect_attempted = False
+        self._session_lost = False
         self._last_pong_s = time.time()   # reset keepalive clock so NAME_ENTRY wait doesn't trigger timeout
         peer_role = msg.get("role", "guest")
         logger.info("Hello from %r (role=%s)", self._peer_name, peer_role)
@@ -935,6 +952,21 @@ class NetworkedGameRunner(GameRunner):
             self._disconnect_time_ms = pygame.time.get_ticks()
             logger.warning("Peer disconnected — showing overlay")
 
+        # Once the reconnect countdown expires, attempt a relay reconnect in the background.
+        if (self._peer_disconnected
+                and not self._reconnect_attempted
+                and not self._session_lost
+                and self._relay_client is not None
+                and self._disconnect_time_ms is not None):
+            elapsed = (pygame.time.get_ticks() - self._disconnect_time_ms) // 1000
+            if elapsed >= _RECONNECT_TIMEOUT_S:
+                self._reconnect_attempted = True
+                rc = self._relay_client
+                def _attempt(rc=rc) -> None:
+                    ok = rc.reconnect(timeout=15.0)
+                    self._incoming.append({"type": "_reconnect_result", "ok": ok})
+                threading.Thread(target=_attempt, daemon=True, name="RelayReconnect").start()
+
         super()._update()
 
     def _apply_remote_move(self, msg: dict) -> None:
@@ -1093,7 +1125,11 @@ class NetworkedGameRunner(GameRunner):
             text(f"Peer    {self._peer_name}  {bars}", pfont_sm, _P_GOOD)
         elif self._peer_disconnected:
             text("Peer    DISCONNECTED", pfont_sm, _P_BAD)
-            if self._disconnect_time_ms is not None:
+            if self._session_lost:
+                text("Session lost — relay restarted", pfont_sm, _P_BAD)
+            elif self._reconnect_attempted:
+                text("Reconnecting...", pfont_sm, _P_WARN)
+            elif self._disconnect_time_ms is not None:
                 elapsed = (pygame.time.get_ticks() - self._disconnect_time_ms) // 1000
                 remaining = max(0, int(_RECONNECT_TIMEOUT_S) - elapsed)
                 text(f"Waiting {remaining}s to reconnect...", pfont_sm, _P_WARN)
@@ -1185,7 +1221,7 @@ class NetworkedGameRunner(GameRunner):
                 on_peer_disconnected=self._on_disconnected,
             )
             relay.set_message_handler(self._on_network_message)
-            code = relay.create_room(timeout=15.0)
+            code = relay.create_room(timeout=60.0)
             if code:
                 self._relay_client = relay
                 self._room_code = code
@@ -1204,7 +1240,7 @@ class NetworkedGameRunner(GameRunner):
             )
             relay.set_message_handler(self._on_network_message)
             room = self._room_code or ""
-            ok = relay.join_room(room, timeout=15.0) if ws_role == "guest" else relay.spectate_room(room, timeout=15.0)
+            ok = relay.join_room(room, timeout=60.0) if ws_role == "guest" else relay.spectate_room(room, timeout=60.0)
             if ok:
                 self._relay_client = relay
                 logger.info("Joined online room %s as %s", room, ws_role)

@@ -2,13 +2,16 @@ services:
   - type: web
     name: chess101-relay
     env: docker
+    plan: free
     dockerfilePath: ./Dockerfile.relay
     # Set RELAY_PORT, RELAY_MAX_ROOMS, RELAY_ROOM_TIMEOUT in the Render dashboard.
     # See deploy/DEPLOY.md for required values and custom domain (relay.chess101.net) setup.
+    # plan: starter — required to prevent spin-down; free tier kills in-memory room state.
 
   - type: web
     name: chess101-spectator
     env: static
+    plan: free
     staticPublishPath: ./web
     headers:
       - path: /*
