@@ -34,7 +34,7 @@ from network.protocol import MoveFlags, board_hash, build_move_msg, decode_grid,
 from network.server import GameServer
 from pieces.king import King
 from pieces.pawn import Pawn
-from simulator.app import GameRunner, Phase, _COLOR_NAMES, _BOARD_W, _SCALE
+from simulator.app import GameRunner, Phase, _COLOR_NAMES, _BOARD_W, _SCALE, _CELL_PX
 
 logger = logging.getLogger(__name__)
 
@@ -148,6 +148,7 @@ class NetworkedGameRunner(GameRunner):
         self._pending_send_move = None
         self._waiting_for_ack = False
         self._pending_remote_move = None
+        self._remote_last_move: Optional[tuple[int, int, int, int]] = None
         super()._reset()
 
     def _net_send(self, msg: dict) -> None:
@@ -589,6 +590,57 @@ class NetworkedGameRunner(GameRunner):
 
     # ── Overrides — PLAYING ───────────────────────────────────────────────────
 
+    def _render_playing(self) -> None:
+        """Extend base rendering with two networked-only visuals.
+
+        1. Waiting animation: while it's the opponent's turn, pulse the checker
+           pattern (same animation the base class uses during AI thinking) so the
+           local player has a clear visual cue that they're waiting.
+
+        2. Last-move blink: once the opponent's move lands, blink the destination
+           square until the local player makes their own move, so it's easy to see
+           what changed.
+        """
+        b = self._b
+
+        if not self._is_my_turn() and not self._peer_disconnected:
+            # Pulse checker while waiting for opponent — mirrors AI-thinking code
+            b.canvas.Clear()
+            b.checker_brightness += b.checker_brightness_dir
+            if b.checker_brightness <= 0:
+                b.checker_brightness_dir *= -1
+                b.checker_brightness = 0
+            elif b.checker_brightness >= 255:
+                b.checker_brightness_dir *= -1
+                b.checker_brightness = 255
+            b.choose_light_checker_town()
+            b.matrix.blit_to_screen()
+            self._draw_piece_overlay()
+            return
+
+        # Normal rendering (my turn, or peer disconnected)
+        super()._render_playing()
+
+        # Clear blink as soon as the local player picks up a piece
+        if self._selected_piece is not None:
+            self._remote_last_move = None
+
+        # Blink the opponent's last move on the pygame surface (on top of piece overlay)
+        if self._remote_last_move is not None:
+            fr, fc, tr, tc = self._remote_last_move
+            screen = b.matrix._screen
+            if screen is not None:
+                remote = self._remote_team()
+                color = (remote.r, remote.g, remote.b)
+                # From square: always-on dim tint
+                from_surf = pygame.Surface((_CELL_PX, _CELL_PX), pygame.SRCALPHA)
+                from_surf.fill((*color, 55))
+                screen.blit(from_surf, (fc * _CELL_PX, fr * _CELL_PX))
+                # To square: pulsing border
+                if (pygame.time.get_ticks() // 400) % 2:
+                    pygame.draw.rect(screen, color,
+                                     (tc * _CELL_PX, tr * _CELL_PX, _CELL_PX, _CELL_PX), 4)
+
     def _handle_game_over(self, event: pygame.event.Event) -> None:
         """N key broadcasts new_game to both sides then resets."""
         if event.type == pygame.KEYDOWN and event.key == pygame.K_n:
@@ -629,6 +681,7 @@ class NetworkedGameRunner(GameRunner):
     def _next_turn(self) -> None:
         """After a local move, send it to the peer then call parent._next_turn."""
         if self._pending_send_move is not None:
+            self._remote_last_move = None  # clear blink when local player moves
             pm = self._pending_send_move
             self._pending_send_move = None
             b = self._b
@@ -792,6 +845,9 @@ class NetworkedGameRunner(GameRunner):
             captured_name,
             promoted_to=flags.promoted_to if flags.is_promotion else None,
         )
+
+        # Remember last remote move so _render_playing can blink the destination
+        self._remote_last_move = (fr, fc, tr, tc)
 
         # Advance turn (this side becomes the next player)
         self._next_turn()
