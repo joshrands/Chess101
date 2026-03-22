@@ -500,7 +500,7 @@ function connect(relayUrl, code) {
 // ── Entry point ────────────────────────────────────────────────────────────
 (function init() {
   const params = new URLSearchParams(window.location.search);
-  const relayUrl = params.get('relay') || 'wss://chess101.net';
+  const relayUrl = params.get('relay') || 'wss://relay.chess101.net';
   const code     = params.get('room')  || '';
 
   if (code) {

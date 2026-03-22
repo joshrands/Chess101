@@ -10,7 +10,6 @@ COPY network/ network/
 COPY pieces/  pieces/
 COPY core/    core/
 
-ENV RELAY_PORT=8765
 ENV RELAY_MAX_ROOMS=100
 ENV RELAY_ROOM_TIMEOUT=600
 
