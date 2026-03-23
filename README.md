@@ -122,6 +122,7 @@ All tests run on Mac without Pi hardware. The test suite uses `conftest.py` to s
 .venv/bin/python -m pytest tests/test_board.py -v       # Board-level (Pi controller)
 .venv/bin/python -m pytest tests/test_network.py -v              # network protocol, transport + NetworkedBoard
 .venv/bin/python -m pytest tests/test_networked_runner.py -v     # NetworkedGameRunner online-play fixes + relay-reconnect board-reset guards
+.venv/bin/python -m pytest tests/test_online_flow.py -v          # E2E online flow: handshake → color-pick → war-games → playing
 .venv/bin/python -m pytest tests/test_relay.py -v                # relay server (see modes below)
 ```
 
@@ -192,7 +193,7 @@ Chess101/
 │   └── sensor.py           # Click-driven reed-switch mock
 │
 ├── plans/multiplayer/      # Design docs for multiplayer phases 1–3
-└── tests/                  # pytest suite (398 tests)
+└── tests/                  # pytest suite (413 tests)
 ```
 
 ---

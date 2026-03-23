@@ -435,10 +435,12 @@ class NetworkedGameRunner(GameRunner):
                 })
                 self.phase = Phase.COLOR_PICK
                 logger.info("Sent game_setup — advancing to COLOR_PICK")
-        elif self.phase == Phase.PLAYING:
-            # GUEST/SPECTATOR reconnecting: send hello back so HOST sends rejoin_sync / board_sync.
+        elif self.phase in (Phase.COLOR_PICK, Phase.WAR_GAMES, Phase.PLAYING):
+            # Send hello back so HOST processes it.
+            # - Initial connection (COLOR_PICK/WAR_GAMES): HOST receives hello → sets _peer_name → sends game_setup
+            # - Mid-game reconnect (PLAYING): HOST receives hello → sends rejoin_sync
             self._on_connected()
-            logger.info("Reconnect: sent hello to trigger rejoin_sync from HOST")
+            logger.info("Sending hello response (phase=%s) — HOST will send game_setup or rejoin_sync", self.phase.name)
 
     def _on_game_setup(self, msg: dict) -> None:
         """GUEST or SPECTATOR receives game_setup."""
@@ -1293,11 +1295,16 @@ class NetworkedGameRunner(GameRunner):
                     on_peer_disconnected=self._on_disconnected,
                 )
                 relay.set_message_handler(self._on_network_message)
+                # Wire up _relay_client before join_room blocks so that any
+                # inbound game messages (e.g. HOST's hello) that arrive
+                # during the handshake can be responded to immediately.
+                self._relay_client = relay
                 ok = relay.join_room(room, timeout=60.0) if ws_role == "guest" else relay.spectate_room(room, timeout=60.0)
                 if ok:
                     logger.info("Joined online room %s as %s", room, ws_role)
                     self._incoming.append({"type": "_network_ready", "relay": relay})
                 else:
+                    self._relay_client = None
                     self._incoming.append({"type": "_network_failed"})
             threading.Thread(target=_connect_guest, daemon=True, name="RelayConnect").start()
 
