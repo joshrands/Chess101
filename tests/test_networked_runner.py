@@ -550,3 +550,177 @@ class TestGameStartColors:
         assert "team_l" in msg, "game_start must include team_l for relay anti-cheat"
         assert msg["team_r"] == {"r": 65, "g": 180, "b": 232}
         assert msg["team_l"] == {"r": 255, "g": 140, "b": 0}
+
+
+# ── Relay reconnect: board-reset regression ────────────────────────────────────
+#
+# After a long relay disconnect the relay replays up to 50 buffered messages,
+# which can include game_start and game_setup from when the game was first set up.
+# Those handlers both call initialize_game_board(), which stamps starting pieces
+# back onto rows 0-1 / 6-7 WITHOUT clearing the rest of the grid — so any piece
+# that had moved to rows 2-5 stayed put while the original 32 pieces reappeared
+# at their starting squares.  The fix adds early-return guards when
+# phase == PLAYING, and makes the non-HOST side send a hello back on reconnect
+# so HOST is prompted to send rejoin_sync and restore the full state cleanly.
+
+class TestRelayReconnectGuards:
+
+    def _make_playing_guest(self, _pygame) -> NetworkedGameRunner:
+        """ONLINE_GUEST runner wired to a FakeRelay, advanced to PLAYING."""
+        runner = NetworkedGameRunner(role=NetworkRole.ONLINE_GUEST)
+        runner._init_board()
+        b = runner._b
+        b.team_r.r, b.team_r.g, b.team_r.b = 65, 180, 232
+        b.team_l.r, b.team_l.g, b.team_l.b = 255, 140, 0
+        b.computer_player_r = False
+        b.computer_player_l = False
+        relay = _FakeRelay()
+        runner._relay_client = relay
+        runner._peer_name = "Host"
+        runner._peer_connected = True
+        runner._start_game()   # phase → PLAYING, grid populated
+        return runner
+
+    def _move_pawn(self, runner: NetworkedGameRunner) -> None:
+        """Advance the team_r pawn at (1,0) to (2,0) so the board is non-trivial."""
+        b = runner._b
+        b.grid[2][0] = b.grid[1][0]
+        b.grid[1][0] = None
+
+    # ── game_start guard ──────────────────────────────────────────────────────
+
+    def test_game_start_ignored_when_playing(self, _pygame):
+        """Replayed game_start must not call initialize_game_board on a live board."""
+        runner = self._make_playing_guest(_pygame)
+        self._move_pawn(runner)
+        b = runner._b
+
+        runner._dispatch({
+            "type": "game_start",
+            "team_r": {"r": b.team_r.r, "g": b.team_r.g, "b": b.team_r.b},
+            "team_l": {"r": b.team_l.r, "g": b.team_l.g, "b": b.team_l.b},
+        })
+
+        assert b.grid[1][0] is None, (
+            "Replayed game_start must not stamp a starting pawn back at (1,0) — "
+            "that was the pre-fix board-reset bug"
+        )
+        assert b.grid[2][0] is not None, "Moved pawn at (2,0) must survive"
+        assert runner.phase == Phase.PLAYING
+
+    def test_game_start_accepted_before_playing(self, _pygame):
+        """game_start must still work normally when phase is not yet PLAYING."""
+        runner = NetworkedGameRunner(role=NetworkRole.ONLINE_GUEST)
+        runner._init_board()
+        b = runner._b
+        b.team_r.r, b.team_r.g, b.team_r.b = 65, 180, 232
+        b.team_l.r, b.team_l.g, b.team_l.b = 255, 140, 0
+        b.computer_player_r = False
+        b.computer_player_l = False
+        runner._relay_client = _FakeRelay()
+        runner._peer_name = "Host"
+        runner.phase = Phase.WAR_GAMES
+
+        runner._dispatch({
+            "type": "game_start",
+            "team_r": {"r": b.team_r.r, "g": b.team_r.g, "b": b.team_r.b},
+            "team_l": {"r": b.team_l.r, "g": b.team_l.g, "b": b.team_l.b},
+        })
+
+        assert runner.phase == Phase.PLAYING, "game_start should advance to PLAYING normally"
+        assert b.grid[1][0] is not None, "initialize_game_board must run for a fresh game_start"
+
+    # ── game_setup guard ──────────────────────────────────────────────────────
+
+    def test_game_setup_ignored_when_playing(self, _pygame):
+        """Replayed game_setup must not call initialize_game_board."""
+        runner = self._make_playing_guest(_pygame)
+        self._move_pawn(runner)
+        b = runner._b
+
+        runner._dispatch({
+            "type": "game_setup",
+            "version": "1",
+            "host_name": "Host",
+            "guest_name": "Guest",
+        })
+
+        assert b.grid[1][0] is None, "game_setup replay must not repopulate (1,0)"
+        assert b.grid[2][0] is not None, "Moved pawn must survive game_setup replay"
+        assert runner.phase == Phase.PLAYING
+
+    def test_game_setup_spectator_view_ignored_when_playing(self, _pygame):
+        """Replayed spectator-view game_setup must also be suppressed."""
+        runner = self._make_playing_guest(_pygame)
+        self._move_pawn(runner)
+        b = runner._b
+
+        runner._dispatch({
+            "type": "game_setup",
+            "version": "1",
+            "mode": "spectator_view",
+            "host_name": "Host",
+            "guest_name": "Guest",
+        })
+
+        assert b.grid[1][0] is None
+        assert b.grid[2][0] is not None
+        assert runner.phase == Phase.PLAYING
+
+    # ── hello reconnect triggers rejoin_sync ──────────────────────────────────
+
+    def test_guest_sends_hello_back_when_reconnecting(self, _pygame):
+        """GUEST in PLAYING receiving hello must send hello back so HOST sends rejoin_sync."""
+        runner = self._make_playing_guest(_pygame)
+        sent: list[dict] = []
+        runner._net_send = lambda msg: sent.append(msg)
+
+        runner._dispatch({
+            "type": "hello",
+            "version": "1",
+            "player_name": "Host",
+            "role": "host",
+        })
+
+        hello_msgs = [m for m in sent if m.get("type") == "hello"]
+        assert len(hello_msgs) == 1, (
+            "GUEST must send hello back to HOST on reconnect — "
+            "that hello causes HOST to send rejoin_sync and restore the board"
+        )
+        assert hello_msgs[0].get("role") == "guest"
+        assert hello_msgs[0].get("version") == "1"
+
+    def test_guest_hello_reconnect_clears_disconnect_flag(self, _pygame):
+        """Receiving hello while PLAYING clears _peer_disconnected."""
+        runner = self._make_playing_guest(_pygame)
+        runner._peer_disconnected = True
+        runner._net_send = lambda msg: None
+
+        runner._dispatch({
+            "type": "hello",
+            "version": "1",
+            "player_name": "Host",
+            "role": "host",
+        })
+
+        assert runner._peer_disconnected is False
+
+    def test_host_still_sends_rejoin_sync_on_guest_hello(self, _pygame):
+        """HOST receiving GUEST's hello (sent by the reconnect fix) sends rejoin_sync."""
+        host = _make_host(_pygame)
+        assert host.phase == Phase.PLAYING
+
+        sent: list[dict] = []
+        host._net_send = lambda msg: sent.append(msg)
+
+        host._dispatch({
+            "type": "hello",
+            "version": "1",
+            "player_name": "Guest",
+            "role": "guest",
+        })
+
+        types_sent = [m["type"] for m in sent]
+        assert "rejoin_sync" in types_sent, (
+            "HOST must respond to the reconnect hello with rejoin_sync"
+        )

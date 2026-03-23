@@ -435,9 +435,15 @@ class NetworkedGameRunner(GameRunner):
                 })
                 self.phase = Phase.COLOR_PICK
                 logger.info("Sent game_setup — advancing to COLOR_PICK")
+        elif self.phase == Phase.PLAYING:
+            # GUEST/SPECTATOR reconnecting: send hello back so HOST sends rejoin_sync / board_sync.
+            self._on_connected()
+            logger.info("Reconnect: sent hello to trigger rejoin_sync from HOST")
 
     def _on_game_setup(self, msg: dict) -> None:
         """GUEST or SPECTATOR receives game_setup."""
+        if self.phase == Phase.PLAYING:
+            return   # replayed from relay history during reconnect — ignore
         mode = msg.get("mode", "")
         logger.info("Received game_setup (mode=%r)", mode)
 
@@ -513,6 +519,8 @@ class NetworkedGameRunner(GameRunner):
 
     def _on_game_start(self, msg: dict) -> None:
         """GUEST receives game_start → begin the game."""
+        if self.phase == Phase.PLAYING:
+            return   # replayed from relay history during reconnect — ignore
         logger.info("Received game_start")
         self._start_game()
         # In physical_host mode the Pi still needs to do interactive_setup;

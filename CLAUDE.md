@@ -62,7 +62,7 @@ sudo python3 GameManager.py --join 192.168.1.42
 .venv/bin/python -m pytest tests/test_simulator.py -v  # simulator only
 .venv/bin/python -m pytest tests/test_board.py -v      # Board-level tests
 .venv/bin/python -m pytest tests/test_network.py -v             # network protocol tests
-.venv/bin/python -m pytest tests/test_networked_runner.py -v    # NetworkedGameRunner online-play fixes
+.venv/bin/python -m pytest tests/test_networked_runner.py -v    # NetworkedGameRunner online-play fixes + relay-reconnect board-reset guards
 .venv/bin/python -m pytest tests/test_relay.py -v               # relay server tests (see below)
 ```
 
