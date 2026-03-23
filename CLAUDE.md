@@ -62,9 +62,29 @@ sudo python3 GameManager.py --join 192.168.1.42
 .venv/bin/python -m pytest tests/test_simulator.py -v  # simulator only
 .venv/bin/python -m pytest tests/test_board.py -v      # Board-level tests
 .venv/bin/python -m pytest tests/test_network.py -v    # network protocol tests
+.venv/bin/python -m pytest tests/test_relay.py -v      # relay server tests (see below)
 ```
 
 `conftest.py` stubs out `rgbmatrix` and `smbus` so all test files run on Mac without Pi hardware.
+
+### Relay tests — three run modes
+
+`test_relay.py` spins up an in-process relay by default (no Docker required):
+
+```bash
+# Default — fast, in-process relay, no external dependencies:
+.venv/bin/python -m pytest tests/test_relay.py -v
+
+# Docker — builds chess101-relay image, runs a container for the session:
+.venv/bin/python -m pytest tests/test_relay.py -v --relay-docker
+
+# External relay — point at any running relay (local Docker or live):
+docker run -d -p 8765:8765 -e RELAY_PORT=8765 chess101-relay
+RELAY_URL=ws://127.0.0.1:8765 .venv/bin/python -m pytest tests/test_relay.py -v
+
+# Post-deploy smoke test against the live relay:
+RELAY_URL=wss://relay.chess101.net .venv/bin/python -m pytest tests/test_relay.py -v
+```
 
 ## Type Checking
 
@@ -145,7 +165,8 @@ Chess101/
     ├── test_gameplay.py     # Pure chess logic + GameRunner integration (headless)
     ├── test_simulator.py    # Simulator-specific bug regression tests
     ├── test_board.py        # Board-level tests (runs on Mac via conftest stubs)
-    └── test_network.py      # Network protocol, beacon, and transport tests
+    ├── test_network.py      # Network protocol, beacon, and transport tests
+    └── test_relay.py        # Relay server protocol, reconnect, and anti-cheat tests
 ```
 
 ## Architecture

@@ -121,9 +121,27 @@ All tests run on Mac without Pi hardware. The test suite uses `conftest.py` to s
 .venv/bin/python -m pytest tests/test_simulator.py -v   # simulator phase state machine
 .venv/bin/python -m pytest tests/test_board.py -v       # Board-level (Pi controller)
 .venv/bin/python -m pytest tests/test_network.py -v     # network protocol, transport + NetworkedBoard
+.venv/bin/python -m pytest tests/test_relay.py -v       # relay server (see modes below)
 ```
 
-Expected result: **295 passed, 1 skipped** (the skipped test is a UDP broadcast test that is unreliable on loopback — the underlying logic is covered by adjacent tests).
+### Relay test modes
+
+`test_relay.py` spins up an in-process relay by default — no Docker or network access needed:
+
+```bash
+# Default — in-process relay, fast:
+.venv/bin/python -m pytest tests/test_relay.py -v
+
+# Docker — builds chess101-relay image, runs a container for the session:
+.venv/bin/python -m pytest tests/test_relay.py -v --relay-docker
+
+# External relay — point at any running relay (local Docker or live):
+docker run -d -p 8765:8765 -e RELAY_PORT=8765 chess101-relay
+RELAY_URL=ws://127.0.0.1:8765 .venv/bin/python -m pytest tests/test_relay.py -v
+
+# Post-deploy smoke test against the live relay:
+RELAY_URL=wss://relay.chess101.net .venv/bin/python -m pytest tests/test_relay.py -v
+```
 
 ---
 
@@ -156,12 +174,15 @@ Chess101/
 ├── hardware/               # I2C sensor interface (Pi only)
 ├── ui/                     # LED renderer helpers
 │
-├── network/                # LAN multiplayer transport
+├── network/                # Multiplayer transport — LAN and internet
 │   ├── protocol.py         # Message types, board serialization, hash
 │   ├── server.py           # WebSocket server (asyncio daemon thread)
 │   ├── client.py           # WebSocket client (asyncio daemon thread)
 │   ├── discovery.py        # UDP beacon broadcast + listener
-│   └── mdns.py             # mDNS/DNS-SD advertiser + browser (zeroconf)
+│   ├── mdns.py             # mDNS/DNS-SD advertiser + browser (zeroconf)
+│   ├── relay.py            # Internet relay server (room codes, reconnect, anti-cheat)
+│   ├── relay_client.py     # Relay client (wraps handshake, cold-start retry)
+│   └── validator.py        # Server-side move validator (anti-cheat)
 │
 ├── simulator/              # Mac simulator
 │   ├── app.py              # GameRunner — Pygame event loop + phase state machine
@@ -170,7 +191,7 @@ Chess101/
 │   └── sensor.py           # Click-driven reed-switch mock
 │
 ├── plans/multiplayer/      # Design docs for multiplayer phases 1–3
-└── tests/                  # pytest suite (295 tests)
+└── tests/                  # pytest suite (366 tests)
 ```
 
 ---
@@ -192,6 +213,6 @@ All bugs are locked in by tests so they do not regress accidentally.
 |---|---|---|
 | Phase 1 | Complete | LAN Sim vs Sim over WebSocket |
 | Phase 2 | Complete | Pi + physical board support (NetworkedBoard, mDNS, Sim-as-UI) |
-| Phase 3 | Planned | Internet play via relay server |
+| Phase 3 | Complete | Internet play via relay server (deployed to relay.chess101.net) |
 
 See `plans/multiplayer/` for full design documents covering protocol, architecture, UX flows, and implementation steps for each phase.
