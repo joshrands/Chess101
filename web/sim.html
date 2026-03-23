@@ -1,0 +1,1298 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Chess101 — Play in Browser</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#0a0a12;color:#c8d0e0;font-family:'Courier New',monospace;min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center}
+#app{display:flex;gap:0;border:1px solid #1e2a3a;border-radius:4px;overflow:hidden;box-shadow:0 0 40px rgba(0,255,136,.08)}
+#board-wrap{flex-shrink:0;background:#050810}
+#board{display:block;cursor:crosshair}
+#panel{width:280px;background:#070c18;border-left:1px solid #1e2a3a;display:flex;flex-direction:column;overflow:hidden}
+#panel-top{padding:14px 14px 0;flex-shrink:0}
+#panel-log{flex:1;overflow-y:auto;padding:6px 14px 14px;font-size:11px;line-height:1.6}
+#panel-log::-webkit-scrollbar{width:4px}
+#panel-log::-webkit-scrollbar-thumb{background:#1e2a3a}
+.p-label{font-size:10px;color:#3a4a60;text-transform:uppercase;letter-spacing:.08em;margin-top:10px;margin-bottom:2px}
+.p-val{font-size:13px;color:#c8d0e0}
+.p-val.accent{color:#00ff88}
+.p-swatch{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:5px;vertical-align:middle}
+.p-bar-wrap{height:4px;background:#1a2030;border-radius:2px;margin-top:4px}
+.p-bar{height:4px;border-radius:2px;background:#00ff88;transition:width .3s}
+.p-alert{font-size:11px;padding:4px 8px;border-radius:2px;margin-top:8px;border-left:3px solid}
+.p-alert.check{color:#ff6060;border-color:#ff3030;background:rgba(255,40,40,.07)}
+.p-alert.ai{color:#60a0ff;border-color:#4080ff;background:rgba(60,100,255,.07)}
+.p-alert.room{color:#00ff88;border-color:#00cc66;background:rgba(0,200,100,.07);font-size:13px;letter-spacing:.1em}
+.log-entry{color:#4a6080;font-size:10px}
+.log-entry.recent{color:#8090a0}
+a.back{display:block;text-align:center;padding:8px;font-size:11px;color:#3a5070;text-decoration:none;border-top:1px solid #1e2a3a;margin-top:auto;flex-shrink:0}
+a.back:hover{color:#00ff88}
+
+#join-overlay{display:none;position:fixed;inset:0;background:rgba(5,8,16,.9);z-index:100;align-items:center;justify-content:center}
+#join-overlay.show{display:flex}
+#join-box{background:#0a1020;border:1px solid #1e2a3a;border-radius:6px;padding:28px 32px;text-align:center;min-width:260px}
+#join-box p{margin-bottom:12px;color:#8090a0;font-size:12px;text-transform:uppercase;letter-spacing:.08em}
+#room-input{background:#050810;border:1px solid #2a3a50;color:#00ff88;font-family:'Courier New',monospace;font-size:20px;letter-spacing:.25em;text-align:center;padding:8px 12px;border-radius:3px;width:100%;text-transform:uppercase;outline:none}
+#room-input:focus{border-color:#00ff88}
+.join-btns{display:flex;gap:10px;margin-top:14px}
+.join-btns button{flex:1;padding:8px;font-family:'Courier New',monospace;font-size:12px;border:1px solid #2a3a50;background:#050810;color:#8090a0;border-radius:3px;cursor:pointer}
+.join-btns button.primary{border-color:#00ff88;color:#00ff88}
+.join-btns button:hover{background:#0a1520}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="board-wrap"><canvas id="board" width="640" height="640"></canvas></div>
+  <div id="panel">
+    <div id="panel-top"></div>
+    <div id="panel-log"></div>
+    <a href="/" class="back">← chess101.net</a>
+  </div>
+</div>
+<div id="join-overlay">
+  <div id="join-box">
+    <p>Enter Room Code</p>
+    <input id="room-input" maxlength="6" placeholder="XXXXXX" autocomplete="off" spellcheck="false">
+    <div class="join-btns">
+      <button id="cancel-btn">Cancel</button>
+      <button id="join-btn" class="primary">Join</button>
+    </div>
+  </div>
+</div>
+
+<!-- Chess engine — loaded in both main thread and Web Worker -->
+<script id="chess-engine">
+'use strict';
+// ── Data structures ──────────────────────────────────────────────────────────
+class Cell{constructor(r,c){this.row=r;this.col=c;}}
+class Team{constructor(r,g,b,name='Wendy'){this.r=r;this.g=g;this.b=b;this.name=name;}}
+
+// ── Piece base ────────────────────────────────────────────────────────────────
+class Piece{
+  constructor(row,col,team){
+    this.row=row;this.col=col;this.team=team;
+    this.targets=[];this.critical=false;this.criticalTargets=[];this.touched=false;
+  }
+  getTargets(){return this.targets;}
+  getValue(grid){return this.pieceValue;}
+  _bladeRunner(grid,dr,dc,row,col){
+    const nr=row+dr,nc=col+dc;
+    if(nr<0||nr>7||nc<0||nc>7)return;
+    const t=grid[nr][nc];
+    if(t===null){this.targets.push(new Cell(nr,nc));this._bladeRunner(grid,dr,dc,nr,nc);}
+    else if(t.team.r!==this.team.r)this.targets.push(new Cell(nr,nc));
+  }
+  _kingsman(grid,row,col,dr,dc){
+    if(row<0||row>7||col<0||col>7)return[-1,-1];
+    const p=grid[row][col];
+    if(p!==null){return p.team.r!==this.team.r?[row,col]:[-1,-1];}
+    const nr=row+dr,nc=col+dc;
+    if(nr<0||nr>7||nc<0||nc>7)return[-1,-1];
+    return this._kingsman(grid,nr,nc,dr,dc);
+  }
+  criticalMan(){
+    if(!this.critical)return;
+    const n=[];
+    for(const ct of this.criticalTargets)
+      for(const t of this.targets)
+        if(ct.row===t.row&&ct.col===t.col){n.push(t);break;}
+    this.targets=n;
+  }
+  skyFall(king){
+    const n=[];
+    for(const t of this.targets)
+      for(const s of king.godSaveTheKing)
+        if(t.row===s.row&&t.col===s.col){n.push(t);break;}
+    this.targets=n;
+  }
+  move(newRow,newCol,grid){this.row=newRow;this.col=newCol;this.touched=true;return null;}
+}
+
+// ── Pawn ─────────────────────────────────────────────────────────────────────
+class Pawn extends Piece{
+  constructor(row,col,team){
+    super(row,col,team);
+    this.startingRow=row;this.startingCol=col;
+    this.direction=row===6?-1:1; // BUG-01 preserved
+    this.enPassantable=false;this.enPassantLoc=null;
+    this.pieceValue=5;
+  }
+  calcTargets(grid){
+    this.enPassantLoc=null;this.targets=[];
+    if(this.row===0||this.row===7)return;
+    const d=this.direction,r=this.row,c=this.col;
+    // diagonal captures
+    if(c>0){const p=grid[r+d][c-1];if(p&&p.team.r!==this.team.r)this.targets.push(new Cell(r+d,c-1));}
+    if(c<7){const p=grid[r+d][c+1];if(p&&p.team.r!==this.team.r)this.targets.push(new Cell(r+d,c+1));}
+    // forward
+    if(grid[r+d][c]===null){
+      this.targets.push(new Cell(r+d,c));
+      if(r===this.startingRow&&grid[r+2*d][c]===null)this.targets.push(new Cell(r+2*d,c));
+    }
+    // en passant
+    if(c>0){const n=grid[r][c-1];if(n instanceof Pawn&&n.team.r!==this.team.r&&n.enPassantable){this.targets.push(new Cell(r+d,c-1));this.enPassantLoc=new Cell(r+d,c-1);}}
+    if(c<7){const n=grid[r][c+1];if(n instanceof Pawn&&n.team.r!==this.team.r&&n.enPassantable){this.targets.push(new Cell(r+d,c+1));this.enPassantLoc=new Cell(r+d,c+1);}}
+    if(this.critical)super.criticalMan();
+  }
+  skyFall(king){
+    const n=[];
+    for(const t of this.targets)for(const s of king.godSaveTheKing)if(t.row===s.row&&t.col===s.col){n.push(t);break;}
+    if(this.enPassantLoc!==null){
+      const loc=this.enPassantLoc;
+      const inPre=this.targets.some(t=>t.row===loc.row&&t.col===loc.col);
+      const capturedRow=loc.row-this.direction;
+      const capturesChecker=king.godSaveTheKing.some(s=>s.row===capturedRow&&s.col===loc.col);
+      if(inPre&&capturesChecker)n.push(new Cell(loc.row,loc.col));
+    }
+    this.targets=n;
+  }
+  move(newRow,newCol,grid){
+    const oldRow=this.row,oldCol=this.col;
+    this.row=newRow;this.col=newCol;
+    if(oldRow===this.startingRow&&oldCol===this.startingCol&&(newRow-oldRow)===2*this.direction)
+      this.enPassantable=true;
+    if(this.enPassantLoc!==null&&newRow===this.enPassantLoc.row&&newCol===this.enPassantLoc.col)
+      return new Cell(this.enPassantLoc.row-this.direction,this.enPassantLoc.col);
+    return null;
+  }
+  getValue(grid){
+    this.calcTargets(grid);
+    let v=this.pieceValue+this.targets.length;
+    for(const c of this.targets){v++;if((c.row===3||c.row===4)&&(c.col===3||c.col===4))v++;}
+    return v;
+  }
+}
+
+// ── Rook ──────────────────────────────────────────────────────────────────────
+class Rook extends Piece{
+  constructor(row,col,team){super(row,col,team);this.pieceValue=27;}
+  calcTargets(grid){
+    this.targets=[];
+    this._bladeRunner(grid,1,0,this.row,this.col);
+    this._bladeRunner(grid,-1,0,this.row,this.col);
+    this._bladeRunner(grid,0,1,this.row,this.col);
+    this._bladeRunner(grid,0,-1,this.row,this.col);
+    if(this.critical)super.criticalMan();
+  }
+  getValue(grid){
+    this.calcTargets(grid);
+    let v=this.pieceValue+this.targets.length;
+    for(const c of this.targets)if((c.row===3||c.row===4)&&(c.col===3||c.col===4))v++;
+    return v;
+  }
+}
+
+// ── Bishop ────────────────────────────────────────────────────────────────────
+class Bishop extends Piece{
+  constructor(row,col,team){super(row,col,team);this.pieceValue=15;}
+  calcTargets(grid){
+    this.targets=[];
+    this._bladeRunner(grid,1,1,this.row,this.col);
+    this._bladeRunner(grid,1,-1,this.row,this.col);
+    this._bladeRunner(grid,-1,1,this.row,this.col);
+    this._bladeRunner(grid,-1,-1,this.row,this.col);
+    if(this.critical)super.criticalMan();
+  }
+  getValue(grid){
+    this.calcTargets(grid);
+    let v=this.pieceValue+this.targets.length;
+    for(const c of this.targets)if((c.row===3||c.row===4)&&(c.col===3||c.col===4))v++;
+    return v;
+  }
+}
+
+// ── Knight ────────────────────────────────────────────────────────────────────
+class Knight extends Piece{
+  constructor(row,col,team){super(row,col,team);this.pieceValue=13;}
+  calcTargets(grid){
+    this.targets=[];
+    const offs=[[-2,-1],[-2,1],[-1,-2],[-1,2],[1,-2],[1,2],[2,-1],[2,1]];
+    for(const[dr,dc]of offs){
+      const nr=this.row+dr,nc=this.col+dc;
+      if(nr<0||nr>7||nc<0||nc>7)continue;
+      const p=grid[nr][nc];
+      if(p===null||p.team.r!==this.team.r)this.targets.push(new Cell(nr,nc));
+    }
+    if(this.critical)super.criticalMan();
+  }
+  getValue(grid){
+    this.calcTargets(grid);
+    let v=this.pieceValue+this.targets.length;
+    for(const c of this.targets)if((c.row===3||c.row===4)&&(c.col===3||c.col===4))v++;
+    return v;
+  }
+}
+
+// ── Queen ─────────────────────────────────────────────────────────────────────
+class Queen extends Piece{
+  constructor(row,col,team){super(row,col,team);this.pieceValue=49;}
+  calcTargets(grid){
+    this.targets=[];
+    for(let dr=-1;dr<=1;dr++)for(let dc=-1;dc<=1;dc++)
+      if(dr!==0||dc!==0)this._bladeRunner(grid,dr,dc,this.row,this.col);
+    if(this.critical)super.criticalMan();
+  }
+  getValue(grid){
+    this.calcTargets(grid);
+    let v=this.pieceValue+this.targets.length;
+    for(const c of this.targets)if((c.row===3||c.row===4)&&(c.col===3||c.col===4))v++;
+    return v;
+  }
+}
+
+// ── King ──────────────────────────────────────────────────────────────────────
+class King extends Piece{
+  constructor(row,col,team){
+    super(row,col,team);
+    this.direction=row===7?-1:1;
+    this.godSaveTheKing=[];
+    this.pieceValue=1000;
+  }
+  _bladeWalker(grid,dr,dc,row,col){
+    const nr=row+dr,nc=col+dc;
+    if(nr<0||nr>7||nc<0||nc>7)return;
+    const p=grid[nr][nc];
+    if(p===null||p.team.r!==this.team.r)this.targets.push(new Cell(nr,nc));
+  }
+  calcTargets(grid){
+    this.targets=[];
+    for(let dr=-1;dr<=1;dr++)for(let dc=-1;dc<=1;dc++)
+      if(dr!==0||dc!==0)this._bladeWalker(grid,dr,dc,this.row,this.col);
+    // Castling
+    if(!this.touched){
+      const lr=grid[this.row][this.col-4];
+      if(lr instanceof Rook&&!lr.touched&&grid[this.row][this.col-1]===null&&grid[this.row][this.col-2]===null&&grid[this.row][this.col-3]===null)
+        this.targets.push(new Cell(this.row,this.col-2));
+      const rr=grid[this.row][this.col+3];
+      if(rr instanceof Rook&&!rr.touched&&grid[this.row][this.col+1]===null&&grid[this.row][this.col+2]===null)
+        this.targets.push(new Cell(this.row,this.col+2));
+    }
+    const oldRow=this.row,oldCol=this.col;
+    let castleLeft=false,castleRight=false,castleLeftStep=true,castleRightStep=true;
+    let castleLeftCell=null,castleRightCell=null;
+    const toRemove=[];
+    for(const cell of this.targets){
+      if(cell.row===oldRow&&cell.col===oldCol-2){castleLeft=true;castleLeftCell=cell;}
+      if(cell.row===oldRow&&cell.col===oldCol+2){castleRight=true;castleRightCell=cell;}
+      const orig=grid[cell.row][cell.col];
+      grid[cell.row][cell.col]=this;grid[this.row][this.col]=null;
+      this.row=cell.row;this.col=cell.col;
+      const[tr,tc]=this.amIGonnaDie(grid);
+      if(tr!==-1){
+        if(cell.row===oldRow&&cell.col===oldCol-2)castleLeft=false;
+        if(cell.row===oldRow&&cell.col===oldCol+2)castleRight=false;
+        if(cell.row===oldRow&&cell.col===oldCol-1)castleLeftStep=false;
+        if(cell.row===oldRow&&cell.col===oldCol+1)castleRightStep=false;
+        toRemove.push(cell);
+      }
+      grid[oldRow][oldCol]=this;grid[cell.row][cell.col]=orig;
+      this.row=oldRow;this.col=oldCol;
+    }
+    const[ar,ac]=this.amIGonnaDie(grid);
+    const inCheck=ar!==-1;
+    if(castleLeft&&(inCheck||!castleLeftStep)&&castleLeftCell)toRemove.push(castleLeftCell);
+    if(castleRight&&(inCheck||!castleRightStep)&&castleRightCell)toRemove.push(castleRightCell);
+    for(const r of toRemove)this.targets=this.targets.filter(t=>!(t.row===r.row&&t.col===r.col));
+    return inCheck;
+  }
+  move(newRow,newCol,grid){
+    const oldRow=this.row,oldCol=this.col;
+    this.row=newRow;this.col=newCol;this.touched=true;
+    if(newRow===oldRow&&newCol===oldCol-2)return[new Cell(oldRow,oldCol-4),new Cell(oldRow,oldCol-1)];
+    if(newRow===oldRow&&newCol===oldCol+2)return[new Cell(oldRow,oldCol+3),new Cell(oldRow,oldCol+1)];
+    return[null,null];
+  }
+  getValue(grid){return this.pieceValue;}
+  _iSpy(grid,row,col,dr,dc){
+    if(row<0||row>7||col<0||col>7)return[-1,-1,-1,-1];
+    const p=grid[row][col];
+    const nr=row+dr,nc=col+dc,nextOk=nr>=0&&nr<=7&&nc>=0&&nc<=7;
+    if(p!==null){
+      if(p.team.r!==this.team.r)return[row,col,-1,-1];
+      if(nextOk){const[sr,sc]=p._kingsman(grid,nr,nc,dr,dc);return[sr,sc,row,col];}
+      return[-1,-1,-1,-1];
+    }
+    if(nextOk)return this._iSpy(grid,nr,nc,dr,dc);
+    return[-1,-1,-1,-1];
+  }
+  _knightInShiningArmor(grid,dr,dc){
+    const nr=this.row+dr,nc=this.col+dc;
+    if(nr<0||nr>7||nc<0||nc>7)return[-1,-1];
+    const p=grid[nr][nc];
+    if(p instanceof Knight&&p.team.r!==this.team.r)return[nr,nc];
+    return[-1,-1];
+  }
+  pleaseGodSaveTheKing(er,ec){
+    const[dr,dc]=this._dirFromEnemy(er,ec);
+    const cells=[];let r=er,c=ec;
+    while(!(Math.round(r)===this.row&&Math.round(c)===this.col)){
+      cells.push(new Cell(Math.round(r),Math.round(c)));r+=dr;c+=dc;
+    }
+    return cells;
+  }
+  _dirFromEnemy(er,ec){
+    if(er===this.row)return[0,-(ec-this.col)/Math.abs(ec-this.col)];
+    if(ec===this.col)return[-(er-this.row)/Math.abs(er-this.row),0];
+    return[-(er-this.row)/Math.abs(er-this.row),-(ec-this.col)/Math.abs(ec-this.col)];
+  }
+  amIGonnaDie(grid){
+    // Clear friendly critical flags
+    for(const row of grid)for(const p of row)if(p&&p.team.r===this.team.r)p.critical=false;
+    let ar=-1,ac=-1;
+    for(let i=-1;i<=1;i++){
+      for(let j=-1;j<=1;j++){
+        if(i===0&&j===0)continue;
+        const[er,ec,sr,sc]=this._iSpy(grid,this.row+i,this.col+j,i,j);
+        const orthogonal=(i===0||j===0);
+        if(sr!==-1){
+          if(er!==-1){
+            const ep=grid[er][ec];
+            const typeOk=orthogonal?(ep instanceof Rook||ep instanceof Queen):(ep instanceof Bishop||ep instanceof Queen);
+            if(typeOk){const sp=grid[sr][sc];if(sp){sp.critical=true;sp.criticalTargets=this.pleaseGodSaveTheKing(er,ec);}}
+          }
+        } else if(er!==-1){
+          const ep=grid[er][ec];
+          if(orthogonal){
+            if(ep instanceof Rook||ep instanceof Queen){this.godSaveTheKing=this.pleaseGodSaveTheKing(er,ec);ar=er;ac=ec;}
+            else if(ep instanceof King&&Math.abs(er-this.row)+Math.abs(ec-this.col)===1){this.godSaveTheKing=this.pleaseGodSaveTheKing(er,ec);ar=er;ac=ec;}
+          } else {
+            if(ep instanceof Bishop||ep instanceof Queen){this.godSaveTheKing=this.pleaseGodSaveTheKing(er,ec);ar=er;ac=ec;}
+            else if(ep instanceof King&&Math.abs(er-this.row)+Math.abs(ec-this.col)===2){this.godSaveTheKing=this.pleaseGodSaveTheKing(er,ec);ar=er;ac=ec;}
+            else if(ep instanceof Pawn&&(er-this.row)===this.direction){this.godSaveTheKing=this.pleaseGodSaveTheKing(er,ec);ar=er;ac=ec;}
+          }
+        }
+      }
+    }
+    // Knight checks
+    for(const[dr,dc]of[[-2,-1],[-2,1],[-1,-2],[-1,2],[1,-2],[1,2],[2,-1],[2,1]]){
+      const[kr,kc]=this._knightInShiningArmor(grid,dr,dc);
+      if(kr!==-1){this.godSaveTheKing=[new Cell(kr,kc)];ar=kr;ac=kc;break;}
+    }
+    return[ar,ac];
+  }
+}
+
+// ── Board copy ────────────────────────────────────────────────────────────────
+function copyPiece(p,teamR,teamL){
+  const team=p.team.r===teamR.r?teamR:teamL;
+  let c;
+  if(p instanceof Pawn){c=new Pawn(p.row,p.col,team);c.startingRow=p.startingRow;c.startingCol=p.startingCol;c.direction=p.direction;c.enPassantable=p.enPassantable;c.enPassantLoc=p.enPassantLoc?new Cell(p.enPassantLoc.row,p.enPassantLoc.col):null;}
+  else if(p instanceof King){c=new King(p.row,p.col,team);c.direction=p.direction;}
+  else if(p instanceof Queen)c=new Queen(p.row,p.col,team);
+  else if(p instanceof Rook)c=new Rook(p.row,p.col,team);
+  else if(p instanceof Bishop)c=new Bishop(p.row,p.col,team);
+  else c=new Knight(p.row,p.col,team);
+  c.touched=p.touched;c.critical=p.critical;c.criticalTargets=[];c.targets=[];
+  return c;
+}
+function deepCopyGrid(grid,teamR,teamL){
+  return grid.map(row=>row.map(p=>p?copyPiece(p,teamR,teamL):null));
+}
+
+// ── Serialization (for Worker postMessage) ────────────────────────────────────
+function serializeGrid(grid){
+  return grid.map(row=>row.map(p=>{
+    if(!p)return null;
+    const t={type:p.constructor.name,row:p.row,col:p.col,tr:p.team.r,tg:p.team.g,tb:p.team.b,touched:p.touched};
+    if(p instanceof Pawn){t.startingRow=p.startingRow;t.direction=p.direction;t.enPassantable=p.enPassantable;t.enPassantLoc=p.enPassantLoc?{row:p.enPassantLoc.row,col:p.enPassantLoc.col}:null;}
+    return t;
+  }));
+}
+function deserializeGrid(data,teamR,teamL){
+  return data.map(row=>row.map(p=>{
+    if(!p)return null;
+    const team=p.tr===teamR.r?teamR:teamL;
+    let c;
+    if(p.type==='Pawn'){c=new Pawn(p.row,p.col,team);c.startingRow=p.startingRow;c.direction=p.direction;c.enPassantable=p.enPassantable;c.enPassantLoc=p.enPassantLoc?new Cell(p.enPassantLoc.row,p.enPassantLoc.col):null;}
+    else if(p.type==='King'){c=new King(p.row,p.col,team);}
+    else if(p.type==='Queen')c=new Queen(p.row,p.col,team);
+    else if(p.type==='Rook')c=new Rook(p.row,p.col,team);
+    else if(p.type==='Bishop')c=new Bishop(p.row,p.col,team);
+    else c=new Knight(p.row,p.col,team);
+    c.touched=p.touched;c.critical=false;c.criticalTargets=[];c.targets=[];
+    return c;
+  }));
+}
+
+// ── AI tree node ──────────────────────────────────────────────────────────────
+class TreeNode{
+  constructor(board,oldCell,newCell,teamR,teamL){
+    this.boardState=board;this.oldCell=oldCell;this.newCell=newCell;
+    this.teamR=new Team(teamR.r,teamR.g,teamR.b);this.teamL=new Team(teamL.r,teamL.g,teamL.b);
+    this.children=[];
+  }
+  addChild(c){this.children.push(c);}
+  getUtility(team){
+    let wr=0,wl=0;
+    for(const row of this.boardState)for(const p of row){
+      if(!p)continue;
+      if(p.team.r===this.teamR.r)wr+=p.getValue(this.boardState);
+      else wl+=p.getValue(this.boardState);
+    }
+    let total=wr-wl;
+    if(team.r===this.teamL.r)total=-total;
+    return total;
+  }
+}
+
+// ── Alpha-beta search ─────────────────────────────────────────────────────────
+function alphaBetaSearch(root,team){
+  let bestVal=-Infinity,beta=Infinity,best=null;
+  for(const s of root.children){
+    const v=abMin(s,bestVal,beta,team);
+    if(v>bestVal){bestVal=v;best=s;}
+  }
+  return best;
+}
+function abMax(node,alpha,beta,team){
+  if(!node.children.length)return node.getUtility(team);
+  let v=-Infinity;
+  for(const s of node.children){v=Math.max(v,abMin(s,alpha,beta,team));if(v>=beta)return v;alpha=Math.max(alpha,v);}
+  return v;
+}
+function abMin(node,alpha,beta,team){
+  if(!node.children.length)return node.getUtility(team);
+  let v=Infinity;
+  for(const s of node.children){v=Math.min(v,abMax(s,alpha,beta,team));if(v<=alpha)return v;beta=Math.min(beta,v);}
+  return v;
+}
+
+// ── Tree builder (used inside Worker) ────────────────────────────────────────
+function addNodes(node,teamR,teamL,team,depth){
+  if(depth===0)return;
+  const board=node.boardState;
+  const pieces=[];for(const row of board)for(const p of row)if(p&&p.team.r===team.r)pieces.push(p);
+  let king=null,check=false;
+  for(const p of pieces)if(p instanceof King){king=p;check=p.calcTargets(board);}
+  for(const p of pieces){
+    p.calcTargets(board);
+    if(check&&!(p instanceof King))p.skyFall(king);
+    for(const target of p.targets){
+      const nb=deepCopyGrid(board,teamR,teamL);
+      const np=nb[p.row][p.col];
+      nb[target.row][target.col]=np;
+      if(np instanceof Pawn){
+        const enemy=np.move(target.row,target.col,nb);
+        if(enemy)nb[enemy.row][enemy.col]=null;
+        // auto-promote
+        if((np.startingRow+6)%12===target.row)nb[target.row][target.col]=new Queen(target.row,target.col,np.team);
+      } else if(np instanceof King){
+        const[rl,rt]=np.move(target.row,target.col,nb);
+        if(rl&&rt){nb[rt.row][rt.col]=nb[rl.row][rl.col];nb[rl.row][rl.col]=null;const rp=nb[rt.row][rt.col];if(rp)rp.move(rt.row,rt.col,nb);}
+      } else {np.move(target.row,target.col,nb);}
+      nb[p.row][p.col]=null;
+      const child=new TreeNode(nb,new Cell(p.row,p.col),new Cell(target.row,target.col),teamR,teamL);
+      node.addChild(child);
+    }
+  }
+  const next=team.r===teamL.r?teamR:teamL;
+  for(const child of node.children)addNodes(child,teamR,teamL,next,depth-1);
+}
+
+// ── Worker entry point (runs only inside Worker context) ──────────────────────
+if(typeof self!=='undefined'&&typeof document==='undefined'){
+  self.onmessage=function(e){
+    const d=e.data;
+    const tR=new Team(d.teamR.r,d.teamR.g,d.teamR.b,d.teamR.name);
+    const tL=new Team(d.teamL.r,d.teamL.g,d.teamL.b,d.teamL.name);
+    const grid=deserializeGrid(d.grid,tR,tL);
+    const currentTeam=d.currentTeamIsR?tR:tL;
+    const root=new TreeNode(grid,null,null,tR,tL);
+    addNodes(root,tR,tL,currentTeam,d.depth);
+    const best=alphaBetaSearch(root,currentTeam);
+    if(best)self.postMessage({fromRow:best.oldCell.row,fromCol:best.oldCell.col,toRow:best.newCell.row,toCol:best.newCell.col});
+    else self.postMessage(null);
+  };
+}
+</script>
+
+<script>
+'use strict';
+// ── Constants ─────────────────────────────────────────────────────────────────
+const LEDS=32,SCALE=20,CELL_PX=80; // 4 LEDs per cell × 20px = 80px; 8 cells × 80 = 640px
+const RADIUS=(SCALE-2)/2;
+const RELAY_URL='wss://relay.chess101.net';
+const PROTOCOL_VERSION='1';
+const PALETTE=[
+  [64,180,232,'Blue'],[190,25,255,'Purple'],[254,220,0,'Yellow'],[250,125,125,'Pink'],
+  [25,255,35,'Green'],[245,125,0,'Orange'],[0,25,230,'Dark Blue'],[28,225,180,'Cyan']
+];
+
+// ── Engine source for Worker ──────────────────────────────────────────────────
+const ENGINE_SRC=document.getElementById('chess-engine').textContent;
+
+// ── Canvas setup ──────────────────────────────────────────────────────────────
+const canvas=document.getElementById('board');
+const ctx=canvas.getContext('2d');
+
+// ── LED pixel buffer ──────────────────────────────────────────────────────────
+const buf=new Uint8Array(LEDS*LEDS*3);
+function setPixel(lx,ly,r,g,b){const i=(ly*LEDS+lx)*3;buf[i]=r;buf[i+1]=g;buf[i+2]=b;}
+function getPixel(lx,ly){const i=(ly*LEDS+lx)*3;return[buf[i],buf[i+1],buf[i+2]];}
+function clearBuf(){buf.fill(0);}
+function lightCell(row,col,r,g,b){for(let i=0;i<4;i++)for(let j=0;j<4;j++)setPixel(col*4+j,row*4+i,r,g,b);}
+
+function drawLED(lx,ly,r,g,b){
+  const cx=lx*SCALE+SCALE/2,cy=ly*SCALE+SCALE/2;
+  const bright=r>12||g>12||b>12;
+  if(bright){
+    const grd=ctx.createRadialGradient(cx,cy,0,cx,cy,RADIUS*2.8);
+    grd.addColorStop(0,`rgba(${r},${g},${b},.38)`);grd.addColorStop(1,`rgba(${r},${g},${b},0)`);
+    ctx.fillStyle=grd;ctx.beginPath();ctx.arc(cx,cy,RADIUS*2.8,0,Math.PI*2);ctx.fill();
+  }
+  ctx.fillStyle=`rgb(${r},${g},${b})`;ctx.beginPath();ctx.arc(cx,cy,RADIUS,0,Math.PI*2);ctx.fill();
+  if(bright){
+    ctx.fillStyle='rgba(255,255,255,.22)';ctx.beginPath();
+    ctx.arc(cx-RADIUS*.22,cy-RADIUS*.22,RADIUS*.32,0,Math.PI*2);ctx.fill();
+  }
+}
+
+function flip(){
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  for(let ly=0;ly<LEDS;ly++)for(let lx=0;lx<LEDS;lx++){
+    const[r,g,b]=getPixel(lx,ly);
+    if(r||g||b)drawLED(lx,ly,r,g,b);
+  }
+}
+
+// ── Piece glyphs ──────────────────────────────────────────────────────────────
+const GLYPHS={Pawn:'♟',Rook:'♜',Knight:'♞',Bishop:'♝',Queen:'♛',King:'♚'};
+function pieceGlyph(p){return GLYPHS[p.constructor.name]||'?';}
+
+// ── Game state ────────────────────────────────────────────────────────────────
+const Phase={LOBBY:0,COLOR_PICK:1,WAR_GAMES:2,PLAYING:3,GAME_OVER:4};
+let phase=Phase.LOBBY;
+let grid=null,teamR=null,teamL=null;
+let computerR=null,computerL=null;
+let currentTeam=null;
+let selectedPiece=null;
+let inCheck=false;
+let isDraw=false;
+let winnerTeam=null;
+let moveCount=0;
+let peaceTime=0;
+let promotingPawn=null; // {row,col}
+let aiThinking=false;
+let aiWorker=null;
+let aiDisplayGrid=null;
+
+// Color pick state
+let selectedRIdx=null,selectedLIdx=null;
+
+// Threefold repetition state
+let daysR=[],doubleR=[],daysL=[],doubleL=[];
+
+// Animation state
+let checkerBrightness=0,checkerDir=2;
+let thinkTick=0,lastThinkMs=0;
+let gameOverColors=null,lastGameOverMs=0;
+let blink=false; // 500ms blink for selected piece
+
+// Lobby
+let lobbySelected=0;
+const LOBBY_OPTS=['Play Locally','Host Online','Join Online'];
+const LOBBY_COLORS=[[25,255,35],[64,180,232],[245,125,0]];
+
+// Network state
+let ws=null,wsRole=null,roomCode=null;
+let netPhase='idle'; // idle|connecting|waiting_peer|waiting_game_start
+let peerName=null;
+let localColorSent=false,remoteColorReceived=false;
+let localWarSent=false,remoteWarReceived=false;
+// For local mode these are always true
+function colorReady(){return wsRole==='local'||(localColorSent&&remoteColorReceived);}
+function warReady(){return wsRole==='local'||(localWarSent&&remoteWarReceived);}
+
+// Sidebar log
+const logLines=[];
+
+// ── Turn helpers ─────────────────────────────────────────────────────────────
+function isMyTurn(){
+  if(!currentTeam)return false;
+  if(wsRole==='local')return true;
+  if(wsRole==='host')return currentTeam.r===teamR.r;
+  if(wsRole==='guest')return currentTeam.r===teamL.r;
+  return true;
+}
+function isWaitingForRemote(){return wsRole!=='local'&&!isMyTurn()&&!aiThinking;}
+
+// ── Move log ──────────────────────────────────────────────────────────────────
+const moveLog=[];
+function logMove(team,piece,fromR,fromC,toR,toC,capture){
+  const cols='abcdefgh',rows='87654321';
+  const from=cols[fromC]+rows[fromR],to=cols[toC]+rows[toR];
+  const cap=capture?' x':'';
+  moveLog.push({text:`${team.name}: ${pieceGlyph(piece)} ${from}${cap}→${to}`,teamR:team.r===teamR.r});
+  if(moveLog.length>80)moveLog.shift();
+  addLog(`${team.name}: ${pieceGlyph(piece)} ${from}${cap}→${to}`);
+}
+function addLog(msg){logLines.push({msg,ts:Date.now()});if(logLines.length>60)logLines.shift();}
+
+// ── Board initialization ──────────────────────────────────────────────────────
+function initBoard(){
+  grid=Array.from({length:8},()=>Array(8).fill(null));
+  for(let c=0;c<8;c++)grid[1][c]=new Pawn(1,c,teamR);
+  grid[0][0]=new Rook(0,0,teamR);grid[0][7]=new Rook(0,7,teamR);
+  grid[0][1]=new Knight(0,1,teamR);grid[0][6]=new Knight(0,6,teamR);
+  grid[0][2]=new Bishop(0,2,teamR);grid[0][5]=new Bishop(0,5,teamR);
+  grid[0][3]=new Queen(0,3,teamR);grid[0][4]=new King(0,4,teamR);
+  for(let c=0;c<8;c++)grid[6][c]=new Pawn(6,c,teamL);
+  grid[7][0]=new Rook(7,0,teamL);grid[7][7]=new Rook(7,7,teamL);
+  grid[7][1]=new Knight(7,1,teamL);grid[7][6]=new Knight(7,6,teamL);
+  grid[7][2]=new Bishop(7,2,teamL);grid[7][5]=new Bishop(7,5,teamL);
+  grid[7][3]=new Queen(7,3,teamL);grid[7][4]=new King(7,4,teamL);
+}
+
+function resetGame(){
+  grid=null;teamR=null;teamL=null;computerR=null;computerL=null;
+  currentTeam=null;selectedPiece=null;inCheck=false;isDraw=false;winnerTeam=null;
+  moveCount=0;peaceTime=0;promotingPawn=null;aiThinking=false;
+  if(aiWorker){aiWorker.terminate();aiWorker=null;}
+  aiDisplayGrid=null;selectedRIdx=null;selectedLIdx=null;
+  daysR=[];doubleR=[];daysL=[];doubleL=[];
+  checkerBrightness=0;checkerDir=2;
+  gameOverColors=null;blink=false;
+  moveLog.length=0;logLines.length=0;
+  localColorSent=false;remoteColorReceived=false;localWarSent=false;remoteWarReceived=false;
+  netPhase='idle';
+}
+
+// ── Draw rules ────────────────────────────────────────────────────────────────
+function gridTypeKey(g){return g.map(row=>row.map(p=>p?p.constructor.name[0]:'.')).join('');}
+
+function bobRoss(team){
+  if(peaceTime>=50){triggerDraw();return true;}
+  const days=team.r===teamL.r?daysL:daysR;
+  const dbl=team.r===teamL.r?doubleL:doubleR;
+  const key=gridTypeKey(grid);
+  if(peaceTime===0){days.length=0;dbl.length=0;days.push(key);return false;}
+  if(dbl.some(k=>k===key)){triggerDraw();return true;}
+  if(days.some(k=>k===key)){dbl.push(key);return false;}
+  days.push(key);return false;
+}
+
+function triggerDraw(){isDraw=true;phase=Phase.GAME_OVER;addLog('Draw!');}
+function declareVictory(losingTeam){winnerTeam=losingTeam.r===teamL.r?teamR:teamL;phase=Phase.GAME_OVER;addLog(`${winnerTeam.name} wins by checkmate!`);}
+
+// ── Apply move ────────────────────────────────────────────────────────────────
+function applyMove(oldR,oldC,toR,toC){
+  const piece=grid[toR][toC];
+  if(piece instanceof Pawn){
+    peaceTime=0;
+    const enemy=piece.move(toR,toC,grid);
+    if(enemy)grid[enemy.row][enemy.col]=null;
+    if((piece.startingRow+6)%12===toR){
+      // auto-promote to Queen
+      grid[toR][toC]=new Queen(toR,toC,piece.team);
+      addLog(`${piece.team.name}: Promoted to Queen at ${toR},${toC}`);
+      promotingPawn=null;
+    }
+  } else if(piece instanceof King){
+    const[rl,rt]=piece.move(toR,toC,grid);
+    if(rl&&rt){
+      grid[rt.row][rt.col]=grid[rl.row][rl.col];
+      grid[rl.row][rl.col]=null;
+      const rp=grid[rt.row][rt.col];
+      if(rp)rp.move(rt.row,rt.col,grid);
+    }
+  } else {
+    if(piece)piece.move(toR,toC,grid);
+  }
+  grid[oldR][oldC]=null;
+}
+
+// ── Begin turn ────────────────────────────────────────────────────────────────
+function beginTurn(team){
+  if(bobRoss(team))return;
+  // Clear current team's en_passantable
+  for(const row of grid)for(const p of row)if(p instanceof Pawn&&p.team.r===team.r)p.enPassantable=false;
+  // King first
+  let king=null,kingRow=-1,kingCol=-1;
+  let check=false;
+  for(const row of grid)for(const p of row){
+    if(p instanceof King&&p.team.r===team.r){
+      king=p;check=p.calcTargets(grid);kingRow=p.row;kingCol=p.col;
+    }
+  }
+  // All non-king pieces for current team only
+  let piecesWithMoves=king&&king.getTargets().length>0?1:0;
+  for(const row of grid)for(const p of row){
+    if(!p||p instanceof King||p.team.r!==team.r)continue;
+    p.calcTargets(grid);
+    if(check&&king)p.skyFall(king);
+    if(p.getTargets().length>0)piecesWithMoves++;
+  }
+  if(piecesWithMoves===0){
+    if(!check){triggerDraw();}
+    else{declareVictory(team);}
+    return;
+  }
+  inCheck=check;
+  if(inCheck)addLog(`${team.name} is in check!`);
+  const isAI=(team.r===teamR.r&&computerR)||(team.r===teamL.r&&computerL);
+  if(isAI){aiThinking=true;launchAI();}
+}
+
+function nextTurn(){
+  selectedPiece=null;inCheck=false;aiThinking=false;
+  const next=currentTeam.r===teamR.r?teamL:teamR;
+  currentTeam=next;
+  // Send move to peer if online
+  beginTurn(currentTeam);
+}
+
+// ── AI ────────────────────────────────────────────────────────────────────────
+function launchAI(){
+  if(aiWorker){aiWorker.terminate();aiWorker=null;}
+  // ENGINE_SRC already contains a self.onmessage handler at the end (gated by typeof document==='undefined')
+  const blob=new Blob([ENGINE_SRC],{type:'text/javascript'});
+  aiWorker=new Worker(URL.createObjectURL(blob));
+  aiWorker.onmessage=function(e){
+    if(!aiThinking)return;
+    const move=e.data;
+    if(move){
+      const{fromRow:fr,fromCol:fc,toRow:tr,toCol:tc}=move;
+      const capture=grid[tr][tc];
+      if(capture)peaceTime=0;else peaceTime++;
+      const piece=grid[fr][fc];
+      if(piece){logMove(currentTeam,piece,fr,fc,tr,tc,!!capture);}
+      grid[tr][tc]=grid[fr][fc];
+      applyMove(fr,fc,tr,tc);
+      moveCount++;
+      // Send to peer if online
+      sendMoveToRelay(fr,fc,tr,tc);
+    }
+    aiThinking=false;aiDisplayGrid=null;
+    if(aiWorker){aiWorker.terminate();aiWorker=null;}
+    nextTurn();
+  };
+  aiWorker.postMessage({
+    grid:serializeGrid(grid),
+    teamR:{r:teamR.r,g:teamR.g,b:teamR.b,name:teamR.name},
+    teamL:{r:teamL.r,g:teamL.g,b:teamL.b,name:teamL.name},
+    currentTeamIsR:currentTeam.r===teamR.r,
+    depth:2
+  });
+}
+
+// ── Network relay ─────────────────────────────────────────────────────────────
+function connectRelay(role,code){
+  wsRole=role;roomCode=code||null;
+  ws=new WebSocket(RELAY_URL);
+  ws.onopen=function(){
+    if(role==='host'){
+      ws.send(JSON.stringify({type:'relay_create',player_name:'Browser'}));
+    } else {
+      ws.send(JSON.stringify({type:'relay_join',room_code:code.toUpperCase(),player_name:'Browser'}));
+    }
+    netPhase='connecting';
+  };
+  ws.onmessage=function(e){
+    let msg;try{msg=JSON.parse(e.data);}catch{return;}
+    handleRelayMsg(msg);
+  };
+  ws.onclose=function(){addLog('Disconnected from relay.');};
+  ws.onerror=function(){addLog('Relay connection error.');};
+}
+
+function netSend(obj){if(ws&&ws.readyState===1)ws.send(JSON.stringify(obj));}
+function sendMoveToRelay(fr,fc,tr,tc){
+  if(!ws||wsRole==='local')return;
+  netSend({type:'move',from_row:fr,from_col:fc,to_row:tr,to_col:tc});
+}
+
+function handleRelayMsg(msg){
+  const t=msg.type;
+  if(t==='relay_created'){
+    roomCode=msg.room_code;
+    if(wsRole==='host'){netPhase='waiting_peer';addLog(`Room: ${roomCode}`);}
+    else{
+      // GUEST: send hello after joining
+      netSend({type:'hello',version:PROTOCOL_VERSION,player_name:'Browser',role:'guest'});
+      netPhase='waiting_game_start';
+    }
+  } else if(t==='relay_peer_connected'){
+    peerName=msg.peer_name||'Opponent';
+    if(wsRole==='host'){
+      netSend({type:'hello',version:PROTOCOL_VERSION,player_name:'Browser',role:'host'});
+    }
+  } else if(t==='relay_error'){
+    addLog(`Relay error: ${msg.code}`);phase=Phase.LOBBY;
+  } else if(t==='hello'){
+    peerName=msg.player_name||'Opponent';
+    if(wsRole==='host'){
+      // Send game_setup
+      netSend({type:'game_setup',version:PROTOCOL_VERSION,host_name:'Browser',guest_name:peerName});
+      phase=Phase.COLOR_PICK;
+    }
+  } else if(t==='game_setup'){
+    if(wsRole==='guest'){peerName=msg.host_name||'Host';phase=Phase.COLOR_PICK;}
+  } else if(t==='color_chosen'){
+    const idx=msg.color_idx,key=msg.team_key;
+    const pal=PALETTE[idx];
+    if(key==='r'){teamR.r=pal[0];teamR.g=pal[1];teamR.b=pal[2];teamR.name=pal[3];selectedRIdx=idx;}
+    else{teamL.r=pal[0];teamL.g=pal[1];teamL.b=pal[2];teamL.name=pal[3];selectedLIdx=idx;}
+    remoteColorReceived=true;checkColorComplete();
+  } else if(t==='war_games_choice'){
+    const key=msg.team_key,isAi=!!msg.is_ai;
+    if(key==='r')computerR=isAi;else computerL=isAi;
+    remoteWarReceived=true;checkWarComplete();
+  } else if(t==='game_start'){
+    if(wsRole==='guest')startGame(); // HOST already started via checkWarComplete
+  } else if(t==='move'){
+    handleRemoteMove(msg);
+  } else if(t==='game_event'){
+    const ev=msg.event;
+    if(ev==='checkmate'||ev==='stalemate')phase=Phase.GAME_OVER;
+  } else if(t==='new_game'){
+    resetGame();phase=Phase.LOBBY;
+  }
+}
+
+function checkColorComplete(){
+  if(selectedRIdx===null||selectedLIdx===null)return;
+  if(!colorReady())return;
+  teamR.r+=1; // BUG-02 preserved
+  phase=Phase.WAR_GAMES;
+}
+function checkWarComplete(){
+  if(computerR===null||computerL===null)return;
+  if(!warReady())return;
+  if(wsRole==='host'){netSend({type:'game_start'});}
+  if(wsRole!=='guest')startGame();
+  // GUEST waits for game_start message from host
+}
+
+function handleRemoteMove(msg){
+  const fr=msg.from_row,fc=msg.from_col,tr=msg.to_row,tc=msg.to_col;
+  if(!grid)return;
+  const capture=grid[tr][tc];
+  if(capture)peaceTime=0;else peaceTime++;
+  const piece=grid[fr][fc];
+  if(piece)logMove(currentTeam,piece,fr,fc,tr,tc,!!capture);
+  grid[tr][tc]=grid[fr][fc];
+  applyMove(fr,fc,tr,tc);
+  moveCount++;
+  nextTurn();
+}
+
+// ── Start game ────────────────────────────────────────────────────────────────
+function startGame(){
+  initBoard();
+  currentTeam=teamR;
+  phase=Phase.PLAYING;
+  addLog(`Game start! ${teamR.name} vs ${teamL.name}`);
+  beginTurn(currentTeam);
+}
+
+// ── Color picker teams ────────────────────────────────────────────────────────
+function initTeams(){
+  teamR=new Team(64,180,232,'Blue');
+  teamL=new Team(190,25,255,'Purple');
+}
+
+// ── Rendering ─────────────────────────────────────────────────────────────────
+function renderLobby(now){
+  clearBuf();
+  for(let opt=0;opt<3;opt++){
+    const sel=lobbySelected===opt;
+    const[r,g,b]=LOBBY_COLORS[opt];
+    const scale=sel?1:0.35; // unselected options stay visible at 35%
+    // rows 0-1 = opt0, 2-3 = opt1, 4-5 = opt2
+    for(let col=0;col<8;col++){
+      lightCell(opt*2,col,Math.floor(r*scale),Math.floor(g*scale),Math.floor(b*scale));
+      lightCell(opt*2+1,col,Math.floor(r*scale*0.4),Math.floor(g*scale*0.4),Math.floor(b*scale*0.4));
+    }
+  }
+  flip();
+}
+
+function renderColorPick(now){
+  clearBuf();
+  const t=now/1000;
+  for(let col=0;col<8;col++){
+    const[pr,pg,pb]=PALETTE[col];
+    // Row 2 = team R, row 5 = team L
+    const dimR=selectedLIdx===col?0.25:1;
+    const dimL=selectedRIdx===col?0.25:1;
+    lightCell(2,col,Math.floor(pr*dimR),Math.floor(pg*dimR),Math.floor(pb*dimR));
+    lightCell(5,col,Math.floor(pr*dimL),Math.floor(pg*dimL),Math.floor(pb*dimL));
+  }
+  // Show selected
+  if(selectedRIdx!==null){const[r,g,b]=PALETTE[selectedRIdx];lightCell(2,selectedRIdx,r,g,b);}
+  if(selectedLIdx!==null){const[r,g,b]=PALETTE[selectedLIdx];lightCell(5,selectedLIdx,r,g,b);}
+  flip();
+}
+
+function renderWarGames(now){
+  clearBuf();
+  // Row 3 = team R: cols 0-3 human (solid teamR), cols 4-7 AI (white+dot)
+  // Row 4 = team L: cols 0-3 AI (white+dot), cols 4-7 human (solid teamL)
+  if(computerR===null){
+    // Not yet chosen: left half = Human option (team color), right half = AI option (dim + dot)
+    for(let c=0;c<4;c++){if(teamR)lightCell(3,c,teamR.r,teamR.g,teamR.b);}
+    for(let c=4;c<8;c++)lightCell(3,c,30,30,30);
+    const dotR=(Math.floor(now/200)%4)+4;
+    lightCell(3,dotR,200,200,200);
+  } else if(computerR){
+    // AI chosen: whole row animates as AI
+    for(let c=0;c<8;c++)lightCell(3,c,30,30,30);
+    const dotR=Math.floor(now/200)%8;
+    lightCell(3,dotR,200,200,200);
+  } else {
+    // Human chosen: whole row lights up team color
+    for(let c=0;c<8;c++){if(teamR)lightCell(3,c,teamR.r,teamR.g,teamR.b);}
+  }
+  if(computerL===null){
+    // Not yet chosen: left half = AI option (dim + dot), right half = Human option (team color)
+    for(let c=0;c<4;c++)lightCell(4,c,30,30,30);
+    const dotL=3-(Math.floor(now/200)%4);
+    lightCell(4,dotL,200,200,200);
+    for(let c=4;c<8;c++){if(teamL)lightCell(4,c,teamL.r,teamL.g,teamL.b);}
+  } else if(computerL){
+    // AI chosen: whole row animates as AI
+    for(let c=0;c<8;c++)lightCell(4,c,30,30,30);
+    const dotL=7-(Math.floor(now/200)%8);
+    lightCell(4,dotL,200,200,200);
+  } else {
+    // Human chosen: whole row lights up team color
+    for(let c=0;c<8;c++){if(teamL)lightCell(4,c,teamL.r,teamL.g,teamL.b);}
+  }
+  flip();
+}
+
+function renderPlaying(now){
+  clearBuf();
+  // Checker background — pulse when AI thinking or waiting for remote opponent
+  if(aiThinking||isWaitingForRemote()){
+    checkerBrightness+=checkerDir;
+    if(checkerBrightness<=0){checkerBrightness=0;checkerDir=2;}
+    if(checkerBrightness>=255){checkerBrightness=255;checkerDir=-2;}
+  } else {
+    checkerBrightness=60;
+  }
+  const cb=checkerBrightness;
+  for(let r=0;r<8;r++)for(let c=0;c<8;c++){
+    const light=(r+c)%2===0;
+    if(light){
+      const v=Math.min(255,Math.floor(cb*3.2));
+      lightCell(r,c,v,v,Math.min(255,Math.floor(v*1.05)));
+    } else {
+      const v=Math.floor(cb*0.10);
+      lightCell(r,c,v,v,v);
+    }
+  }
+
+  // AI display board overlay
+  const displayGrid=aiThinking&&aiDisplayGrid?aiDisplayGrid:grid;
+
+  // Draw pieces — outer LEDs keep checker color; only center 2×2 is painted with team color
+  if(displayGrid){
+    for(let r=0;r<8;r++)for(let c=0;c<8;c++){
+      const p=displayGrid[r][c];if(!p)continue;
+      for(let i=1;i<=2;i++)for(let j=1;j<=2;j++){
+        setPixel(c*4+j,r*4+i,p.team.r,p.team.g,p.team.b);
+      }
+    }
+  }
+
+  // Highlight targets
+  if(selectedPiece&&!aiThinking){
+    for(const t of selectedPiece.targets){
+      lightCell(t.row,t.col,Math.floor(selectedPiece.team.r*0.6),Math.floor(selectedPiece.team.g*0.6),Math.floor(selectedPiece.team.b*0.6));
+    }
+  }
+
+  // Selected piece blink
+  if(selectedPiece&&!aiThinking){
+    const blinkOn=Math.floor(now/500)%2===0;
+    if(blinkOn){lightCell(selectedPiece.row,selectedPiece.col,255,255,255);}
+    else if(grid&&grid[selectedPiece.row]&&grid[selectedPiece.row][selectedPiece.col]){
+      const p=grid[selectedPiece.row][selectedPiece.col];
+      if(p)lightCell(selectedPiece.row,selectedPiece.col,p.team.r,p.team.g,p.team.b);
+    }
+  }
+
+  // Check flash
+  if(inCheck&&grid){
+    for(let r=0;r<8;r++)for(let c=0;c<8;c++){
+      const p=grid[r][c];
+      if(p instanceof King&&p.team.r===currentTeam.r){
+        const checkOn=Math.floor(now/250)%2===0;
+        if(checkOn)lightCell(r,c,255,50,50);
+      }
+    }
+  }
+
+  flip();
+  drawPieceOverlay(displayGrid);
+}
+
+function renderGameOver(now){
+  clearBuf();
+  if(isDraw){
+    for(let r=0;r<4;r++)for(let c=0;c<8;c++){if(teamR)lightCell(r,c,teamR.r,teamR.g,teamR.b);}
+    for(let r=4;r<8;r++)for(let c=0;c<8;c++){if(teamL)lightCell(r,c,teamL.r,teamL.g,teamL.b);}
+  } else if(winnerTeam){
+    const w=winnerTeam;
+    if(!gameOverColors||now-lastGameOverMs>=50){
+      gameOverColors=Array.from({length:6},()=>Array.from({length:6},()=>[Math.random()*255|0,Math.random()*255|0,Math.random()*255|0]));
+      lastGameOverMs=now;
+    }
+    // Border in winner color
+    for(let m=0;m<8;m++){lightCell(m,0,w.r,w.g,w.b);lightCell(m,7,w.r,w.g,w.b);}
+    for(let m=0;m<8;m++){lightCell(0,m,w.r,w.g,w.b);lightCell(7,m,w.r,w.g,w.b);}
+    // Inner 6x6 random
+    for(let r=0;r<6;r++)for(let c=0;c<6;c++){const[ir,ig,ib]=gameOverColors[r][c];lightCell(r+1,c+1,ir,ig,ib);}
+  }
+  flip();
+}
+
+function drawPieceOverlay(g){
+  if(!g)return;
+  ctx.save();
+  ctx.textAlign='center';ctx.textBaseline='middle';
+  const fs=Math.floor(CELL_PX*0.52);
+  ctx.font=`bold ${fs}px serif`;
+  for(let r=0;r<8;r++)for(let c=0;c<8;c++){
+    const p=g[r][c];if(!p)continue;
+    const cx=c*CELL_PX+CELL_PX/2,cy=r*CELL_PX+CELL_PX/2;
+    const isBlackTeam=teamL&&p.team.r===teamL.r;
+    const outlineColor=isBlackTeam?'rgba(255,255,255,0.9)':'rgba(0,0,0,0.85)';
+    const fillColor=isBlackTeam?'rgba(10,10,10,0.97)':'rgba(255,255,255,0.95)';
+    ctx.fillStyle=outlineColor;
+    ctx.fillText(pieceGlyph(p),cx-1,cy-1);
+    ctx.fillText(pieceGlyph(p),cx+1,cy-1);
+    ctx.fillText(pieceGlyph(p),cx-1,cy+1);
+    ctx.fillText(pieceGlyph(p),cx+1,cy+1);
+    ctx.fillStyle=fillColor;
+    ctx.fillText(pieceGlyph(p),cx,cy);
+  }
+  ctx.restore();
+}
+
+function render(now){
+  if(phase===Phase.LOBBY)renderLobby(now);
+  else if(phase===Phase.COLOR_PICK)renderColorPick(now);
+  else if(phase===Phase.WAR_GAMES)renderWarGames(now);
+  else if(phase===Phase.PLAYING)renderPlaying(now);
+  else if(phase===Phase.GAME_OVER)renderGameOver(now);
+}
+
+// ── Sidebar panel ─────────────────────────────────────────────────────────────
+function renderPanel(){
+  const top=document.getElementById('panel-top');
+  const phaseNames=['LOBBY','COLOR PICK','WAR GAMES','PLAYING','GAME OVER'];
+  let html=`<div class="p-label">Phase</div><div class="p-val accent">${phaseNames[phase]||''}</div>`;
+  if(phase===Phase.LOBBY){
+    html+=`<div class="p-label" style="margin-top:14px">Select Mode</div>`;
+    for(let i=0;i<LOBBY_OPTS.length;i++){
+      const sel=lobbySelected===i;
+      const[r,g,b]=LOBBY_COLORS[i];
+      const col=sel?`rgb(${r},${g},${b})`:'#3a4a60';
+      const prefix=sel?'▶ ':'  ';
+      html+=`<div class="p-val" style="color:${col};margin-top:6px;cursor:pointer" onclick="lobbySelect(${i})">${prefix}${LOBBY_OPTS[i]}</div>`;
+    }
+    html+=`<div style="margin-top:10px;font-size:10px;color:#2a3a50">↑↓ arrows · Enter · click</div>`;
+  }
+  if(phase>=Phase.PLAYING&&currentTeam){
+    html+=`<div class="p-label">Turn</div><div class="p-val"><span class="p-swatch" style="background:rgb(${currentTeam.r},${currentTeam.g},${currentTeam.b})"></span>${currentTeam.name}</div>`;
+    html+=`<div class="p-label">Move</div><div class="p-val">${moveCount}</div>`;
+    const pct=Math.min(100,peaceTime*2);
+    html+=`<div class="p-label">Peace-time <span style="color:#8090a0">${peaceTime}/50</span></div><div class="p-bar-wrap"><div class="p-bar" style="width:${pct}%;background:${peaceTime>40?'#ff6060':'#00ff88'}"></div></div>`;
+    if(inCheck)html+=`<div class="p-alert check">⚠ CHECK</div>`;
+    if(aiThinking)html+=`<div class="p-alert ai">AI thinking…</div>`;
+    if(isWaitingForRemote())html+=`<div class="p-alert ai">Waiting for opponent…</div>`;
+  }
+  if(phase===Phase.COLOR_PICK||phase===Phase.WAR_GAMES){
+    if(teamR)html+=`<div class="p-label">Team Right</div><div class="p-val"><span class="p-swatch" style="background:rgb(${teamR.r},${teamR.g},${teamR.b})"></span>${teamR.name}</div>`;
+    if(teamL)html+=`<div class="p-label">Team Left</div><div class="p-val"><span class="p-swatch" style="background:rgb(${teamL.r},${teamL.g},${teamL.b})"></span>${teamL.name}</div>`;
+  }
+  if(phase===Phase.GAME_OVER){
+    html+=`<div class="p-label">Result</div>`;
+    if(isDraw)html+=`<div class="p-val">Draw</div>`;
+    else if(winnerTeam)html+=`<div class="p-val accent">${winnerTeam.name} wins!</div>`;
+    html+=`<div style="margin-top:12px;font-size:11px;color:#3a4a60">Press N to play again</div>`;
+  }
+  if(roomCode&&wsRole!=='local')html+=`<div class="p-alert room">ROOM: ${roomCode}</div>`;
+  if(netPhase==='waiting_peer')html+=`<div class="p-alert ai">Waiting for opponent…</div>`;
+  top.innerHTML=html;
+
+  const logDiv=document.getElementById('panel-log');
+  const recent=logLines.slice(-30);
+  logDiv.innerHTML=recent.map((l,i)=>`<div class="log-entry${i>=recent.length-3?' recent':''}">${escHtml(l.msg)}</div>`).join('');
+  logDiv.scrollTop=logDiv.scrollHeight;
+}
+
+function escHtml(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+
+// ── Input handling ────────────────────────────────────────────────────────────
+function pxToCell(px,py){
+  const col=Math.floor(px/CELL_PX),row=Math.floor(py/CELL_PX);
+  if(col<0||col>7||row<0||row>7)return null;
+  return[row,col];
+}
+
+canvas.addEventListener('click',function(e){
+  const rect=canvas.getBoundingClientRect();
+  const px=(e.clientX-rect.left)*(canvas.width/rect.width);
+  const py=(e.clientY-rect.top)*(canvas.height/rect.height);
+  handleClick(px,py);
+});
+
+function handleClick(px,py){
+  const cell=pxToCell(px,py);
+  if(phase===Phase.LOBBY){handleLobbyClick(cell);return;}
+  if(phase===Phase.COLOR_PICK){handleColorPickClick(cell);return;}
+  if(phase===Phase.WAR_GAMES){handleWarGamesClick(cell);return;}
+  if(phase===Phase.PLAYING){handlePlayingClick(cell);return;}
+  if(phase===Phase.GAME_OVER)return;
+}
+
+function handleLobbyClick(cell){
+  if(!cell)return;
+  const[row]=cell;
+  const opt=Math.floor(row/2); // rows 0-1=opt0, 2-3=opt1, 4-5=opt2
+  if(opt>=0&&opt<3)lobbySelect(opt);
+}
+
+function lobbySelect(opt){
+  lobbySelected=opt;
+  if(opt===0){
+    wsRole='local';initTeams();phase=Phase.COLOR_PICK;
+    addLog('Local game selected.');
+  } else if(opt===1){
+    initTeams();connectRelay('host');
+    addLog('Connecting to relay…');
+  } else if(opt===2){
+    initTeams();showJoinOverlay();
+  }
+}
+
+function handleColorPickClick(cell){
+  if(!cell||!teamR||!teamL)return;
+  const[row,col]=cell;
+  // Online: HOST controls row 2 (team_r), GUEST controls row 5 (team_l)
+  if(row===2){
+    if(wsRole==='guest')return; // GUEST doesn't pick team_r
+    selectedRIdx=col;
+    const p=PALETTE[col];teamR.r=p[0];teamR.g=p[1];teamR.b=p[2];teamR.name=p[3];
+    if(wsRole!=='local'){netSend({type:'color_chosen',team_key:'r',color_idx:col});localColorSent=true;}
+  } else if(row===5){
+    if(wsRole==='host')return; // HOST doesn't pick team_l
+    selectedLIdx=col;
+    const p=PALETTE[col];teamL.r=p[0];teamL.g=p[1];teamL.b=p[2];teamL.name=p[3];
+    if(wsRole!=='local'){netSend({type:'color_chosen',team_key:'l',color_idx:col});localColorSent=true;}
+  }
+  checkColorComplete();
+}
+
+function handleWarGamesClick(cell){
+  if(!cell||!teamR||!teamL)return;
+  const[row,col]=cell;
+  // Online: HOST controls row 3 (team_r), GUEST controls row 4 (team_l)
+  if(row===3){
+    if(wsRole==='guest')return;
+    computerR=col>=4; // cols 0-3=Human, cols 4-7=AI
+    if(wsRole!=='local'){netSend({type:'war_games_choice',team_key:'r',is_ai:computerR});localWarSent=true;}
+    checkWarComplete();
+  } else if(row===4){
+    if(wsRole==='host')return;
+    computerL=col<4; // cols 0-3=AI, cols 4-7=Human (kitty-corner)
+    if(wsRole!=='local'){netSend({type:'war_games_choice',team_key:'l',is_ai:computerL});localWarSent=true;}
+    checkWarComplete();
+  }
+}
+
+function handlePlayingClick(cell){
+  if(aiThinking)return;
+  const isAI=(currentTeam.r===teamR.r&&computerR)||(currentTeam.r===teamL.r&&computerL);
+  if(isAI||!isMyTurn())return;
+  if(!cell){selectedPiece=null;return;}
+  const[row,col]=cell;
+  if(selectedPiece){
+    // Try to move
+    for(const t of selectedPiece.targets){
+      if(t.row===row&&t.col===col){
+        const oldR=selectedPiece.row,oldC=selectedPiece.col;
+        const capture=grid[row][col];
+        if(capture)peaceTime=0;else peaceTime++;
+        logMove(currentTeam,selectedPiece,oldR,oldC,row,col,!!capture);
+        grid[row][col]=grid[oldR][oldC];
+        applyMove(oldR,oldC,row,col);
+        moveCount++;
+        selectedPiece=null;
+        sendMoveToRelay(oldR,oldC,row,col);
+        nextTurn();
+        return;
+      }
+    }
+    // Click same piece = deselect; click another friendly = select it
+    const p=grid[row][col];
+    if(p&&p===selectedPiece)selectedPiece=null;
+    else if(p&&p.team.r===currentTeam.r)selectedPiece=p;
+    else selectedPiece=null;
+  } else {
+    const p=grid[row][col];
+    if(p&&p.team.r===currentTeam.r)selectedPiece=p;
+  }
+}
+
+// ── Keyboard ──────────────────────────────────────────────────────────────────
+document.addEventListener('keydown',function(e){
+  if(e.key==='n'||e.key==='N'){
+    if(phase===Phase.GAME_OVER||phase===Phase.PLAYING){
+      if(ws&&wsRole!=='local')netSend({type:'new_game'});
+      resetGame();phase=Phase.LOBBY;
+    }
+  }
+  if(phase===Phase.LOBBY){
+    if(e.key==='ArrowDown')lobbySelected=(lobbySelected+1)%3;
+    if(e.key==='ArrowUp')lobbySelected=(lobbySelected+2)%3;
+    if(e.key==='Enter')lobbySelect(lobbySelected);
+  }
+});
+
+// ── Join overlay ──────────────────────────────────────────────────────────────
+function showJoinOverlay(){
+  document.getElementById('join-overlay').classList.add('show');
+  document.getElementById('room-input').value='';
+  document.getElementById('room-input').focus();
+}
+function hideJoinOverlay(){document.getElementById('join-overlay').classList.remove('show');}
+
+document.getElementById('join-btn').addEventListener('click',function(){
+  const code=document.getElementById('room-input').value.trim().toUpperCase();
+  if(code.length!==6){alert('Enter a 6-character room code.');return;}
+  hideJoinOverlay();
+  connectRelay('guest',code);
+  addLog(`Joining room ${code}…`);
+});
+document.getElementById('cancel-btn').addEventListener('click',function(){
+  hideJoinOverlay();phase=Phase.LOBBY;
+});
+document.getElementById('room-input').addEventListener('keydown',function(e){
+  if(e.key==='Enter')document.getElementById('join-btn').click();
+  if(e.key==='Escape')document.getElementById('cancel-btn').click();
+});
+document.getElementById('room-input').addEventListener('input',function(){
+  this.value=this.value.toUpperCase();
+});
+
+// ── Animation loop ────────────────────────────────────────────────────────────
+let lastPanelMs=0;
+function frame(now){
+  render(now);
+  if(now-lastPanelMs>100){renderPanel();lastPanelMs=now;}
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+
+// ── Initial log ───────────────────────────────────────────────────────────────
+addLog('Chess101 Browser Simulator');
+addLog('Select a mode to begin.');
+</script>
+</body>
+</html>
