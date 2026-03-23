@@ -123,10 +123,13 @@ def encode(code: str) -> list[list[tuple[int, int, int]]]:
     raw = _cm.encode(payload)   # list[list[int]] or flat list[int]
 
     # Normalise: accept both flat (64 ints) and 8×8 nested lists.
+    # Flat layout is assumed to be row-major (row-first), same as nested.
     if raw and not isinstance(raw[0], (list, tuple)):
         raw = [raw[i * 8:(i + 1) * 8] for i in range(8)]
 
-    return [[_CM_RGB.get(int(raw[r][c]), (0, 0, 0)) for c in range(8)]
+    # The library returns row-major: raw[row][col].  No transpose needed —
+    # pass through directly so grid[row][col] matches what decode() expects.
+    return [[_CM_RGB.get(int(raw[r][c]), (255, 255, 255)) for c in range(8)]
             for r in range(8)]
 
 
@@ -143,6 +146,10 @@ def render_to_led(grid: list[list[tuple[int, int, int]]], canvas: object) -> Non
     This function is hardware-agnostic: it works with ``FakeFrameCanvas``
     (simulator) and the real Pi ``FrameCanvas`` (Phase 2).
 
+    The codebase-wide ``SetPixel`` convention is ``SetPixel(x=row_pixel,
+    y=col_pixel)``, matching ``light_cell()`` in ``ui/renderer.py`` and the
+    ``FakeFrameCanvas`` implementation.
+
     Args:
         grid: An 8×8 list of (R, G, B) tuples, e.g. from ``encode()``.
         canvas: Any object with ``SetPixel(x, y, r, g, b)``.
@@ -150,11 +157,11 @@ def render_to_led(grid: list[list[tuple[int, int, int]]], canvas: object) -> Non
     for row in range(8):
         for col in range(8):
             r, g, b = grid[row][col]
-            px_x = col * 4   # LED pixel column start
-            px_y = row * 4   # LED pixel row start
-            for dy in range(4):
-                for dx in range(4):
-                    canvas.SetPixel(px_x + dx, px_y + dy, r, g, b)  # type: ignore[attr-defined]
+            for di in range(4):
+                for dj in range(4):
+                    # Codebase convention: SetPixel(x=row_pixel, y=col_pixel)
+                    # matches light_cell() in ui/renderer.py and FakeFrameCanvas.
+                    canvas.SetPixel(row * 4 + di, col * 4 + dj, r, g, b)  # type: ignore[attr-defined]
 
 
 # ── Decode from camera frame ────────────────────────────────────────────────

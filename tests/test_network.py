@@ -685,3 +685,59 @@ class TestChessMatrix:
         for bad in ("A1BCDE", "123456", "ABCDE1"):
             with pytest.raises(ValueError):
                 room_code_to_bytes(bad)
+
+    # ── encode() tests (mock the chessmatrix library) ──────────────────────
+
+    def _make_raw(self, mapping: dict) -> list:
+        """Build an 8×8 nested list (raw[row][col]) with given (row, col) → value."""
+        raw = [[0] * 8 for _ in range(8)]
+        for (row, col), val in mapping.items():
+            raw[row][col] = val
+        return raw
+
+    def test_unknown_color_index_renders_as_white(self):
+        """Color values outside 0-3 (structural / border cells) render as white."""
+        from unittest.mock import patch
+        import importlib
+        # All cells return value 4 (not a data color — simulates white border cells)
+        raw = [[4] * 8 for _ in range(8)]
+        with patch.dict("sys.modules", {"chessmatrix": type("cm", (), {"encode": staticmethod(lambda d: raw)})()} ):
+            import network.chessmatrix as cm_mod
+            importlib.reload(cm_mod)
+            grid = cm_mod.encode("AAAAAA")
+        assert all(
+            grid[r][c] == (255, 255, 255)
+            for r in range(8) for c in range(8)
+        ), "All unknown-index cells should render as white"
+
+    def test_data_colors_map_correctly(self):
+        """0=black, 1=red, 2=green, 3=blue in the encode output."""
+        from unittest.mock import patch
+        import importlib
+        # raw[row][col]: put each color at a distinct (row=0, col) position
+        raw = self._make_raw({(0, 0): 0, (0, 1): 1, (0, 2): 2, (0, 3): 3})
+        with patch.dict("sys.modules", {"chessmatrix": type("cm", (), {"encode": staticmethod(lambda d: raw)})()} ):
+            import network.chessmatrix as cm_mod
+            importlib.reload(cm_mod)
+            grid = cm_mod.encode("AAAAAA")
+        # Library is row-major: raw[row][col] → grid[row][col] directly
+        assert grid[0][0] == (0,   0,   0),   "BLACK at grid[0][0]"
+        assert grid[0][1] == (220, 0,   0),   "RED at grid[0][1]"
+        assert grid[0][2] == (0,   180, 0),   "GREEN at grid[0][2]"
+        assert grid[0][3] == (0,   0,   220), "BLUE at grid[0][3]"
+
+    def test_encode_preserves_row_major_layout(self):
+        """Library raw[row][col] passes through directly to grid[row][col].
+
+        Places a sentinel RED cell at raw[row=5][col=2].  encode() must
+        preserve this: grid[row=5][col=2] = RED, not grid[row=2][col=5].
+        """
+        from unittest.mock import patch
+        import importlib
+        raw = self._make_raw({(5, 2): 1})   # raw[row=5][col=2] = RED
+        with patch.dict("sys.modules", {"chessmatrix": type("cm", (), {"encode": staticmethod(lambda d: raw)})()} ):
+            import network.chessmatrix as cm_mod
+            importlib.reload(cm_mod)
+            grid = cm_mod.encode("AAAAAA")
+        assert grid[5][2] == (220, 0, 0), "Sentinel RED must appear at grid[row=5][col=2]"
+        assert grid[2][5] == (0, 0, 0),   "Transposed position grid[row=2][col=5] must be black"
