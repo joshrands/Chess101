@@ -503,7 +503,11 @@ class NetworkedGameRunner(GameRunner):
             return
         if self._role in (NetworkRole.HOST, NetworkRole.ONLINE_HOST):
             logger.info("Both war_games choices received — sending game_start")
-            self._net_send({"type": "game_start"})
+            self._net_send({
+                "type": "game_start",
+                "team_r": {"r": b.team_r.r, "g": b.team_r.g, "b": b.team_r.b},
+                "team_l": {"r": b.team_l.r, "g": b.team_l.g, "b": b.team_l.b},
+            })
             self._start_game()
         # GUEST waits for game_start message
 
@@ -587,6 +591,8 @@ class NetworkedGameRunner(GameRunner):
                 (msg.get("from_row"), msg.get("from_col")),
                 (msg.get("to_row"),   msg.get("to_col")),
             )
+            self._waiting_for_ack = False
+            self._net_send({"type": "board_sync_request"})  # resync with peer's board state
         else:
             logger.error("Relay error: %s", code)
 

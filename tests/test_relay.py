@@ -825,3 +825,167 @@ class TestAntiCheat:
             assert nothing is None, f"Guest received the illegal move: {nothing}"
         finally:
             h_ws.close(); g_ws.close()
+
+
+# ── TestGameProtocolForwarding ─────────────────────────────────────────────────
+
+
+class TestGameProtocolForwarding:
+    """Verify that every actual game-protocol message type passes through the
+    relay unchanged — guaranteeing identical behaviour with and without relay.
+
+    Each test sends a real game message from one side and asserts the other
+    side receives an identical copy.  The relay must NOT modify, drop, or
+    reorder game-layer messages.
+    """
+
+    def _pair(self, relay_url):
+        """Return (h_ws, g_ws) with both connected and relay_peer_connected drained."""
+        h_ws, code, _ = _do_host(relay_url)
+        g_ws, _       = _do_guest(relay_url, code)
+        _recv(h_ws)    # drain relay_peer_connected on host side
+        return h_ws, g_ws
+
+    # ── Negotiation messages (host → guest) ──────────────────────────────────
+
+    def test_hello_forwarded(self, relay_url):
+        h_ws, g_ws = self._pair(relay_url)
+        msg = {"type": "hello", "version": "1", "player_name": "Alice", "role": "host"}
+        _send(h_ws, msg)
+        received = _recv(g_ws)
+        try:
+            assert received == msg, f"hello not forwarded intact: {received}"
+        finally:
+            h_ws.close(); g_ws.close()
+
+    def test_game_setup_forwarded(self, relay_url):
+        h_ws, g_ws = self._pair(relay_url)
+        msg = {"type": "game_setup", "version": "1",
+               "host_name": "Alice", "guest_name": "Bob"}
+        _send(h_ws, msg)
+        received = _recv(g_ws)
+        try:
+            assert received == msg
+        finally:
+            h_ws.close(); g_ws.close()
+
+    def test_color_chosen_forwarded(self, relay_url):
+        h_ws, g_ws = self._pair(relay_url)
+        msg = {"type": "color_chosen", "team_key": "r", "color_idx": 3}
+        _send(h_ws, msg)
+        received = _recv(g_ws)
+        try:
+            assert received == msg
+        finally:
+            h_ws.close(); g_ws.close()
+
+    def test_war_games_choice_forwarded(self, relay_url):
+        h_ws, g_ws = self._pair(relay_url)
+        msg = {"type": "war_games_choice", "team_key": "r", "is_ai": False}
+        _send(h_ws, msg)
+        received = _recv(g_ws)
+        try:
+            assert received == msg
+        finally:
+            h_ws.close(); g_ws.close()
+
+    def test_game_start_forwarded(self, relay_url):
+        """game_start (with team colors) reaches guest and is not consumed by relay."""
+        h_ws, g_ws = self._pair(relay_url)
+        msg = {
+            "type": "game_start",
+            "team_r": {"r": 65,  "g": 180, "b": 232},
+            "team_l": {"r": 255, "g": 140, "b": 0},
+        }
+        _send(h_ws, msg)
+        received = _recv(g_ws)
+        try:
+            assert received == msg, (
+                "game_start must be forwarded to guest unchanged; "
+                "relay should not strip or modify it"
+            )
+        finally:
+            h_ws.close(); g_ws.close()
+
+    # ── Move round-trip (both directions) ────────────────────────────────────
+
+    def test_move_forwarded_host_to_guest(self, relay_url):
+        h_ws, g_ws = self._pair(relay_url)
+        msg = {
+            "type": "move", "seq": 1,
+            "from_row": 1, "from_col": 4, "to_row": 3, "to_col": 4,
+            "piece": "Pawn", "flags": {}, "board_hash": "abc123",
+        }
+        _send(h_ws, msg)
+        received = _recv(g_ws)
+        try:
+            assert received == msg
+        finally:
+            h_ws.close(); g_ws.close()
+
+    def test_move_ack_forwarded_guest_to_host(self, relay_url):
+        h_ws, g_ws = self._pair(relay_url)
+        msg = {"type": "move_ack", "seq": 1, "status": "ok", "board_hash": "abc123"}
+        _send(g_ws, msg)
+        received = _recv(h_ws)
+        try:
+            assert received == msg
+        finally:
+            h_ws.close(); g_ws.close()
+
+    # ── Keepalive (ping → pong round-trip through relay) ─────────────────────
+
+    def test_ping_forwarded(self, relay_url):
+        h_ws, g_ws = self._pair(relay_url)
+        msg = {"type": "ping", "seq": 42}
+        _send(h_ws, msg)
+        received = _recv(g_ws)
+        try:
+            assert received == msg, "ping must pass through relay unchanged"
+        finally:
+            h_ws.close(); g_ws.close()
+
+    def test_pong_forwarded(self, relay_url):
+        h_ws, g_ws = self._pair(relay_url)
+        msg = {"type": "pong", "seq": 42}
+        _send(g_ws, msg)
+        received = _recv(h_ws)
+        try:
+            assert received == msg, "pong must pass through relay unchanged"
+        finally:
+            h_ws.close(); g_ws.close()
+
+    # ── Post-game reset ───────────────────────────────────────────────────────
+
+    def test_new_game_forwarded(self, relay_url):
+        h_ws, g_ws = self._pair(relay_url)
+        msg = {"type": "new_game"}
+        _send(h_ws, msg)
+        received = _recv(g_ws)
+        try:
+            assert received == msg
+        finally:
+            h_ws.close(); g_ws.close()
+
+    # ── Desync recovery ───────────────────────────────────────────────────────
+
+    def test_board_sync_request_forwarded(self, relay_url):
+        h_ws, g_ws = self._pair(relay_url)
+        msg = {"type": "board_sync_request"}
+        _send(h_ws, msg)
+        received = _recv(g_ws)
+        try:
+            assert received == msg
+        finally:
+            h_ws.close(); g_ws.close()
+
+    def test_board_sync_forwarded(self, relay_url):
+        h_ws, g_ws = self._pair(relay_url)
+        msg = {"type": "board_sync", "grid": [], "peace_time": 0,
+               "current_team_key": "r", "move_count": 5}
+        _send(g_ws, msg)
+        received = _recv(h_ws)
+        try:
+            assert received == msg
+        finally:
+            h_ws.close(); g_ws.close()

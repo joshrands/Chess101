@@ -481,3 +481,72 @@ class TestNewGameRematch:
 
         assert runner._local_color_sent is False
         assert runner._selected_r_idx is None
+
+
+# ── relay_error handling ──────────────────────────────────────────────────────
+
+class TestRelayErrorHandling:
+    """relay_error(illegal_move) must unblock _waiting_for_ack and trigger sync."""
+
+    def test_illegal_move_clears_waiting_for_ack(self, _pygame):
+        runner, relay = _make_online_runner(NetworkRole.ONLINE_HOST, _pygame)
+        runner._waiting_for_ack = True
+
+        runner._dispatch({"type": "relay_error", "code": "illegal_move",
+                          "from_row": 6, "from_col": 4, "to_row": 4, "to_col": 4})
+
+        assert runner._waiting_for_ack is False, (
+            "illegal_move relay_error must clear _waiting_for_ack "
+            "so the game does not freeze"
+        )
+
+    def test_illegal_move_sends_board_sync_request(self, _pygame):
+        runner, relay = _make_online_runner(NetworkRole.ONLINE_HOST, _pygame)
+        runner._waiting_for_ack = True
+        relay.sent.clear()
+
+        runner._dispatch({"type": "relay_error", "code": "illegal_move",
+                          "from_row": 6, "from_col": 4, "to_row": 4, "to_col": 4})
+
+        types_sent = [m["type"] for m in relay.sent]
+        assert "board_sync_request" in types_sent, (
+            "illegal_move rejection must trigger board_sync_request "
+            "to resync the board state with the peer"
+        )
+
+    def test_other_relay_error_does_not_clear_ack(self, _pygame):
+        runner, relay = _make_online_runner(NetworkRole.ONLINE_HOST, _pygame)
+        runner._waiting_for_ack = True
+
+        runner._dispatch({"type": "relay_error", "code": "server_full"})
+
+        assert runner._waiting_for_ack is True, (
+            "Non-illegal_move relay errors must not touch _waiting_for_ack"
+        )
+
+
+# ── game_start includes team colors (enables relay anti-cheat) ─────────────
+
+class TestGameStartColors:
+    """HOST's game_start must include team_r and team_l so the relay can
+    initialize the server-side RoomValidator (anti-cheat)."""
+
+    def test_game_start_includes_team_r_and_team_l(self, _pygame):
+        runner, relay = _make_online_runner(NetworkRole.ONLINE_HOST, _pygame)
+        b = runner._b
+        # Set distinct team colors we can verify
+        b.team_r.r, b.team_r.g, b.team_r.b = 65, 180, 232
+        b.team_l.r, b.team_l.g, b.team_l.b = 255, 140, 0
+        b.computer_player_r = False
+        b.computer_player_l = False
+        relay.sent.clear()
+
+        runner._check_war_complete()   # triggers game_start when both choices set
+
+        game_start_msgs = [m for m in relay.sent if m.get("type") == "game_start"]
+        assert len(game_start_msgs) == 1, "HOST should send exactly one game_start"
+        msg = game_start_msgs[0]
+        assert "team_r" in msg, "game_start must include team_r for relay anti-cheat"
+        assert "team_l" in msg, "game_start must include team_l for relay anti-cheat"
+        assert msg["team_r"] == {"r": 65, "g": 180, "b": 232}
+        assert msg["team_l"] == {"r": 255, "g": 140, "b": 0}
