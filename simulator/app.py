@@ -112,6 +112,8 @@ class Phase(Enum):
         WAR_GAMES: Players are selecting Human vs. AI for each side.
         PLAYING: The chess game is in progress.
         GAME_OVER: The game has ended (checkmate, stalemate, or draw).
+        CODE_SCAN: Camera scanner active — waiting for ChessMatrix barcode
+            to be decoded (networked guest only; handled by subclass).
     """
 
     NAME_ENTRY = auto()
@@ -120,6 +122,7 @@ class Phase(Enum):
     WAR_GAMES = auto()
     PLAYING = auto()
     GAME_OVER = auto()
+    CODE_SCAN = auto()
 
 
 # Lobby option constants
@@ -1145,6 +1148,12 @@ class GameRunner:
             self._reset()
             self._init_board()
 
+    def _handle_code_scan(self, event: pygame.event.Event) -> None:
+        """Handle input during CODE_SCAN phase (stub — overridden by NetworkedGameRunner)."""
+
+    def _render_code_scan(self) -> None:
+        """Render the code-scan screen (stub — overridden by NetworkedGameRunner)."""
+
     def _handle_event(self, event: pygame.event.Event) -> None:
         """Route a Pygame event to the handler for the current phase.
 
@@ -1163,6 +1172,8 @@ class GameRunner:
             self._handle_playing(event)
         elif self.phase == Phase.GAME_OVER:
             self._handle_game_over(event)
+        elif self.phase == Phase.CODE_SCAN:
+            self._handle_code_scan(event)
 
     # ── Update ─────────────────────────────────────────────────────────────────
 
@@ -1394,6 +1405,8 @@ class GameRunner:
             self._render_playing()
         elif self.phase == Phase.GAME_OVER:
             self._render_game_over()
+        elif self.phase == Phase.CODE_SCAN:
+            self._render_code_scan()
         self._render_panel()
         self._pre_flip()
         pygame.display.flip()

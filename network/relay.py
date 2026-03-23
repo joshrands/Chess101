@@ -6,7 +6,7 @@ between them transparently after the room handshake is complete.
 
 Features
 --------
-- 6-character room codes (uppercase alphanumeric)
+- 6-character room codes (uppercase alphabetic A-Z)
 - UUID reconnection tokens — clients can resume a dropped session
 - Last-50-message replay buffer per room for reconnect catch-up
 - Spectator support (receive-only connections)
@@ -109,9 +109,8 @@ _rooms: dict[str, Room] = {}
 
 
 def _generate_code() -> str:
-    alphabet = string.ascii_uppercase + string.digits
     while True:
-        code = "".join(random.choices(alphabet, k=_CODE_LEN))
+        code = "".join(random.choices(string.ascii_uppercase, k=_CODE_LEN))
         if code not in _rooms:
             return code
 

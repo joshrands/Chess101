@@ -40,6 +40,14 @@ a.back:hover{color:#00ff88}
 .join-btns button{flex:1;padding:8px;font-family:'Courier New',monospace;font-size:12px;border:1px solid #2a3a50;background:#050810;color:#8090a0;border-radius:3px;cursor:pointer}
 .join-btns button.primary{border-color:#00ff88;color:#00ff88}
 .join-btns button:hover{background:#0a1520}
+#scan-row{margin-top:10px}
+#scan-row button{width:100%;padding:8px;font-family:'Courier New',monospace;font-size:11px;border:1px solid #1a4a30;background:#050810;color:#00aa66;border-radius:3px;cursor:pointer}
+#scan-row button:hover{background:#0a1a10}
+#scan-video-wrap{margin-top:10px;display:none;flex-direction:column;align-items:center;gap:6px}
+#scan-video2{width:220px;height:220px;border:1px solid #1e2a3a;border-radius:3px;object-fit:cover}
+#scan-canvas2{display:none}
+#scan-note{font-size:10px;color:#3a7050}
+#stop-scan2{font-size:10px;color:#3a4a60;background:none;border:none;cursor:pointer;text-decoration:underline}
 </style>
 </head>
 <body>
@@ -58,6 +66,15 @@ a.back:hover{color:#00ff88}
     <div class="join-btns">
       <button id="cancel-btn">Cancel</button>
       <button id="join-btn" class="primary">Join</button>
+    </div>
+    <div id="scan-row">
+      <button id="scan-btn2">📷 Scan ChessMatrix</button>
+    </div>
+    <div id="scan-video-wrap">
+      <video id="scan-video2" autoplay playsinline muted></video>
+      <canvas id="scan-canvas2" width="220" height="220"></canvas>
+      <div id="scan-note">Scanning…</div>
+      <button id="stop-scan2">Stop scanning</button>
     </div>
   </div>
 </div>
@@ -1280,6 +1297,79 @@ document.getElementById('room-input').addEventListener('keydown',function(e){
 document.getElementById('room-input').addEventListener('input',function(){
   this.value=this.value.toUpperCase();
 });
+
+// ── ChessMatrix camera scanner (Join Online) ──────────────────────────────
+let _simScanRaf=null, _simScanStream=null;
+
+function bytesToRoomCode(bytes){
+  if(!bytes||bytes.length!==4)return null;
+  let v=((bytes[0]<<24)|(bytes[1]<<16)|(bytes[2]<<8)|bytes[3])>>>0;
+  if(v>Math.pow(26,6)-1)return null;
+  let c=[];
+  for(let i=0;i<6;i++){c.push(String.fromCharCode(65+(v%26)));v=Math.floor(v/26);}
+  return c.reverse().join('');
+}
+
+async function startSimScan(){
+  const video=document.getElementById('scan-video2');
+  const canvas=document.getElementById('scan-canvas2');
+  const ctx=canvas.getContext('2d');
+  const wrap=document.getElementById('scan-video-wrap');
+  const note=document.getElementById('scan-note');
+  try{
+    _simScanStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}});
+    video.srcObject=_simScanStream;
+    wrap.style.display='flex';
+    note.textContent='Scanning for ChessMatrix code…';
+  }catch(e){
+    note.textContent='Camera unavailable — type code above.';
+    wrap.style.display='flex';
+    return;
+  }
+  let CM=null;
+  try{
+    if(typeof ChessMatrix==='undefined'){
+      await new Promise((res,rej)=>{
+        const s=document.createElement('script');
+        s.src='https://cdn.jsdelivr.net/npm/chessmatrix/dist/chessmatrix.min.js';
+        s.onload=res;s.onerror=rej;
+        document.head.appendChild(s);
+      });
+    }
+    CM=window.ChessMatrix;
+  }catch(_){}
+  function tick(){
+    if(!_simScanStream)return;
+    ctx.drawImage(video,0,0,220,220);
+    if(CM){
+      try{
+        const r=CM.decode(ctx.getImageData(0,0,220,220));
+        if(r){
+          const code=bytesToRoomCode(new Uint8Array(r));
+          if(code){
+            stopSimScan();
+            document.getElementById('room-input').value=code;
+            note.textContent=`✓ Scanned: ${code}`;
+            document.getElementById('scan-video-wrap').style.display='flex';
+            setTimeout(()=>document.getElementById('join-btn').click(),600);
+            return;
+          }
+        }
+      }catch(_){}
+    }
+    _simScanRaf=requestAnimationFrame(tick);
+  }
+  video.onloadedmetadata=()=>{_simScanRaf=requestAnimationFrame(tick);};
+}
+
+function stopSimScan(){
+  if(_simScanRaf){cancelAnimationFrame(_simScanRaf);_simScanRaf=null;}
+  if(_simScanStream){_simScanStream.getTracks().forEach(t=>t.stop());_simScanStream=null;}
+  document.getElementById('scan-video-wrap').style.display='none';
+}
+
+document.getElementById('scan-btn2').addEventListener('click',startSimScan);
+document.getElementById('stop-scan2').addEventListener('click',stopSimScan);
 
 // ── Animation loop ────────────────────────────────────────────────────────────
 let lastPanelMs=0;

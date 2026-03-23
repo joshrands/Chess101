@@ -123,9 +123,8 @@ class TestRoomLifecycle:
     def test_create_gets_code_and_token(self, relay_url):
         ws, code, token = _do_host(relay_url)
         ws.close()
-        alphanum = set(string.ascii_uppercase + string.digits)
         assert len(code) == 6
-        assert all(c in alphanum for c in code)
+        assert all(c in string.ascii_uppercase for c in code)
         assert len(token) > 0
 
     def test_guest_join_notifies_host(self, relay_url):
@@ -169,7 +168,7 @@ class TestRoomLifecycle:
 
     def test_spectate_nonexistent_room(self, relay_url):
         ws = _open(relay_url)
-        _send(ws, {"type": "relay_spectate", "room_code": "XXXX00"})
+        _send(ws, {"type": "relay_spectate", "room_code": "XXXXXX"})
         msg = _recv(ws)
         ws.close()
         assert msg is not None
@@ -359,7 +358,7 @@ class TestReconnectionStandard:
         assert resp["code"] == "bad_token"
 
     def test_reconnect_wrong_room(self, relay_url):
-        ws, resp = _do_reconnect(relay_url, "BADRM0", "sometoken" * 4)
+        ws, resp = _do_reconnect(relay_url, "BADRMD", "sometoken" * 4)
         ws.close()
         assert resp["type"] == "relay_error"
         assert resp["code"] in ("room_not_found", "bad_token")
@@ -607,8 +606,7 @@ class TestServerLimits:
             ws1.close(); ws2.close()
 
     def test_room_code_uniqueness(self, relay_url):
-        """Ten rooms all get distinct 6-character uppercase-alphanumeric codes."""
-        alphanum = set(string.ascii_uppercase + string.digits)
+        """Ten rooms all get distinct 6-character uppercase-alpha codes."""
         codes = []
         connections = []
         try:
@@ -622,7 +620,7 @@ class TestServerLimits:
         assert len(set(codes)) == 10, f"Duplicate room codes generated: {codes}"
         for code in codes:
             assert len(code) == 6
-            assert all(c in alphanum for c in code)
+            assert all(c in string.ascii_uppercase for c in code)
 
 
 # ── TestRelayClientIntegration ─────────────────────────────────────────────────

@@ -27,7 +27,22 @@ from typing import Optional
 
 import pygame
 
+try:
+    import cv2 as _cv2  # type: ignore[import]
+    _CV2_AVAILABLE = True
+except ImportError:
+    _cv2 = None  # type: ignore[assignment]
+    _CV2_AVAILABLE = False
+
+try:
+    import numpy as _np  # type: ignore[import]
+    _NP_AVAILABLE = True
+except ImportError:
+    _np = None  # type: ignore[assignment]
+    _NP_AVAILABLE = False
+
 from core.team import Team
+from network import chessmatrix as _chessmatrix
 from network.client import GameClient
 from network.discovery import BeaconBroadcaster, BeaconListener
 from network.protocol import MoveFlags, board_hash, build_move_msg, decode_grid, encode_grid
@@ -136,9 +151,16 @@ class NetworkedGameRunner(GameRunner):
         self._physical_setup_r_complete = False
         self._physical_setup_l_complete = False
 
-        # Room-code entry sub-state (Join Online from Lobby)
+        # Room-code entry sub-state (Join Online from Lobby — text fallback)
         self._entering_room_code = False
         self._room_code_input    = ""
+
+        # ChessMatrix display (host waiting for peer)
+        self._chessmatrix_grid: Optional[list] = None   # 8×8 RGB grid, set after room created
+
+        # Camera scanner (guest joining online via CODE_SCAN phase)
+        self._cv_capture: Optional[object] = None        # cv2.VideoCapture or None
+        self._cv_last_frame: Optional[object] = None     # most recent BGR numpy frame
 
         # Call parent AFTER setting our attrs so _reset() can reference them.
         # LOCAL role shows the Lobby so the player can choose a mode;
@@ -168,7 +190,7 @@ class NetworkedGameRunner(GameRunner):
                         self._role = NetworkRole.ONLINE_GUEST
                         self._local_team_key = "l"
                         self.phase = Phase.NAME_ENTRY
-                elif event.unicode and event.unicode.isalnum() and len(self._room_code_input) < 6:
+                elif event.unicode and event.unicode.isalpha() and len(self._room_code_input) < 6:
                     self._room_code_input += event.unicode.upper()
             return
         super()._handle_lobby(event)
@@ -211,10 +233,22 @@ class NetworkedGameRunner(GameRunner):
             logger.info("Lobby: Host Online selected (relay: %s)", self._relay_url)
 
         elif opt_idx == 5:
-            # Join Online — prompt for room code first
-            self._entering_room_code = True
-            self._room_code_input    = ""
-            logger.info("Lobby: Join Online selected — awaiting room code")
+            # Join Online — open camera scanner (fall back to text entry if no camera)
+            self._room_code_input = ""
+            if _CV2_AVAILABLE:
+                self._close_camera()
+                cap = _cv2.VideoCapture(0)  # type: ignore[attr-defined]
+                if cap.isOpened():
+                    self._cv_capture = cap
+                    self.phase = Phase.CODE_SCAN
+                    logger.info("Lobby: Join Online — camera opened for ChessMatrix scan")
+                else:
+                    cap.release()
+                    self._entering_room_code = True
+                    logger.info("Lobby: Join Online — no camera, using text entry fallback")
+            else:
+                self._entering_room_code = True
+                logger.info("Lobby: Join Online — opencv unavailable, using text entry")
 
     # ── Name entry ─────────────────────────────────────────────────────────────
 
@@ -241,6 +275,8 @@ class NetworkedGameRunner(GameRunner):
         self._remote_last_move: Optional[tuple[int, int, int, int]] = None
         self._entering_room_code = False
         self._room_code_input    = ""
+        self._chessmatrix_grid   = None
+        self._close_camera()
         super()._reset()
 
     def _net_send(self, msg: dict) -> None:
@@ -321,6 +357,7 @@ class NetworkedGameRunner(GameRunner):
         """Peer connected — send hello."""
         self._last_pong_s = time.time()   # reset keepalive clock — peer just connected
         self._peer_connected = True
+        self._chessmatrix_grid = None   # peer joined, stop displaying ChessMatrix
         # Translate online roles to their wire-protocol equivalents
         wire_role = {
             NetworkRole.ONLINE_HOST:      "host",
@@ -352,6 +389,12 @@ class NetworkedGameRunner(GameRunner):
         self._room_code    = msg.get("room_code") or self._room_code
         self._connecting   = False
         logger.info("Relay connected — room %s", self._room_code)
+        # Encode ChessMatrix for HOST so it can be displayed while waiting for peer
+        if self._role == NetworkRole.ONLINE_HOST and self._room_code:
+            try:
+                self._chessmatrix_grid = _chessmatrix.encode(self._room_code)
+            except Exception as exc:
+                logger.warning("ChessMatrix encode failed: %s", exc)
 
     def _on_network_failed(self, msg: dict) -> None:  # noqa: ARG002
         """Background relay connect failed."""
@@ -1355,3 +1398,111 @@ class NetworkedGameRunner(GameRunner):
             self._broadcaster.stop()
         if self._listener:
             self._listener.stop()
+
+    # ── ChessMatrix host display ───────────────────────────────────────────
+
+    def _render_chessmatrix_waiting(self) -> None:
+        """Paint the encoded ChessMatrix onto the LED canvas."""
+        b = self._b
+        b.canvas.Clear()
+        if self._chessmatrix_grid is not None:
+            try:
+                _chessmatrix.render_to_led(self._chessmatrix_grid, b.canvas)
+            except Exception as exc:
+                logger.warning("ChessMatrix render failed: %s", exc)
+        b.matrix.blit_to_screen()
+
+    # ── Camera scanner (CODE_SCAN phase) ──────────────────────────────────
+
+    def _close_camera(self) -> None:
+        """Release the camera capture if it is open."""
+        cap = self._cv_capture
+        if cap is not None:
+            try:
+                cap.release()  # type: ignore[attr-defined]
+            except Exception:
+                pass
+            self._cv_capture = None
+        self._cv_last_frame = None
+
+    def _handle_code_scan(self, event: pygame.event.Event) -> None:
+        """Handle input during CODE_SCAN: ESC returns to lobby; manual fallback typing."""
+        if event.type != pygame.KEYDOWN:
+            return
+        if event.key in (pygame.K_ESCAPE, pygame.K_BACKSPACE):
+            self._close_camera()
+            self.phase = Phase.LOBBY
+            return
+        # Manual text fallback alongside camera (accepts alpha chars only)
+        if event.unicode and event.unicode.isalpha() and len(self._room_code_input) < 6:
+            self._room_code_input += event.unicode.upper()
+        elif event.key in (pygame.K_RETURN, pygame.K_KP_ENTER):
+            code = self._room_code_input.upper().strip()
+            if len(code) == 6 and code.isalpha():
+                self._room_code = code
+                self._close_camera()
+                self._role = NetworkRole.ONLINE_GUEST
+                self._local_team_key = "l"
+                self.phase = Phase.NAME_ENTRY
+                logger.info("Room code entered manually: %s", code)
+
+    def _render_code_scan(self) -> None:
+        """Render the camera feed; attempt ChessMatrix decode each frame."""
+        from simulator.app import _BOARD_W
+
+        screen = self._b.matrix._screen
+        if screen is None:
+            return
+
+        cap = self._cv_capture
+        if cap is not None and _CV2_AVAILABLE and _NP_AVAILABLE:
+            ret, frame = cap.read()  # type: ignore[attr-defined]
+            if ret and frame is not None:
+                self._cv_last_frame = frame
+                # Attempt decode
+                try:
+                    code = _chessmatrix.decode_frame(frame)
+                    if code is not None:
+                        self._room_code = code
+                        self._close_camera()
+                        self._role = NetworkRole.ONLINE_GUEST
+                        self._local_team_key = "l"
+                        self.phase = Phase.NAME_ENTRY
+                        logger.info("ChessMatrix scanned: room code %s", code)
+                        return
+                except Exception as exc:
+                    logger.debug("ChessMatrix decode attempt: %s", exc)
+
+        # Render last captured frame (or black if no frame yet)
+        board_px = 32 * _SCALE
+        last = self._cv_last_frame
+        if last is not None and _CV2_AVAILABLE and _NP_AVAILABLE:
+            try:
+                frame_rgb = _cv2.cvtColor(last, _cv2.COLOR_BGR2RGB)  # type: ignore[attr-defined]
+                # pygame wants (width, height, 3) but numpy shape is (h, w, 3)
+                surf = pygame.surfarray.make_surface(
+                    _np.transpose(frame_rgb, (1, 0, 2)))  # type: ignore[attr-defined]
+                surf_scaled = pygame.transform.scale(surf, (board_px, board_px))
+                screen.blit(surf_scaled, (0, 0))
+            except Exception:
+                screen.fill((0, 0, 0), (0, 0, board_px, board_px))
+        else:
+            screen.fill((0, 0, 0), (0, 0, board_px, board_px))
+
+    # ── _render override ───────────────────────────────────────────────────
+
+    def _render(self) -> None:
+        """Extend base render to handle ChessMatrix host display and CODE_SCAN."""
+        from simulator.app import _P_DIM, _P_TEXT, _P_WARN, _BOARD_W
+
+        # HOST waiting for peer: show ChessMatrix instead of game board
+        if (self._role == NetworkRole.ONLINE_HOST
+                and self._chessmatrix_grid is not None
+                and not self._peer_connected):
+            self._render_chessmatrix_waiting()
+            self._render_panel()
+            self._pre_flip()
+            pygame.display.flip()
+            return
+
+        super()._render()

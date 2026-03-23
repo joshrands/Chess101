@@ -151,6 +151,47 @@
     width: 100%;
   }
   #connect-form button:hover { background: #2280be; }
+
+  /* Camera scanner */
+  #scan-btn {
+    background: #1a5a38;
+    color: #c0e8c8;
+    border: none;
+    border-radius: 4px;
+    padding: 9px 22px;
+    font-family: inherit;
+    font-size: 0.9rem;
+    cursor: pointer;
+    width: 100%;
+    margin-top: 8px;
+  }
+  #scan-btn:hover { background: #226845; }
+  #scan-area {
+    margin-top: 12px;
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+  }
+  #scan-video {
+    width: 240px;
+    height: 240px;
+    border: 2px solid #2a3048;
+    border-radius: 4px;
+    object-fit: cover;
+  }
+  #scan-canvas { display: none; }
+  #scan-status { font-size: 0.78rem; color: #6a9a7a; min-height: 1.2em; }
+  #stop-scan-btn {
+    background: transparent;
+    border: 1px solid #3a4060;
+    color: #6a7a9a;
+    border-radius: 4px;
+    padding: 5px 14px;
+    font-family: inherit;
+    font-size: 0.8rem;
+    cursor: pointer;
+  }
 </style>
 </head>
 <body>
@@ -163,6 +204,13 @@
   <p>Enter the 6-character room code to spectate a game.</p>
   <input id="code-input" type="text" maxlength="6" placeholder="XXXXXX" autocomplete="off">
   <button id="connect-btn">Watch Game</button>
+  <button id="scan-btn">📷 Scan ChessMatrix Code</button>
+  <div id="scan-area">
+    <video id="scan-video" autoplay playsinline muted></video>
+    <canvas id="scan-canvas" width="240" height="240"></canvas>
+    <div id="scan-status">Scanning for ChessMatrix code…</div>
+    <button id="stop-scan-btn">Stop Scanning</button>
+  </div>
 </div>
 
 <div id="layout" style="display:none">
@@ -497,6 +545,86 @@ function connect(relayUrl, code) {
   ws.onerror  = () => setStatus('Connection error');
 }
 
+// ── ChessMatrix camera scanner ─────────────────────────────────────────────
+let _scanRaf   = null;
+let _scanStream = null;
+
+async function startScan(onCodeFound) {
+  const video   = document.getElementById('scan-video');
+  const canvas  = document.getElementById('scan-canvas');
+  const ctx2    = canvas.getContext('2d');
+  const scanArea = document.getElementById('scan-area');
+  const scanStatus = document.getElementById('scan-status');
+
+  try {
+    _scanStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+    video.srcObject = _scanStream;
+    scanArea.style.display = 'flex';
+    scanStatus.textContent = 'Scanning for ChessMatrix code…';
+  } catch (err) {
+    scanStatus.textContent = 'Camera access denied — type code manually.';
+    scanArea.style.display = 'flex';
+    return;
+  }
+
+  let CM = null;
+  try {
+    // Load chessmatrix JS library (CDN)
+    if (typeof ChessMatrix === 'undefined') {
+      await new Promise((resolve, reject) => {
+        const s = document.createElement('script');
+        s.src = 'https://cdn.jsdelivr.net/npm/chessmatrix/dist/chessmatrix.min.js';
+        s.onload = resolve; s.onerror = reject;
+        document.head.appendChild(s);
+      });
+    }
+    CM = window.ChessMatrix;
+  } catch (_) {
+    scanStatus.textContent = 'ChessMatrix library unavailable — type code manually.';
+    return;
+  }
+
+  function tick() {
+    if (!_scanStream) return;
+    ctx2.drawImage(video, 0, 0, 240, 240);
+    const imageData = ctx2.getImageData(0, 0, 240, 240);
+    try {
+      const result = CM.decode(imageData);
+      if (result) {
+        const bytes = new Uint8Array(result);
+        const code  = bytesToRoomCode(bytes);
+        if (code) {
+          stopScan();
+          onCodeFound(code);
+          return;
+        }
+      }
+    } catch (_) {}
+    _scanRaf = requestAnimationFrame(tick);
+  }
+  video.onloadedmetadata = () => { _scanRaf = requestAnimationFrame(tick); };
+}
+
+function stopScan() {
+  if (_scanRaf) { cancelAnimationFrame(_scanRaf); _scanRaf = null; }
+  if (_scanStream) { _scanStream.getTracks().forEach(t => t.stop()); _scanStream = null; }
+  document.getElementById('scan-area').style.display = 'none';
+}
+
+// Base-26 decode: 4 bytes → 6-char room code (mirrors network/chessmatrix.py)
+function bytesToRoomCode(bytes) {
+  if (!bytes || bytes.length !== 4) return null;
+  let value = ((bytes[0] << 24) | (bytes[1] << 16) | (bytes[2] << 8) | bytes[3]) >>> 0;
+  const max = Math.pow(26, 6) - 1;
+  if (value > max) return null;
+  let chars = [];
+  for (let i = 0; i < 6; i++) {
+    chars.push(String.fromCharCode(65 + (value % 26)));
+    value = Math.floor(value / 26);
+  }
+  return chars.reverse().join('');
+}
+
 // ── Entry point ────────────────────────────────────────────────────────────
 (function init() {
   const params = new URLSearchParams(window.location.search);
@@ -519,6 +647,21 @@ function connect(relayUrl, code) {
     document.getElementById('code-input').addEventListener('keydown', e => {
       if (e.key === 'Enter') document.getElementById('connect-btn').click();
     });
+
+    document.getElementById('scan-btn').addEventListener('click', () => {
+      startScan(code => {
+        document.getElementById('code-input').value = code;
+        document.getElementById('scan-status').textContent = `✓ Scanned: ${code}`;
+        document.getElementById('scan-area').style.display = 'flex';
+        // Auto-connect after short delay so user can see the result
+        setTimeout(() => {
+          document.getElementById('connect-form').style.display = 'none';
+          connect(relayUrl, code);
+        }, 800);
+      });
+    });
+
+    document.getElementById('stop-scan-btn').addEventListener('click', stopScan);
   }
 })();
 </script>

@@ -286,6 +286,30 @@ class RelayClient:
         except Exception as exc:
             logger.warning("Relay send failed: %s", exc)
 
+    def _start_pre_peer_keepalive(self) -> None:
+        """Send a ping every 45 s until the peer joins or the client stops.
+
+        This keeps the relay WebSocket alive (and prevents the Render free-tier
+        instance from going idle) while the guest is entering the ChessMatrix
+        code — a process that may take several minutes.
+        """
+        _KEEPALIVE_INTERVAL = 45.0
+
+        def _loop() -> None:
+            while not self._peer_joined.wait(timeout=_KEEPALIVE_INTERVAL):
+                if self._stop.is_set():
+                    return
+                ws = self._ws
+                if ws is None:
+                    return
+                try:
+                    ws.send(json.dumps({"type": "ping"}))  # type: ignore[attr-defined]
+                    logger.debug("Pre-peer keepalive ping sent")
+                except Exception:
+                    return
+
+        threading.Thread(target=_loop, daemon=True, name="RelayKeepalive").start()
+
     def _dispatch(self, msg: dict, raw: str) -> None:
         """Handle relay-protocol messages internally; deliver game messages to handler."""
         t = msg.get("type", "")
@@ -295,6 +319,7 @@ class RelayClient:
             self._token     = msg.get("token")
             logger.info("Relay room ready: %s", self._room_code)
             self._room_ready.set()
+            self._start_pre_peer_keepalive()
 
         elif t == "relay_spectating":
             self._room_code = msg.get("room_code")

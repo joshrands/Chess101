@@ -642,3 +642,46 @@ class TestMdns:
         assert g.host_ip == "10.0.0.1"
         assert g.port    == 65101
         assert g.state   == "lobby"
+
+
+# ── TestChessMatrix ─────────────────────────────────────────────────────────────
+
+
+class TestChessMatrix:
+    """Tests for network.chessmatrix encode/decode helpers."""
+
+    def test_round_trip_basic(self):
+        from network.chessmatrix import room_code_to_bytes, bytes_to_room_code
+        for code in ("AAAAAA", "ZZZZZZ", "ABCDEF", "XKCDQR"):
+            data = room_code_to_bytes(code)
+            assert len(data) == 4
+            assert bytes_to_room_code(data) == code
+
+    def test_boundary_values(self):
+        from network.chessmatrix import room_code_to_bytes, bytes_to_room_code
+        # Minimum: AAAAAA → 0
+        assert room_code_to_bytes("AAAAAA") == b"\x00\x00\x00\x00"
+        assert bytes_to_room_code(b"\x00\x00\x00\x00") == "AAAAAA"
+        # Maximum: ZZZZZZ → 26^6 - 1 = 308 915 775 = 0x126_7B08F
+        import struct
+        max_val = 26 ** 6 - 1
+        max_bytes = struct.pack(">I", max_val)
+        assert room_code_to_bytes("ZZZZZZ") == max_bytes
+        assert bytes_to_room_code(max_bytes) == "ZZZZZZ"
+
+    def test_invalid_inputs(self):
+        import pytest
+        from network.chessmatrix import room_code_to_bytes, bytes_to_room_code
+        with pytest.raises(ValueError):
+            room_code_to_bytes("ABC")          # too short
+        with pytest.raises(ValueError):
+            room_code_to_bytes("ABC123")       # contains digits (all-alpha required)
+        with pytest.raises(ValueError):
+            bytes_to_room_code(b"\xff\xff\xff\xff")   # value out of range
+
+    def test_no_digits_allowed(self):
+        import pytest
+        from network.chessmatrix import room_code_to_bytes
+        for bad in ("A1BCDE", "123456", "ABCDE1"):
+            with pytest.raises(ValueError):
+                room_code_to_bytes(bad)
