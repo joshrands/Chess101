@@ -1,0 +1,880 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chess101 — RGB LED Chess Board</title>
+  <meta name="description" content="A physical chess board on a Raspberry Pi. 32×32 RGB LED matrix. 64 reed switches. Alpha-beta AI. LAN + internet multiplayer.">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+
+  <style>
+    :root {
+      --bg:       #08080f;
+      --surface:  #0f0f1a;
+      --surface2: #141425;
+      --border:   #1e1e35;
+      --text:     #c8c8dc;
+      --dim:      #55556a;
+      --g: #00ff88;  /* neon green  */
+      --b: #2299ff;  /* neon blue   */
+      --r: #ff2255;  /* neon red    */
+      --c: #00eeff;  /* neon cyan   */
+      --y: #ffdd00;  /* neon yellow */
+      --m: #ee00cc;  /* neon magenta*/
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 15px;
+      line-height: 1.75;
+      overflow-x: hidden;
+    }
+
+    a { color: inherit; text-decoration: none; }
+
+    /* ── PALETTE BAR ──────────────────────────────────────────────── */
+    .palette-bar {
+      display: flex;
+      height: 3px;
+      width: 100%;
+    }
+    .palette-bar b {
+      flex: 1;
+      animation: pb 2.8s ease-in-out infinite;
+    }
+    .palette-bar b:nth-child(1) { background:#ff0000; animation-delay:0s;    }
+    .palette-bar b:nth-child(2) { background:#00ff00; animation-delay:.25s;  }
+    .palette-bar b:nth-child(3) { background:#0044ff; animation-delay:.5s;   }
+    .palette-bar b:nth-child(4) { background:#ffff00; animation-delay:.75s;  }
+    .palette-bar b:nth-child(5) { background:#ff00ff; animation-delay:1s;    }
+    .palette-bar b:nth-child(6) { background:#00ffff; animation-delay:1.25s; }
+    .palette-bar b:nth-child(7) { background:#ff8800; animation-delay:1.5s;  }
+    .palette-bar b:nth-child(8) { background:#ffffff; animation-delay:1.75s; }
+    @keyframes pb { 0%,100%{opacity:.3} 50%{opacity:1} }
+
+    /* ── NAV ──────────────────────────────────────────────────────── */
+    nav {
+      position: fixed;
+      top: 3px;
+      left: 0; right: 0;
+      z-index: 100;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 32px;
+      background: rgba(8,8,15,.85);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+    }
+    .nav-logo {
+      font-family: 'Orbitron', sans-serif;
+      font-weight: 900;
+      font-size: .9rem;
+      letter-spacing: .08em;
+      color: #fff;
+    }
+    .nav-logo span { color: var(--g); }
+    .nav-links {
+      display: flex;
+      gap: 28px;
+      font-size: .75rem;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+      color: var(--dim);
+    }
+    .nav-links a:hover { color: var(--g); }
+    .nav-gh {
+      font-size: .75rem;
+      letter-spacing: .1em;
+      text-transform: uppercase;
+      padding: 8px 18px;
+      border: 1px solid var(--g);
+      border-radius: 3px;
+      color: var(--g);
+      transition: all .2s;
+    }
+    .nav-gh:hover {
+      background: var(--g);
+      color: #000;
+      box-shadow: 0 0 20px rgba(0,255,136,.5);
+    }
+    @media(max-width:640px){ .nav-links{display:none} }
+
+    /* ── HERO ──────────────────────────────────────────────────────── */
+    #hero {
+      min-height: 100svh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      overflow: hidden;
+      padding: 120px 24px 80px;
+      text-align: center;
+    }
+
+    #led-canvas {
+      position: absolute;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      opacity: .42;
+      pointer-events: none;
+    }
+
+    /* radial vignette so edges fade */
+    #hero::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(ellipse 70% 80% at 50% 50%,
+        transparent 40%, var(--bg) 100%);
+      pointer-events: none;
+    }
+
+    .hero-inner { position: relative; z-index: 1; max-width: 780px; }
+
+    .eyebrow {
+      font-size: .7rem;
+      letter-spacing: .35em;
+      text-transform: uppercase;
+      color: var(--g);
+      margin-bottom: 20px;
+    }
+
+    h1 {
+      font-family: 'Orbitron', sans-serif;
+      font-weight: 900;
+      font-size: clamp(3.5rem, 12vw, 8rem);
+      line-height: .95;
+      letter-spacing: -.02em;
+      color: #fff;
+      text-shadow:
+        0 0 30px rgba(0,255,136,.7),
+        0 0 80px rgba(0,255,136,.35),
+        0 0 180px rgba(0,255,136,.15);
+      margin-bottom: 28px;
+    }
+    h1 em {
+      font-style: normal;
+      color: var(--g);
+    }
+
+    .hero-sub {
+      font-size: 1rem;
+      color: var(--dim);
+      max-width: 560px;
+      margin: 0 auto 44px;
+      line-height: 1.9;
+    }
+    .hero-sub strong { color: var(--text); }
+
+    .btn-row {
+      display: flex;
+      gap: 14px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 9px;
+      padding: 13px 26px;
+      border-radius: 3px;
+      font-family: 'Share Tech Mono', monospace;
+      font-size: .85rem;
+      letter-spacing: .06em;
+      transition: all .2s;
+      cursor: pointer;
+      border: none;
+    }
+    .btn-primary {
+      background: var(--g);
+      color: #000;
+      box-shadow: 0 0 24px rgba(0,255,136,.45);
+    }
+    .btn-primary:hover {
+      background: #fff;
+      box-shadow: 0 0 48px rgba(0,255,136,.8);
+      transform: translateY(-2px);
+    }
+    .btn-outline {
+      background: transparent;
+      color: var(--text);
+      border: 1px solid var(--border);
+    }
+    .btn-outline:hover {
+      border-color: var(--b);
+      color: var(--b);
+      box-shadow: 0 0 20px rgba(34,153,255,.25);
+      transform: translateY(-2px);
+    }
+
+    .scroll-hint {
+      position: absolute;
+      bottom: 28px; left: 50%;
+      transform: translateX(-50%);
+      z-index: 1;
+      font-size: .65rem;
+      letter-spacing: .25em;
+      text-transform: uppercase;
+      color: var(--dim);
+      animation: bounce 2.2s ease-in-out infinite;
+    }
+    .scroll-hint::after { content: '▼'; display:block; text-align:center; margin-top:4px; }
+    @keyframes bounce {
+      0%,100%{ opacity:.35; transform:translateX(-50%) translateY(0); }
+      50%    { opacity: .9; transform:translateX(-50%) translateY(7px); }
+    }
+
+    /* ── SHARED SECTION STYLES ────────────────────────────────────── */
+    section { padding: 96px 24px; }
+    .wrap   { max-width: 1080px; margin: 0 auto; }
+
+    .s-label {
+      font-size: .68rem;
+      letter-spacing: .35em;
+      text-transform: uppercase;
+      color: var(--g);
+      margin-bottom: 10px;
+    }
+    h2 {
+      font-family: 'Orbitron', sans-serif;
+      font-size: clamp(1.5rem, 3.5vw, 2.2rem);
+      font-weight: 700;
+      color: #fff;
+      line-height: 1.2;
+      margin-bottom: 14px;
+    }
+    .s-sub {
+      color: var(--dim);
+      max-width: 560px;
+      margin-bottom: 52px;
+      line-height: 1.9;
+    }
+
+    /* ── ABOUT ────────────────────────────────────────────────────── */
+    #about { background: var(--surface); border-top:1px solid var(--border); border-bottom:1px solid var(--border); }
+
+    .about-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 72px;
+      align-items: center;
+    }
+    @media(max-width:768px){ .about-grid{ grid-template-columns:1fr; gap:48px; } }
+
+    .about-text p { color:var(--dim); margin-bottom:18px; line-height:1.95; }
+    .about-text p strong { color:var(--text); }
+
+    .stats {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 2px;
+      background: var(--border);
+      border: 1px solid var(--border);
+      border-radius: 5px;
+      overflow: hidden;
+    }
+    .stat {
+      background: var(--surface2);
+      padding: 30px 20px;
+      text-align: center;
+      transition: background .2s;
+    }
+    .stat:hover { background: #1a1a2e; }
+    .stat-val {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 2rem;
+      font-weight: 900;
+      color: var(--g);
+      text-shadow: 0 0 20px rgba(0,255,136,.55);
+      display: block;
+      line-height: 1;
+      margin-bottom: 8px;
+    }
+    .stat-lbl {
+      font-size: .65rem;
+      letter-spacing: .18em;
+      text-transform: uppercase;
+      color: var(--dim);
+    }
+
+    /* ── FEATURES GRID ────────────────────────────────────────────── */
+    .feat-grid {
+      display: grid;
+      grid-template-columns: repeat(3,1fr);
+      gap: 2px;
+      background: var(--border);
+      border: 1px solid var(--border);
+      border-radius: 5px;
+      overflow: hidden;
+    }
+    @media(max-width:860px){ .feat-grid{ grid-template-columns:repeat(2,1fr); } }
+    @media(max-width:520px){ .feat-grid{ grid-template-columns:1fr; } }
+
+    .feat {
+      background: var(--surface);
+      padding: 36px 28px;
+      transition: background .2s;
+      position: relative;
+    }
+    .feat:hover { background: var(--surface2); }
+    .feat-icon { font-size: 1.8rem; margin-bottom: 16px; display: block; }
+    .feat-name {
+      font-family: 'Orbitron', sans-serif;
+      font-size: .78rem;
+      font-weight: 700;
+      color: #fff;
+      letter-spacing: .06em;
+      margin-bottom: 10px;
+      text-transform: uppercase;
+    }
+    .feat-desc { font-size: .82rem; color: var(--dim); line-height: 1.85; }
+
+    /* ── TECH ─────────────────────────────────────────────────────── */
+    #tech { background: var(--surface); border-top:1px solid var(--border); border-bottom:1px solid var(--border); }
+
+    .tags { display:flex; flex-wrap:wrap; gap:10px; margin-bottom:44px; }
+    .tag {
+      font-size: .7rem;
+      letter-spacing: .1em;
+      text-transform: uppercase;
+      padding: 5px 13px;
+      border-radius: 3px;
+      border: 1px solid var(--border);
+      color: var(--dim);
+      background: var(--surface2);
+    }
+    .tag.g { border-color:rgba(0,255,136,.3); color:var(--g); }
+    .tag.b { border-color:rgba(34,153,255,.3); color:var(--b); }
+    .tag.r { border-color:rgba(255,34,85,.3);  color:var(--r); }
+    .tag.c { border-color:rgba(0,238,255,.3);  color:var(--c); }
+    .tag.y { border-color:rgba(255,221,0,.3);  color:var(--y); }
+
+    .codebox {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 5px;
+      padding: 32px;
+      font-size: .8rem;
+      line-height: 2.1;
+      color: var(--dim);
+      overflow-x: auto;
+    }
+    .codebox .c1 { color:var(--g); }
+    .codebox .c2 { color:var(--b); }
+    .codebox .c3 { color:var(--r); }
+    .codebox .c4 { color:var(--c); }
+
+    /* ── MODES ────────────────────────────────────────────────────── */
+    .modes-grid {
+      display: grid;
+      grid-template-columns: repeat(3,1fr);
+      gap: 2px;
+      background: var(--border);
+      border: 1px solid var(--border);
+      border-radius: 5px;
+      overflow: hidden;
+    }
+    @media(max-width:860px){ .modes-grid{ grid-template-columns:repeat(2,1fr); } }
+    @media(max-width:520px){ .modes-grid{ grid-template-columns:1fr; } }
+
+    .mode {
+      background: var(--surface);
+      padding: 32px 28px;
+      border-left: 3px solid transparent;
+      transition: background .2s;
+    }
+    .mode:hover { background: var(--surface2); }
+    .mode.g  { border-left-color:var(--g);  }
+    .mode.b  { border-left-color:var(--b);  }
+    .mode.r  { border-left-color:var(--r);  }
+    .mode.c  { border-left-color:var(--c);  }
+    .mode.y  { border-left-color:var(--y);  }
+    .mode.m  { border-left-color:var(--m);  }
+
+    .mode-title {
+      font-family: 'Orbitron', sans-serif;
+      font-size: .78rem;
+      font-weight: 700;
+      color: #fff;
+      text-transform: uppercase;
+      letter-spacing: .06em;
+      margin-bottom: 12px;
+    }
+    .mode-cmd {
+      display: inline-block;
+      font-size: .73rem;
+      color: var(--g);
+      background: rgba(0,255,136,.06);
+      border: 1px solid rgba(0,255,136,.18);
+      border-radius: 3px;
+      padding: 5px 11px;
+      margin-bottom: 12px;
+      white-space: nowrap;
+    }
+    .mode-desc { font-size: .8rem; color: var(--dim); line-height: 1.85; }
+
+    /* ── CTA ──────────────────────────────────────────────────────── */
+    #cta {
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+    }
+    #cta::before {
+      content: '';
+      position: absolute;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      width: 700px; height: 700px;
+      background: radial-gradient(circle, rgba(0,255,136,.07) 0%, transparent 65%);
+      pointer-events: none;
+    }
+    #cta h2 { font-size: clamp(2rem, 5vw, 3.2rem); margin-bottom:18px; }
+    #cta .s-sub { margin: 0 auto 44px; text-align: center; }
+
+    /* ── FOOTER ───────────────────────────────────────────────────── */
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 36px 24px 28px;
+      text-align: center;
+    }
+    .footer-logo {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 1.1rem;
+      font-weight: 900;
+      color: #fff;
+      letter-spacing: .06em;
+      margin-bottom: 8px;
+    }
+    .footer-logo span { color: var(--g); }
+    footer p { font-size: .72rem; color: var(--dim); margin: 6px 0; letter-spacing: .05em; }
+    footer a { color: var(--g); }
+    footer a:hover { text-decoration: underline; }
+
+    /* responsive nav padding */
+    @media(max-width:480px){ section{ padding:72px 18px; } }
+  </style>
+</head>
+<body>
+
+<!-- Animated palette bar -->
+<div class="palette-bar"><b></b><b></b><b></b><b></b><b></b><b></b><b></b><b></b></div>
+
+<!-- ── NAV ──────────────────────────────────────────────────────────── -->
+<nav>
+  <div class="nav-logo">CHESS<span>101</span></div>
+  <div class="nav-links">
+    <a href="#about">About</a>
+    <a href="#features">Features</a>
+    <a href="#tech">Stack</a>
+    <a href="#modes">Play</a>
+  </div>
+  <a class="nav-gh" href="https://github.com/joshrands/Chess101" target="_blank" rel="noopener">GitHub ↗</a>
+</nav>
+
+<!-- ── HERO ──────────────────────────────────────────────────────────── -->
+<section id="hero">
+  <canvas id="led-canvas" width="512" height="512"></canvas>
+
+  <div class="hero-inner">
+    <p class="eyebrow">// Raspberry Pi · RGB LED Matrix · Chess</p>
+    <h1>CHESS<em>101</em></h1>
+    <p class="hero-sub">
+      A <strong>real, physical chess board</strong> built on a Raspberry Pi.
+      32×32 RGB LEDs. 64 magnetic reed switches. Alpha-beta AI.
+      LAN and internet multiplayer with a live browser spectator.
+    </p>
+    <div class="btn-row">
+      <a class="btn btn-primary" href="https://github.com/joshrands/Chess101" target="_blank" rel="noopener">
+        ⬡&nbsp; View on GitHub
+      </a>
+      <a class="btn btn-outline" href="/spectate">
+        ♟&nbsp; Watch Live
+      </a>
+    </div>
+  </div>
+
+  <div class="scroll-hint">Scroll</div>
+</section>
+
+<!-- ── ABOUT ─────────────────────────────────────────────────────────── -->
+<section id="about">
+  <div class="wrap">
+    <div class="about-grid">
+
+      <div class="about-text">
+        <p class="s-label">// What is Chess101</p>
+        <h2>A chess board that <span style="color:var(--g)">lights up</span> when it thinks.</h2>
+        <p>Chess101 is a fully playable chess board where every square is a 4×4 block of individually addressable RGB LEDs on a <strong>32×32 matrix</strong>. Pieces glow in your chosen team color, valid moves pulse with light, and the AI animates its search in real time.</p>
+        <p>Eight Arduinos connected via <strong>I2C</strong> read magnetic reed switches under every square. The Raspberry Pi knows exactly where every piece sits — no cameras, no computer vision, just magnets and math.</p>
+        <p>A <strong>Mac simulator</strong> reuses the exact same rendering code via a Pygame window, so you can develop and play without any Pi hardware at all.</p>
+      </div>
+
+      <div class="stats">
+        <div class="stat">
+          <span class="stat-val">32×32</span>
+          <span class="stat-lbl">LED Matrix</span>
+        </div>
+        <div class="stat">
+          <span class="stat-val">8</span>
+          <span class="stat-lbl">Arduinos</span>
+        </div>
+        <div class="stat">
+          <span class="stat-val">64</span>
+          <span class="stat-lbl">Reed Switches</span>
+        </div>
+        <div class="stat">
+          <span class="stat-val" style="color:var(--b);">8</span>
+          <span class="stat-lbl">Team Colors</span>
+        </div>
+        <div class="stat">
+          <span class="stat-val" style="color:var(--r);">AI</span>
+          <span class="stat-lbl">Alpha-Beta</span>
+        </div>
+        <div class="stat">
+          <span class="stat-val" style="color:var(--c);">∞</span>
+          <span class="stat-lbl">Games Played</span>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- ── FEATURES ───────────────────────────────────────────────────────── -->
+<section id="features">
+  <div class="wrap">
+    <p class="s-label">// Features</p>
+    <h2>Everything you'd expect.<br>And then some.</h2>
+    <p class="s-sub">Full chess rules, beautiful LED animations, a real AI opponent, and internet play — on a board you can hold in your hands.</p>
+
+    <div class="feat-grid">
+
+      <div class="feat">
+        <span class="feat-icon">♟</span>
+        <div class="feat-name">Full Chess Rules</div>
+        <div class="feat-desc">En passant, castling, promotion, fifty-move rule, threefold repetition, check, stalemate — every edge case handled.</div>
+      </div>
+
+      <div class="feat">
+        <span class="feat-icon" style="color:var(--r)">🧠</span>
+        <div class="feat-name">Alpha-Beta AI</div>
+        <div class="feat-desc">Minimax tree search with alpha-beta pruning. Animates candidate moves on the board as it thinks. Plays to win.</div>
+      </div>
+
+      <div class="feat">
+        <span class="feat-icon" style="color:var(--g)">◈</span>
+        <div class="feat-name">RGB LED Display</div>
+        <div class="feat-desc">1,024 individually addressable LEDs. Pieces pulse in team color, targets glow, and end-game animations fill the board.</div>
+      </div>
+
+      <div class="feat">
+        <span class="feat-icon" style="color:var(--b)">⇄</span>
+        <div class="feat-name">LAN Multiplayer</div>
+        <div class="feat-desc">Host/join over your local network. UDP beacon auto-discovers the host — no IP address required.</div>
+      </div>
+
+      <div class="feat">
+        <span class="feat-icon" style="color:var(--m)">🌐</span>
+        <div class="feat-name">Internet Play</div>
+        <div class="feat-desc">Relay server at chess101.net. 6-character room codes, reconnection tokens, and server-side move validation.</div>
+      </div>
+
+      <div class="feat">
+        <span class="feat-icon" style="color:var(--c)">👁</span>
+        <div class="feat-name">Browser Spectator</div>
+        <div class="feat-desc">Watch any internet game live from any browser. No install needed — just visit /spectate and enter the room code.</div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- ── TECH STACK ─────────────────────────────────────────────────────── -->
+<section id="tech">
+  <div class="wrap">
+    <p class="s-label">// Stack</p>
+    <h2>Real hardware.<br>Pure Python.</h2>
+    <p class="s-sub">The game logic runs identically on the Pi and on Mac. Only the hardware abstraction layer swaps out.</p>
+
+    <div class="tags">
+      <span class="tag g">Python 3</span>
+      <span class="tag g">Pygame</span>
+      <span class="tag r">Raspberry Pi</span>
+      <span class="tag r">rpi-rgb-led-matrix</span>
+      <span class="tag c">Arduino / I2C</span>
+      <span class="tag c">Reed Switches</span>
+      <span class="tag b">WebSockets</span>
+      <span class="tag b">asyncio</span>
+      <span class="tag y">Alpha-Beta Pruning</span>
+      <span class="tag">Docker</span>
+      <span class="tag">Nginx</span>
+      <span class="tag">mypy</span>
+      <span class="tag">pytest</span>
+    </div>
+
+    <div class="codebox"><pre>
+<span class="c1"># Hardware layer (Pi only)</span>
+rgbmatrix     <span class="c2">→</span> 32×32 LED matrix  <span class="c2">(</span>1,024 RGB pixels<span class="c2">)</span>
+smbus / I2C   <span class="c2">→</span> 8 Arduinos  <span class="c2">→</span>  64 reed switches
+
+<span class="c1"># Game logic (runs on Pi and Mac — identical code)</span>
+Board         <span class="c2">→</span> color_picker  <span class="c2">→</span>  war_games  <span class="c2">→</span>  do_turn  <span class="c2">→</span>  declare_victory
+Piece         <span class="c2">→</span> Pawn · Rook · Bishop · Knight · Queen · King
+AlphaBeta     <span class="c2">→</span> minimax tree search with alpha-beta pruning
+
+<span class="c1"># Mac simulator  (hardware-mock layer)</span>
+FakeRGBMatrix <span class="c2">→</span> pygame.Surface   <span class="c2">(</span>injected via sys.modules<span class="c2">)</span>
+SimSensor     <span class="c2">→</span> mouse clicks replace reed switches
+
+<span class="c1"># Network layer</span>
+GameServer / GameClient  <span class="c2">→</span> asyncio WebSocket  <span class="c2">(</span>LAN<span class="c2">)</span>
+RelayClient              <span class="c2">→</span> <span class="c3">wss://chess101.net</span>  <span class="c2">(</span>internet<span class="c2">)</span>
+RoomValidator            <span class="c2">→</span> server-side move legality check
+BeaconBroadcaster        <span class="c2">→</span> UDP auto-discovery  <span class="c2">(</span>LAN<span class="c2">)</span></pre></div>
+  </div>
+</section>
+
+<!-- ── PLAY MODES ─────────────────────────────────────────────────────── -->
+<section id="modes">
+  <div class="wrap">
+    <p class="s-label">// How to Play</p>
+    <h2>Pick your mode.</h2>
+    <p class="s-sub">Run the simulator on Mac — no Pi required. Or deploy to a Pi for the full physical experience.</p>
+
+    <div class="modes-grid">
+
+      <div class="mode g">
+        <div class="mode-title">Local Game</div>
+        <div class="mode-cmd">python run_simulator.py --local</div>
+        <div class="mode-desc">Play on one machine. Two humans or Human vs AI. Choose colors, choose sides, play.</div>
+      </div>
+
+      <div class="mode b">
+        <div class="mode-title">LAN — Host</div>
+        <div class="mode-cmd">python run_simulator.py --host</div>
+        <div class="mode-desc">Bind a WebSocket server on your LAN. Broadcasts a UDP beacon so your opponent finds you automatically.</div>
+      </div>
+
+      <div class="mode b">
+        <div class="mode-title">LAN — Join</div>
+        <div class="mode-cmd">python run_simulator.py --join</div>
+        <div class="mode-desc">Auto-discover any host on your network, or pass an IP explicitly. Spectators welcome.</div>
+      </div>
+
+      <div class="mode r">
+        <div class="mode-title">Internet — Host</div>
+        <div class="mode-cmd">python run_simulator.py --online-host</div>
+        <div class="mode-desc">Create a room on chess101.net. Share the 6-character code. Reconnection tokens survive drops.</div>
+      </div>
+
+      <div class="mode r">
+        <div class="mode-title">Internet — Join</div>
+        <div class="mode-cmd">python run_simulator.py --online-join CODE</div>
+        <div class="mode-desc">Enter the code your opponent shared. The relay forwards moves. The server validates every one.</div>
+      </div>
+
+      <div class="mode c">
+        <div class="mode-title">Browser Spectator</div>
+        <div class="mode-cmd">chess101.net/spectate</div>
+        <div class="mode-desc">Watch any internet game live from your browser. No installation — just a room code.</div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- ── CTA ────────────────────────────────────────────────────────────── -->
+<section id="cta">
+  <div class="wrap">
+    <h2>Open source.<br>Build your own.</h2>
+    <p class="s-sub">Full source on GitHub. Dive into the hardware schematics, Pi setup, and the complete Python codebase.</p>
+    <div class="btn-row">
+      <a class="btn btn-primary" href="https://github.com/joshrands/Chess101" target="_blank" rel="noopener">
+        ⬡&nbsp; View Source on GitHub
+      </a>
+      <a class="btn btn-outline" href="/spectate">
+        ♟&nbsp; Spectate a Game
+      </a>
+    </div>
+  </div>
+</section>
+
+<!-- ── FOOTER ─────────────────────────────────────────────────────────── -->
+<footer>
+  <div class="palette-bar" style="max-width:400px;margin:0 auto 28px;border-radius:2px;overflow:hidden">
+    <b></b><b></b><b></b><b></b><b></b><b></b><b></b><b></b>
+  </div>
+  <div class="footer-logo">CHESS<span>101</span></div>
+  <p><a href="https://github.com/joshrands/Chess101" target="_blank" rel="noopener">github.com/joshrands/Chess101</a></p>
+  <p style="margin-top:10px">MIT License &nbsp;·&nbsp; Built with ♟ and a lot of solder</p>
+</footer>
+
+<!-- ── ANIMATED LED CANVAS ─────────────────────────────────────────────── -->
+<script>
+(function () {
+  'use strict';
+
+  const canvas = document.getElementById('led-canvas');
+  if (!canvas || !canvas.getContext) return;
+  const ctx = canvas.getContext('2d');
+
+  // 32×32 LED grid (8×8 cells, each 4×4 LEDs)
+  const LEDS      = 32;
+  const LED_PX    = canvas.width / LEDS;   // 16 px per LED
+  const RADIUS    = (LED_PX - 2) / 2;
+  const CELLS     = 8;
+
+  // ── piece type constants ──────────────────────────────────────────
+  const EMPTY = 0, PIECE_R = 1, PAWN_R = 2, PAWN_G = 3, PIECE_G = 4;
+
+  // Team colors — Red vs Green (classic first pick)
+  const CR = [255, 20, 20];
+  const CG = [20, 220, 60];
+
+  // Checker background
+  const BG_DARK  = [12,  8, 24];
+  const BG_LIGHT = [22, 16, 44];
+
+  // ── grid state ────────────────────────────────────────────────────
+  let grid = [];
+
+  function initGrid () {
+    grid = Array.from({ length: CELLS }, () => Array(CELLS).fill(EMPTY));
+    for (let c = 0; c < 8; c++) {
+      grid[0][c] = PIECE_R;
+      grid[1][c] = PAWN_R;
+      grid[6][c] = PAWN_G;
+      grid[7][c] = PIECE_G;
+    }
+  }
+
+  initGrid();
+
+  // Pre-scripted demo moves (all non-capturing so grid is always valid)
+  const SCRIPT = [
+    [1,4, 3,4],  // e4
+    [6,4, 4,4],  // e5
+    [1,3, 3,3],  // d4
+    [6,3, 4,3],  // d5
+    [0,6, 2,5],  // Nf3
+    [7,6, 5,5],  // Nf6
+    [0,1, 2,2],  // Nc3
+    [7,1, 5,2],  // Nc6
+    [0,5, 2,3],  // Be2 (diagonal)
+    [7,5, 5,3],  // Bg4 (diagonal)
+  ];
+
+  let scriptIdx  = 0;
+  let lastMove   = null;
+  let hlAlpha    = 0;
+  let moveTimer  = 0;
+  const MOVE_MS  = 1800;
+
+  function applyNext (now) {
+    if (now - moveTimer < MOVE_MS) return;
+    moveTimer = now;
+
+    if (scriptIdx >= SCRIPT.length) { initGrid(); scriptIdx = 0; return; }
+
+    const [fr, fc, tr, tc] = SCRIPT[scriptIdx++];
+    if (grid[fr][fc] !== EMPTY) {
+      grid[tr][tc] = grid[fr][fc];
+      grid[fr][fc] = EMPTY;
+      lastMove  = [fr, fc, tr, tc];
+      hlAlpha   = 1.0;
+    }
+  }
+
+  // ── LED drawing ───────────────────────────────────────────────────
+  function led (lx, ly, r, g, b) {
+    const cx = lx * LED_PX + LED_PX / 2;
+    const cy = ly * LED_PX + LED_PX / 2;
+    const bright = r > 12 || g > 12 || b > 12;
+
+    if (bright) {
+      const grd = ctx.createRadialGradient(cx, cy, 0, cx, cy, RADIUS * 2.8);
+      grd.addColorStop(0, `rgba(${r},${g},${b},.38)`);
+      grd.addColorStop(1, `rgba(${r},${g},${b},0)`);
+      ctx.fillStyle = grd;
+      ctx.beginPath();
+      ctx.arc(cx, cy, RADIUS * 2.8, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    ctx.fillStyle = `rgb(${r},${g},${b})`;
+    ctx.beginPath();
+    ctx.arc(cx, cy, RADIUS, 0, Math.PI * 2);
+    ctx.fill();
+
+    if (bright) {
+      ctx.fillStyle = 'rgba(255,255,255,.22)';
+      ctx.beginPath();
+      ctx.arc(cx - RADIUS * .22, cy - RADIUS * .22, RADIUS * .32, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
+  // ── render loop ───────────────────────────────────────────────────
+  function frame (ts) {
+    applyNext(ts);
+    if (hlAlpha > 0) hlAlpha = Math.max(0, hlAlpha - .007);
+
+    const t  = ts / 1000;
+    const p1 = (Math.sin(t * 2.4)       + 1) / 2;  // 0..1  piece pulse
+    const p2 = (Math.sin(t * 1.9 + 1.6) + 1) / 2;
+
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    for (let ly = 0; ly < LEDS; ly++) {
+      for (let lx = 0; lx < LEDS; lx++) {
+        const row = (ly / 4) | 0;
+        const col = (lx / 4) | 0;
+        const isDark = (row + col) % 2 === 0;
+        const bg = isDark ? BG_DARK : BG_LIGHT;
+
+        let r = bg[0], g = bg[1], b = bg[2];
+        const pt = grid[row][col];
+
+        if (pt !== EMPTY) {
+          const pulse = (pt === PIECE_R || pt === PAWN_R) ? p1 : p2;
+          const tc    = (pt === PIECE_R || pt === PAWN_R) ? CR : CG;
+          const brt   = 0.65 + 0.35 * pulse;
+          r = tc[0] * brt | 0;
+          g = tc[1] * brt | 0;
+          b = tc[2] * brt | 0;
+        }
+
+        // Last-move yellow flash
+        if (lastMove && hlAlpha > 0) {
+          const [fr, fc, tr, tc] = lastMove;
+          if ((row === tr && col === tc) || (row === fr && col === fc)) {
+            const ha = hlAlpha * .55;
+            r = Math.min(255, r + (200 * ha) | 0);
+            g = Math.min(255, g + (180 * ha) | 0);
+            b = Math.min(255, b + (40  * ha) | 0);
+          }
+        }
+
+        led(lx, ly, r, g, b);
+      }
+    }
+
+    requestAnimationFrame(frame);
+  }
+
+  requestAnimationFrame(frame);
+})();
+</script>
+
+</body>
+</html>
