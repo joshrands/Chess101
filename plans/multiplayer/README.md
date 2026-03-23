@@ -89,3 +89,37 @@ The host's color and WAR_GAMES selections propagate to the guest. The guest can 
 
 ### Physical board is always the authority
 When a Pi is involved, the Pi is always the source of truth for piece positions. The Pi's sensor reads are the canonical board; the simulator receiving moves from a Pi renders them but does not override them.
+
+---
+
+## Future Work — Phase 4: Host-Side Anti-Cheat
+
+### Problem with the current relay validator
+
+The relay server runs an independent copy of the chess engine (`network/validator.py`, `RoomValidator`) to validate moves before forwarding them. This creates a parallel chess brain that can silently diverge from the clients:
+
+- Any engine bug must be fixed in two places — the game engine **and** the validator.
+- Edge cases that the validator handles differently from the client cause false rejections (the `sky_fall`-on-King bug, where the validator incorrectly restricted a King's escape moves to the attacker's ray, is one example).
+- The relay is now stateful and chess-aware, making it harder to reason about, test, and deploy independently.
+
+### Proposed design — relay as a pure pass-through
+
+Move all anti-cheat responsibility to the HOST, who already runs the authoritative game engine and knows every legal move at every point in the game.
+
+**Relay changes (`network/relay.py`)**
+- Remove `RoomValidator`, `_maybe_init_validator`, `_validate_move`, and the `room.validator` field from `Room`.
+- The relay becomes a stateless message router: receive → record history → forward. No chess knowledge required.
+- `network/validator.py` can be deleted once host-side validation is in place.
+
+**Host changes (`simulator/networked_runner.py` and `game/networked_board.py`)**
+- In `_apply_remote_move` (Sim) and `_wait_for_remote_move` (Pi), after parsing the incoming `move` message, verify it against the legal targets already computed by `_begin_turn` / `calc_targets`:
+  1. Confirm it is the GUEST's turn (current team check).
+  2. Look up the piece at `(from_row, from_col)` and confirm it belongs to the remote team.
+  3. Check that `(to_row, to_col)` is in the piece's pre-computed `targets` list.
+- If any check fails: log the violation, send a `board_sync_request` to force reconciliation, and optionally disconnect the peer.
+- Because `_begin_turn` is always called before the remote move is processed, legal targets are already available — no extra computation required.
+
+**Why this is better**
+- Single source of truth: the rules engine used for validation is the exact same code that drives gameplay. Engine bugs are fixed once and take effect everywhere.
+- The relay is stateless and trivially correct — any WebSocket proxy could replace it.
+- Relay cold-starts and reconnects become simpler: no game state to rebuild on the server side.
