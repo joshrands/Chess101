@@ -10,14 +10,14 @@ from the point of view of ``NetworkedGameRunner``.
 Usage
 -----
     # HOST side
-    rc = RelayClient("wss://chess101.net", role="host", player_name="Seth")
+    rc = RelayClient("wss://relay.chess101.net", role="host", player_name="Seth")
     rc.set_message_handler(my_handler)
     room_code = rc.create_room()   # blocks until room is ready or timeout
     # display room_code to the user…
     rc.wait_for_peer()             # blocks until opponent joins
 
     # GUEST side
-    rc = RelayClient("wss://chess101.net", role="guest", player_name="Alex")
+    rc = RelayClient("wss://relay.chess101.net", role="guest", player_name="Alex")
     rc.set_message_handler(my_handler)
     ok = rc.join_room("XKCD42")   # blocks until joined
 
@@ -40,7 +40,7 @@ except ImportError:  # pragma: no cover
     _ws_connect = None   # type: ignore[assignment]
     _ws_exc     = None   # type: ignore[assignment]
 
-_DEFAULT_RELAY_URL = "wss://chess101.net"
+_DEFAULT_RELAY_URL = "wss://relay.chess101.net"
 
 
 class RelayClient:

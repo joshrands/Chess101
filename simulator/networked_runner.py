@@ -100,6 +100,7 @@ class NetworkedGameRunner(GameRunner):
         self._disconnect_time_ms: Optional[int] = None
         self._reconnect_attempted = False   # True once a relay reconnect thread is running
         self._session_lost = False          # True when relay restarted and room is gone
+        self._connecting = False            # True while background relay connect is in progress
 
         # Negotiation state
         self._local_color_sent = False
@@ -289,6 +290,8 @@ class NetworkedGameRunner(GameRunner):
             "relay_error":       self._on_relay_error,
             "_peer_lost":        self._on_peer_lost,
             "_reconnect_result": self._on_reconnect_result,
+            "_network_ready":    self._on_network_ready,
+            "_network_failed":   self._on_network_failed,
             "new_game":          self._on_new_game,
         }
         handler = handlers.get(t)
@@ -341,6 +344,18 @@ class NetworkedGameRunner(GameRunner):
     def _on_peer_lost(self, msg: dict) -> None:  # noqa: ARG002
         """Internal: peer disconnected, show overlay."""
         self._peer_disconnected = True
+
+    def _on_network_ready(self, msg: dict) -> None:
+        """Background relay connect succeeded — wire up the client."""
+        self._relay_client = msg["relay"]
+        self._room_code    = msg.get("room_code") or self._room_code
+        self._connecting   = False
+        logger.info("Relay connected — room %s", self._room_code)
+
+    def _on_network_failed(self, msg: dict) -> None:  # noqa: ARG002
+        """Background relay connect failed."""
+        self._connecting = False
+        logger.error("Failed to connect to relay at %s", self._relay_url)
 
     def _on_reconnect_result(self, msg: dict) -> None:
         """Internal: result of a background relay reconnect attempt."""
@@ -1093,10 +1108,13 @@ class NetworkedGameRunner(GameRunner):
         text(f"Mode    {role_label}", pfont_md, _P_DIM)
 
         # Room code display for online host (share with opponent)
-        if self._role == NetworkRole.ONLINE_HOST and self._room_code:
+        if self._role == NetworkRole.ONLINE_HOST:
             sep()
-            text("Share this code:", pfont_md, _P_TEXT)
-            text(f"  {self._room_code}", pfont_md, _P_GOOD)
+            if self._connecting:
+                text("Connecting to relay...", pfont_sm, _P_WARN)
+            elif self._room_code:
+                text("Share this code:", pfont_md, _P_TEXT)
+                text(f"  {self._room_code}", pfont_md, _P_GOOD)
             sep()
 
         # Room code entry hint (join online from lobby)
@@ -1213,39 +1231,44 @@ class NetworkedGameRunner(GameRunner):
                 logger.error("Could not connect to %s:%d", self._host_ip, self._port)
 
         elif self._role == NetworkRole.ONLINE_HOST:
-            relay = RelayClient(
-                relay_url=self._relay_url,
-                role="host",
-                player_name=self._player_name,
-                on_peer_connected=self._on_connected,
-                on_peer_disconnected=self._on_disconnected,
-            )
-            relay.set_message_handler(self._on_network_message)
-            code = relay.create_room(timeout=60.0)
-            if code:
-                self._relay_client = relay
-                self._room_code = code
-                logger.info("Online room created: %s — waiting for opponent", code)
-            else:
-                logger.error("Failed to create relay room at %s", self._relay_url)
+            self._connecting = True
+            def _connect_host() -> None:
+                relay = RelayClient(
+                    relay_url=self._relay_url,
+                    role="host",
+                    player_name=self._player_name,
+                    on_peer_connected=self._on_connected,
+                    on_peer_disconnected=self._on_disconnected,
+                )
+                relay.set_message_handler(self._on_network_message)
+                code = relay.create_room(timeout=60.0)
+                if code:
+                    logger.info("Online room created: %s — waiting for opponent", code)
+                    self._incoming.append({"type": "_network_ready", "relay": relay, "room_code": code})
+                else:
+                    self._incoming.append({"type": "_network_failed"})
+            threading.Thread(target=_connect_host, daemon=True, name="RelayConnect").start()
 
         elif self._role in (NetworkRole.ONLINE_GUEST, NetworkRole.ONLINE_SPECTATOR):
+            self._connecting = True
             ws_role = "spectator" if self._role == NetworkRole.ONLINE_SPECTATOR else "guest"
-            relay = RelayClient(
-                relay_url=self._relay_url,
-                role=ws_role,
-                player_name=self._player_name,
-                on_peer_connected=self._on_connected,
-                on_peer_disconnected=self._on_disconnected,
-            )
-            relay.set_message_handler(self._on_network_message)
             room = self._room_code or ""
-            ok = relay.join_room(room, timeout=60.0) if ws_role == "guest" else relay.spectate_room(room, timeout=60.0)
-            if ok:
-                self._relay_client = relay
-                logger.info("Joined online room %s as %s", room, ws_role)
-            else:
-                logger.error("Failed to join relay room %s", room)
+            def _connect_guest(ws_role: str = ws_role, room: str = room) -> None:
+                relay = RelayClient(
+                    relay_url=self._relay_url,
+                    role=ws_role,
+                    player_name=self._player_name,
+                    on_peer_connected=self._on_connected,
+                    on_peer_disconnected=self._on_disconnected,
+                )
+                relay.set_message_handler(self._on_network_message)
+                ok = relay.join_room(room, timeout=60.0) if ws_role == "guest" else relay.spectate_room(room, timeout=60.0)
+                if ok:
+                    logger.info("Joined online room %s as %s", room, ws_role)
+                    self._incoming.append({"type": "_network_ready", "relay": relay})
+                else:
+                    self._incoming.append({"type": "_network_failed"})
+            threading.Thread(target=_connect_guest, daemon=True, name="RelayConnect").start()
 
     def _stop_network(self) -> None:
         if self._server:

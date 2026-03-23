@@ -88,9 +88,9 @@ if __name__ == "__main__":
                         help="Join an internet game with the given 6-character room code")
     parser.add_argument("--online-spectate", metavar="CODE",
                         help="Spectate an internet game with the given 6-character room code")
-    parser.add_argument("--relay",         default="wss://chess101.net",
+    parser.add_argument("--relay",         default="wss://relay.chess101.net",
                         metavar="URL",
-                        help="Relay server URL (default wss://chess101.net)")
+                        help="Relay server URL (default wss://relay.chess101.net)")
     args = parser.parse_args()
 
     if args.local:
