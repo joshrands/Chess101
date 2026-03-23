@@ -3,8 +3,22 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Chess101 — RGB LED Chess Board</title>
+  <title>Chess101 — Bringing the Game of the Past Into the Future</title>
   <meta name="description" content="A physical chess board on a Raspberry Pi. 32×32 RGB LED matrix. 64 reed switches. Alpha-beta AI. LAN + internet multiplayer.">
+
+  <!-- Open Graph / iMessage / Slack / Discord previews -->
+  <meta property="og:type"        content="website">
+  <meta property="og:url"         content="https://chess101.net/">
+  <meta property="og:title"       content="Chess101 — Bringing the Game of the Past Into the Future">
+  <meta property="og:description" content="A physical chess board on a Raspberry Pi. 32×32 RGB LED matrix. 64 reed switches. Alpha-beta AI. LAN + internet multiplayer.">
+  <meta property="og:image"       content="https://chess101.net/landing.jpg">
+  <meta property="og:image:alt"   content="Chess101 RGB LED chess board">
+
+  <!-- Twitter / X card -->
+  <meta name="twitter:card"        content="summary_large_image">
+  <meta name="twitter:title"       content="Chess101 — Bringing the Game of the Past Into the Future">
+  <meta name="twitter:description" content="A physical chess board on a Raspberry Pi. 32×32 RGB LED matrix. 64 reed switches. Alpha-beta AI. LAN + internet multiplayer.">
+  <meta name="twitter:image"       content="https://chess101.net/landing.jpg">
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -90,7 +104,7 @@
       text-transform: uppercase;
       color: var(--dim);
     }
-    .nav-links a:hover { color: var(--g); }
+    .nav-links a:hover, .nav-links a.active { color: var(--g); }
     .nav-gh {
       font-size: .75rem;
       letter-spacing: .1em;
@@ -497,7 +511,7 @@
       <a class="btn btn-primary" href="https://github.com/joshrands/Chess101" target="_blank" rel="noopener">
         ⬡&nbsp; View on GitHub
       </a>
-      <a class="btn btn-outline" href="/spectate">
+      <a class="btn btn-outline" href="/spectator.html">
         ♟&nbsp; Watch Live
       </a>
     </div>
@@ -685,7 +699,7 @@ BeaconBroadcaster        <span class="c2">→</span> UDP auto-discovery  <span c
 
       <div class="mode c">
         <div class="mode-title">Browser Spectator</div>
-        <div class="mode-cmd">chess101.net/spectate</div>
+        <div class="mode-cmd">chess101.net/spectator.html</div>
         <div class="mode-desc">Watch any internet game live from your browser. No installation — just a room code.</div>
       </div>
 
@@ -702,7 +716,7 @@ BeaconBroadcaster        <span class="c2">→</span> UDP auto-discovery  <span c
       <a class="btn btn-primary" href="https://github.com/joshrands/Chess101" target="_blank" rel="noopener">
         ⬡&nbsp; View Source on GitHub
       </a>
-      <a class="btn btn-outline" href="/spectate">
+      <a class="btn btn-outline" href="/spectator.html">
         ♟&nbsp; Spectate a Game
       </a>
     </div>
@@ -718,6 +732,27 @@ BeaconBroadcaster        <span class="c2">→</span> UDP auto-discovery  <span c
   <p><a href="https://github.com/joshrands/Chess101" target="_blank" rel="noopener">github.com/joshrands/Chess101</a></p>
   <p style="margin-top:10px">MIT License &nbsp;·&nbsp; Built with ♟ and a lot of solder</p>
 </footer>
+
+<!-- ── ACTIVE NAV HIGHLIGHT ────────────────────────────────────────────── -->
+<script>
+(function () {
+  const links   = document.querySelectorAll('.nav-links a');
+  const sections = Array.from(links).map(a => document.querySelector(a.getAttribute('href')));
+
+  const observer = new IntersectionObserver(entries => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        const id = entry.target.id;
+        links.forEach(a => {
+          a.classList.toggle('active', a.getAttribute('href') === '#' + id);
+        });
+      }
+    });
+  }, { rootMargin: '-40% 0px -55% 0px', threshold: 0 });
+
+  sections.forEach(s => { if (s) observer.observe(s); });
+})();
+</script>
 
 <!-- ── ANIMATED LED CANVAS ─────────────────────────────────────────────── -->
 <script>
