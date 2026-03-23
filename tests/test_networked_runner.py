@@ -724,3 +724,190 @@ class TestRelayReconnectGuards:
         assert "rejoin_sync" in types_sent, (
             "HOST must respond to the reconnect hello with rejoin_sync"
         )
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# AI-move relay bug — illegal_move from relay validator de-sync
+# ═════════════════════════════════════════════════════════════════════════════
+#
+# Root cause: when computer_player_l was True, _begin_turn() set _ai_thinking=True
+# on BOTH sides (HOST and GUEST), but only GUEST actually owned team_l.  HOST ran
+# the AI, applied the move locally, and never sent it to the relay.  The relay's
+# RoomValidator counter stayed on team_l's turn, so HOST's next human move was
+# rejected as "illegal_move".
+#
+# Fix: _begin_turn override in NetworkedGameRunner clears _ai_thinking when it's
+# not our turn; _update override intercepts the AI result before super() applies
+# it and stamps _pending_send_move so _next_turn() sends it over the relay.
+
+import threading  # noqa: E402 — already imported at top; repeated here for clarity
+
+
+class TestAIMoveRelaySend:
+    """AI moves must be sent over the relay, not just applied silently."""
+
+    def _make_playing_runner(
+        self,
+        _pygame,
+        role: NetworkRole,
+        computer_player_r: bool,
+        computer_player_l: bool,
+    ) -> tuple[NetworkedGameRunner, _FakeRelay]:
+        """Return a runner in PLAYING with the given AI flags and a FakeRelay."""
+        runner = NetworkedGameRunner(role=role)
+        runner._init_board()
+        b = runner._b
+        b.team_r.r, b.team_r.g, b.team_r.b = 65, 180, 232
+        b.team_l.r, b.team_l.g, b.team_l.b = 255, 140, 0
+        b.computer_player_r = computer_player_r
+        b.computer_player_l = computer_player_l
+        relay = _FakeRelay()
+        runner._relay_client = relay
+        runner._peer_name = "Peer"
+        runner._start_game()   # phase → PLAYING, _current_team = team_r
+        return runner, relay
+
+    # ── _begin_turn: suppress AI for remote team ──────────────────────────────
+
+    def test_begin_turn_suppresses_ai_for_remote_team_r(self, _pygame):
+        """HOST must not set _ai_thinking when team_r is AI and it's team_l's turn."""
+        # HOST owns team_r; team_r AI is irrelevant here — we test the case where
+        # team_l (remote) is AI and HOST should NOT run it.
+        runner, _ = self._make_playing_runner(
+            _pygame, NetworkRole.ONLINE_HOST,
+            computer_player_r=False, computer_player_l=True,
+        )
+        b = runner._b
+        # Manually advance to team_l's turn (the remote AI's turn)
+        runner._current_team = b.team_l
+        runner._begin_turn(b.team_l)
+
+        assert runner._ai_thinking is False, (
+            "HOST must not run AI for team_l (remote team) — "
+            "GUEST owns that AI and will send the move"
+        )
+
+    def test_begin_turn_suppresses_ai_for_remote_team_l(self, _pygame):
+        """GUEST must not set _ai_thinking when team_r is AI and it's team_r's turn."""
+        runner, _ = self._make_playing_runner(
+            _pygame, NetworkRole.ONLINE_GUEST,
+            computer_player_r=True, computer_player_l=False,
+        )
+        b = runner._b
+        # team_r's turn — HOST (remote) owns team_r
+        runner._current_team = b.team_r
+        runner._begin_turn(b.team_r)
+
+        assert runner._ai_thinking is False, (
+            "GUEST must not run AI for team_r (remote team)"
+        )
+
+    def test_begin_turn_allows_ai_for_local_team(self, _pygame):
+        """HOST with AI team_r should still set _ai_thinking when it's team_r's turn."""
+        runner, _ = self._make_playing_runner(
+            _pygame, NetworkRole.ONLINE_HOST,
+            computer_player_r=True, computer_player_l=False,
+        )
+        b = runner._b
+        runner._current_team = b.team_r
+        runner._begin_turn(b.team_r)
+
+        assert runner._ai_thinking is True, (
+            "HOST must set _ai_thinking for its own AI team"
+        )
+
+    # ── _update: intercept AI result and set _pending_send_move ──────────────
+
+    def _fake_dead_thread(self) -> threading.Thread:
+        """Return a thread that has already finished."""
+        t = threading.Thread(target=lambda: None)
+        t.start()
+        t.join()
+        return t
+
+    def test_update_sets_pending_send_move_for_ai(self, _pygame):
+        """When our AI thread finishes, _update must stamp _pending_send_move."""
+        from ai.tree import Tree
+        from core.cell import Cell
+
+        runner, relay = self._make_playing_runner(
+            _pygame, NetworkRole.ONLINE_HOST,
+            computer_player_r=True, computer_player_l=False,
+        )
+        b = runner._b
+        runner._current_team = b.team_r
+
+        # Simulate a finished AI thread with a valid move result (e2→e4, i.e., row1col4→row3col4)
+        # Use a pawn at (1,4) → (3,4).
+        best = Tree(
+            board_state=b.grid,
+            old_cell=Cell(1, 4),
+            new_cell=Cell(3, 4),
+            team_r=b.team_r,
+            team_l=b.team_l,
+        )
+        runner._ai_thinking = True
+        runner._ai_result = best
+        runner._ai_thread = self._fake_dead_thread()
+
+        # Suppress actual network send and super()'s update-side effects
+        runner._net_send = lambda msg: None
+        # We don't call super()._update() to avoid pygame/board side effects;
+        # instead test the intercept block directly by calling _update and
+        # checking _pending_send_move is set *before* super clears _ai_thread.
+        # We patch super() to be a no-op for this unit test.
+        original_update = runner.__class__.__bases__[0]._update
+        runner.__class__.__bases__[0]._update = lambda self: None
+        try:
+            runner._drain_incoming = lambda: None
+            runner._check_keepalive = lambda: None
+            runner._update()
+        finally:
+            runner.__class__.__bases__[0]._update = original_update
+
+        assert runner._pending_send_move is not None, (
+            "AI move intercept must set _pending_send_move before super()._update() "
+            "applies the move — otherwise _next_turn() won't send it to the peer"
+        )
+        pm = runner._pending_send_move
+        assert pm["fr"] == 1 and pm["fc"] == 4
+        assert pm["tr"] == 3 and pm["tc"] == 4
+        assert pm["piece"] == "Pawn"
+
+    def test_update_does_not_set_pending_for_remote_ai(self, _pygame):
+        """When it's the remote team's AI turn, _update must not set _pending_send_move."""
+        from ai.tree import Tree
+        from core.cell import Cell
+
+        runner, relay = self._make_playing_runner(
+            _pygame, NetworkRole.ONLINE_HOST,
+            computer_player_r=False, computer_player_l=True,
+        )
+        b = runner._b
+        runner._current_team = b.team_l  # remote AI's turn
+
+        best = Tree(
+            board_state=b.grid,
+            old_cell=Cell(6, 4),
+            new_cell=Cell(4, 4),
+            team_r=b.team_r,
+            team_l=b.team_l,
+        )
+        # Even if _ai_thinking were True (before the _begin_turn fix suppresses it),
+        # the _update intercept guard checks _is_my_turn() and must not fire.
+        runner._ai_thinking = True
+        runner._ai_result = best
+        runner._ai_thread = self._fake_dead_thread()
+
+        original_update = runner.__class__.__bases__[0]._update
+        runner.__class__.__bases__[0]._update = lambda self: None
+        try:
+            runner._drain_incoming = lambda: None
+            runner._check_keepalive = lambda: None
+            runner._update()
+        finally:
+            runner.__class__.__bases__[0]._update = original_update
+
+        assert runner._pending_send_move is None, (
+            "_update must not set _pending_send_move when it's the remote team's turn"
+        )

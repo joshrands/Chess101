@@ -946,6 +946,16 @@ class NetworkedGameRunner(GameRunner):
             )
         super()._next_turn()
 
+    def _begin_turn(self, team) -> None:
+        """Only run AI for our own team; suppress it for the remote team."""
+        super()._begin_turn(team)
+        # In a real networked game (not LOCAL / spectator), each side only controls
+        # its own team.  super()._begin_turn() may have set _ai_thinking=True because
+        # the *remote* team happens to be AI-controlled, but we must not run that AI
+        # locally — the remote instance will run it and send the resulting move.
+        if self._local_team_key not in ("both", "spectator") and not self._is_my_turn():
+            self._ai_thinking = False
+
     # ── Update ────────────────────────────────────────────────────────────────
 
     # ── Move logging ──────────────────────────────────────────────────────────
@@ -1014,6 +1024,32 @@ class NetworkedGameRunner(GameRunner):
                     ok = rc.reconnect(timeout=15.0)
                     self._incoming.append({"type": "_reconnect_result", "ok": ok})
                 threading.Thread(target=_attempt, daemon=True, name="RelayReconnect").start()
+
+        # Intercept AI moves before the parent applies them so _next_turn() sends
+        # the move to the peer.  _pending_send_move must be set before _next_turn()
+        # is called inside super()._update().  The piece is still at old_r/old_c
+        # at this point (super hasn't moved it yet), so _build_move_flags is valid.
+        if (self.phase == Phase.PLAYING
+                and self._is_my_turn()
+                and self._ai_thinking
+                and self._ai_thread is not None
+                and not self._ai_thread.is_alive()):
+            best = self._ai_result
+            if best is not None and best.old_cell is not None and best.new_cell is not None:
+                b = self._b
+                old_r, old_c = best.old_cell.row, best.old_cell.col
+                tgt_r, tgt_c = best.new_cell.row, best.new_cell.col
+                piece = b.grid[old_r][old_c]
+                if piece is not None:
+                    pre_capture = b.grid[tgt_r][tgt_c]
+                    flags = self._build_move_flags(
+                        piece, old_r, old_c, tgt_r, tgt_c, pre_capture)
+                    self._pending_send_move = {
+                        "fr": old_r, "fc": old_c, "tr": tgt_r, "tc": tgt_c,
+                        "piece": type(piece).__name__,
+                        "captured": type(pre_capture).__name__ if pre_capture else None,
+                        "flags": flags,
+                    }
 
         super()._update()
 

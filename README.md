@@ -193,7 +193,7 @@ Chess101/
 │   └── sensor.py           # Click-driven reed-switch mock
 │
 ├── plans/multiplayer/      # Design docs for multiplayer phases 1–3
-└── tests/                  # pytest suite (413 tests)
+└── tests/                  # pytest suite (418 tests)
 ```
 
 ---
