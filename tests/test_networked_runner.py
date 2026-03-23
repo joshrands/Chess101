@@ -305,3 +305,179 @@ class TestRemoteLastMove:
             runner.__class__.__bases__[0]._next_turn = original_next
 
         assert runner._remote_last_move == (6, 0, 5, 0)
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# Bug-fix tests — online-play guards
+# ═════════════════════════════════════════════════════════════════════════════
+
+import time  # noqa: E402 (placed here to avoid reorder with top-level imports)
+
+from simulator.app import _CELL_PX  # noqa: E402
+
+
+class _FakeRelay:
+    """Minimal relay-client stub — records sent messages."""
+    def __init__(self) -> None:
+        self.sent: list[dict] = []
+
+    def send(self, msg: dict) -> None:
+        self.sent.append(msg)
+
+    def color_chosen_msgs(self) -> list[dict]:
+        return [m for m in self.sent if m.get("type") == "color_chosen"]
+
+    def war_games_msgs(self) -> list[dict]:
+        return [m for m in self.sent if m.get("type") == "war_games_choice"]
+
+
+def _click(row: int, col: int) -> pygame.event.Event:
+    """Synthesise a MOUSEBUTTONDOWN at the centre pixel of board cell (row, col)."""
+    px = col * _CELL_PX + _CELL_PX // 2
+    py = row * _CELL_PX + _CELL_PX // 2
+    return pygame.event.Event(pygame.MOUSEBUTTONDOWN, {"pos": (px, py), "button": 1})
+
+
+def _make_online_runner(role: NetworkRole, _pygame_fixture) -> tuple[NetworkedGameRunner, _FakeRelay]:
+    """Create a NetworkedGameRunner wired to a FakeRelay, ready for tests."""
+    runner = NetworkedGameRunner(role=role)
+    runner._init_board()
+    relay = _FakeRelay()
+    runner._relay_client = relay
+    runner._peer_name = "Bob"           # simulate peer already introduced
+    runner.phase = Phase.COLOR_PICK
+    return runner, relay
+
+
+# ── Bug 1 — Keepalive: _on_connected must reset _last_pong_s ─────────────────
+
+class TestKeepaliveOnConnect:
+    def test_peer_connected_resets_pong_clock(self, _pygame):
+        runner = NetworkedGameRunner(role=NetworkRole.ONLINE_HOST)
+        runner._init_board()
+        relay = _FakeRelay()
+        runner._relay_client = relay
+
+        # Simulate a 40-second wait before peer joins
+        runner._last_pong_s = time.time() - 40.0
+
+        runner._on_connected()
+
+        assert time.time() - runner._last_pong_s < 1.0, (
+            "_on_connected() must reset _last_pong_s so a long wait before peer "
+            "joins does not immediately trigger the 30s pong timeout"
+        )
+
+    def test_no_immediate_disconnect_after_connect(self, _pygame):
+        runner = NetworkedGameRunner(role=NetworkRole.ONLINE_HOST)
+        runner._init_board()
+        relay = _FakeRelay()
+        runner._relay_client = relay
+
+        # Simulate a 40-second wait before peer joins
+        runner._last_pong_s = time.time() - 40.0
+
+        runner._on_connected()
+        runner._check_keepalive()   # would have fired the timeout before the fix
+
+        assert runner._peer_disconnected is False, (
+            "Peer should not be marked disconnected immediately after connecting"
+        )
+
+
+# ── Bugs 2 & 3 — COLOR_PICK guards ───────────────────────────────────────────
+
+class TestColorPickGuards:
+    def test_color_pick_blocked_before_peer_joins(self, _pygame):
+        """Clicks on row 2 must be ignored while _peer_name is None."""
+        runner, relay = _make_online_runner(NetworkRole.ONLINE_HOST, _pygame)
+        runner._peer_name = None        # peer has NOT joined yet
+
+        runner._handle_color_pick(_click(2, 3))
+
+        assert relay.color_chosen_msgs() == [], "No color_chosen should be sent before peer joins"
+        assert runner._local_color_sent is False
+
+    def test_color_pick_allowed_after_peer_joins(self, _pygame):
+        """After peer sends hello, row 2 clicks should register."""
+        runner, relay = _make_online_runner(NetworkRole.ONLINE_HOST, _pygame)
+        # _peer_name already set by _make_online_runner
+
+        runner._handle_color_pick(_click(2, 3))
+
+        msgs = relay.color_chosen_msgs()
+        assert len(msgs) == 1
+        assert msgs[0]["color_idx"] == 3
+        assert runner._local_color_sent is True
+
+    def test_color_pick_idempotent(self, _pygame):
+        """Clicking a second time must not send another color_chosen."""
+        runner, relay = _make_online_runner(NetworkRole.ONLINE_HOST, _pygame)
+
+        runner._handle_color_pick(_click(2, 0))   # first pick: col 0
+        runner._handle_color_pick(_click(2, 5))   # attempted re-pick: col 5
+
+        msgs = relay.color_chosen_msgs()
+        assert len(msgs) == 1, "Only the first pick should be sent"
+        assert msgs[0]["color_idx"] == 0, "First pick (col 0) should be the winner"
+        assert runner._selected_r_idx == 0
+
+
+# ── Bug 4 — WAR_GAMES guard ───────────────────────────────────────────────────
+
+class TestWarGamesGuards:
+    def test_war_games_idempotent(self, _pygame):
+        """Clicking a second time in WAR_GAMES must not send another war_games_choice."""
+        runner, relay = _make_online_runner(NetworkRole.ONLINE_HOST, _pygame)
+        runner.phase = Phase.WAR_GAMES
+
+        runner._handle_war_games(_click(3, 0))   # first pick: Human (col 0-3)
+        runner._handle_war_games(_click(3, 5))   # attempted re-pick: AI (col 4-7)
+
+        msgs = relay.war_games_msgs()
+        assert len(msgs) == 1, "Only the first war-games choice should be sent"
+        assert msgs[0]["is_ai"] is False, "First pick (Human) should be the winner"
+        assert runner._b.computer_player_r is False
+
+
+# ── Bug 5 — New game goes to COLOR_PICK (rematch), not LOBBY ─────────────────
+
+class TestNewGameRematch:
+    def test_new_game_stays_connected_host(self, _pygame):
+        """HOST pressing N should land at COLOR_PICK with relay still wired."""
+        runner, relay = _make_online_runner(NetworkRole.ONLINE_HOST, _pygame)
+        runner.phase = Phase.GAME_OVER
+
+        runner._new_game_local()
+
+        assert runner.phase == Phase.COLOR_PICK, (
+            "Online HOST should rematch at COLOR_PICK, not go back to LOBBY"
+        )
+        assert runner._relay_client is relay, "Relay should remain connected after rematch"
+        assert runner._peer_disconnected is False
+
+    def test_new_game_stays_connected_guest(self, _pygame):
+        """GUEST receiving new_game should also land at COLOR_PICK."""
+        runner, relay = _make_online_runner(NetworkRole.ONLINE_GUEST, _pygame)
+        runner._local_team_key = "l"
+        runner.phase = Phase.GAME_OVER
+
+        runner._incoming.append({"type": "new_game"})
+        runner._drain_incoming()
+
+        assert runner.phase == Phase.COLOR_PICK, (
+            "Online GUEST should rematch at COLOR_PICK after receiving new_game"
+        )
+        assert runner._peer_disconnected is False
+
+    def test_new_game_resets_color_state(self, _pygame):
+        """Color negotiation state must be cleared so the rematch can re-pick."""
+        runner, relay = _make_online_runner(NetworkRole.ONLINE_HOST, _pygame)
+        runner._local_color_sent = True
+        runner._selected_r_idx = 3
+        runner.phase = Phase.GAME_OVER
+
+        runner._new_game_local()
+
+        assert runner._local_color_sent is False
+        assert runner._selected_r_idx is None

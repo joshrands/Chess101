@@ -319,6 +319,7 @@ class NetworkedGameRunner(GameRunner):
 
     def _on_connected(self) -> None:
         """Peer connected — send hello."""
+        self._last_pong_s = time.time()   # reset keepalive clock — peer just connected
         self._peer_connected = True
         # Translate online roles to their wire-protocol equivalents
         wire_role = {
@@ -373,6 +374,11 @@ class NetworkedGameRunner(GameRunner):
         """Peer pressed N — reset without re-broadcasting."""
         self._reset()
         self._init_board()
+        if self._local_team_key in ("r", "l") and (self._relay_client or self._server or self._client):
+            self.phase = Phase.COLOR_PICK
+            self._peer_disconnected = False
+            self._disconnect_time_ms = None
+            self._last_pong_s = time.time()
         logger.info("New game triggered by peer")
 
     def _new_game_local(self) -> None:
@@ -380,6 +386,11 @@ class NetworkedGameRunner(GameRunner):
         self._net_send({"type": "new_game"})
         self._reset()
         self._init_board()
+        if self._local_team_key in ("r", "l") and (self._relay_client or self._server or self._client):
+            self.phase = Phase.COLOR_PICK
+            self._peer_disconnected = False
+            self._disconnect_time_ms = None
+            self._last_pong_s = time.time()
 
     def _on_hello(self, msg: dict) -> None:
         remote_ver = msg.get("version", "")
@@ -707,6 +718,10 @@ class NetworkedGameRunner(GameRunner):
         """Networked COLOR_PICK: each side controls only their own row."""
         if event.type != pygame.MOUSEBUTTONDOWN:
             return
+        if self._peer_name is None:     # peer hasn't joined yet — ignore clicks
+            return
+        if self._local_color_sent:      # already picked — ignore re-picks
+            return
         cell = self._px_to_cell(*event.pos)
         if cell is None:
             return
@@ -750,6 +765,8 @@ class NetworkedGameRunner(GameRunner):
     def _handle_war_games(self, event: pygame.event.Event) -> None:
         """Networked WAR_GAMES: each side controls only their own row."""
         if event.type != pygame.MOUSEBUTTONDOWN:
+            return
+        if self._local_war_sent:        # already chose — ignore re-picks
             return
         cell = self._px_to_cell(*event.pos)
         if cell is None:
