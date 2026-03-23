@@ -193,7 +193,11 @@ class RoomValidator:
         piece.calc_targets(g)
 
         # If the king is in check, only moves that resolve it are legal.
-        if in_check:
+        # Do NOT apply sky_fall to the King itself — the King's calc_targets()
+        # already filters its own unsafe escape squares via simulation.  sky_fall
+        # restricts targets to the attack-ray (blocking/capturing) squares, which
+        # would incorrectly remove King escape moves that exit the ray diagonally.
+        if in_check and not isinstance(piece, King):
             piece.sky_fall(king)
 
         legal = any(t.row == tr and t.col == tc for t in piece.targets)

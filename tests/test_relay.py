@@ -989,3 +989,130 @@ class TestGameProtocolForwarding:
             assert received == msg
         finally:
             h_ws.close(); g_ws.close()
+
+
+# ── TestValidatorKingEscape ────────────────────────────────────────────────────
+
+
+class TestValidatorKingEscape:
+    """Unit tests for RoomValidator: King escaping from check.
+
+    Regression for the bug where sky_fall() was incorrectly applied to the
+    King itself in _validate_and_apply().  sky_fall() restricts targets to
+    the attacker's ray (blocking/capturing squares), which removed valid King
+    escape moves that exit the ray diagonally.  The game code's _begin_turn()
+    explicitly skips sky_fall for King pieces; the validator must do the same.
+    """
+
+    @staticmethod
+    def _anticheat_available() -> bool:
+        try:
+            from network.validator import RoomValidator  # noqa: F401
+            return True
+        except Exception:
+            return False
+
+    @staticmethod
+    def _make_minimal_validator(king_r_pos, queen_l_pos, king_l_pos=(7, 7)):
+        """Return a RoomValidator with only three pieces on the board.
+
+        Blue (team_r) King at king_r_pos, Orange (team_l) Queen at queen_l_pos,
+        and Orange King at king_l_pos.  It is Blue's turn (_current_team=team_r).
+        """
+        from network.validator import RoomValidator
+        from pieces.king import King
+        from pieces.queen import Queen
+
+        v = RoomValidator()
+        v.initialize((64, 180, 232), (255, 140, 0))
+        # Wipe the full starting position.
+        for r in range(8):
+            for c in range(8):
+                v._grid[r][c] = None
+        # Place the three pieces used by the test.
+        v._grid[king_r_pos[0]][king_r_pos[1]] = King(*king_r_pos, v._team_r)
+        v._grid[queen_l_pos[0]][queen_l_pos[1]] = Queen(*queen_l_pos, v._team_l)
+        v._grid[king_l_pos[0]][king_l_pos[1]] = King(*king_l_pos, v._team_l)
+        v._current_team = v._team_r  # Blue to move
+        return v
+
+    @staticmethod
+    def _move(fr, fc, tr, tc):
+        return {
+            "type": "move", "seq": 1,
+            "from_row": fr, "from_col": fc,
+            "to_row": tr, "to_col": tc,
+            "piece": "King", "flags": {}, "board_hash": "",
+        }
+
+    def test_king_escape_diagonal_off_attack_ray_accepted(self):
+        """King in check along rank 0 can escape diagonally to row 1.
+
+        Blue King (0,4) is attacked by Orange Queen (0,7) along rank 0.
+        King escapes to (1,3) — diagonal, not on the attack ray.
+
+        Before the fix: sky_fall restricted King's targets to rank-0 squares
+        [(0,7),(0,6),(0,5)], so (1,3) was removed and the move was rejected.
+        After the fix: sky_fall is NOT applied to the King; (1,3) stays in
+        targets and the move is accepted.
+        """
+        if not self._anticheat_available():
+            pytest.skip("RoomValidator not available")
+        v = self._make_minimal_validator(
+            king_r_pos=(0, 4), queen_l_pos=(0, 7)
+        )
+        result = v.validate_and_apply(self._move(0, 4, 1, 3))
+        assert result, (
+            "King escape to (1,3) off the rank-0 attack ray must be accepted. "
+            "Regression: sky_fall was incorrectly applied to the King itself."
+        )
+
+    def test_king_escape_diagonal_other_direction_accepted(self):
+        """King in check along a file can escape diagonally.
+
+        Blue King (0,4) attacked by Orange Queen (7,4) along file 4.
+        King escapes to (1,5) — diagonal, not on file 4.
+        """
+        if not self._anticheat_available():
+            pytest.skip("RoomValidator not available")
+        v = self._make_minimal_validator(
+            king_r_pos=(0, 4), queen_l_pos=(7, 4)
+        )
+        result = v.validate_and_apply(self._move(0, 4, 1, 5))
+        assert result, (
+            "King escape to (1,5) off the file-4 attack ray must be accepted."
+        )
+
+    def test_king_cannot_escape_to_still_attacked_square(self):
+        """King in check cannot move to a square still attacked by the Queen.
+
+        Blue King (0,4) attacked by Orange Queen (0,7) along rank 0.
+        King tries to move to (0,5) — still on rank 0, still attacked.
+        Expected: rejected.
+        """
+        if not self._anticheat_available():
+            pytest.skip("RoomValidator not available")
+        v = self._make_minimal_validator(
+            king_r_pos=(0, 4), queen_l_pos=(0, 7)
+        )
+        result = v.validate_and_apply(self._move(0, 4, 0, 5))
+        assert not result, (
+            "King move to (0,5) is still attacked by Queen at (0,7) — must be rejected."
+        )
+
+    def test_king_escape_close_attacker_diagonal_accepted(self):
+        """Exact scenario from the game that triggered the bug.
+
+        Blue King at (0,2), Orange Queen at (0,5) — mirrors moves 36-37 of
+        the second online game.  King escapes to (1,1) diagonally.
+        """
+        if not self._anticheat_available():
+            pytest.skip("RoomValidator not available")
+        v = self._make_minimal_validator(
+            king_r_pos=(0, 2), queen_l_pos=(0, 5)
+        )
+        result = v.validate_and_apply(self._move(0, 2, 1, 1))
+        assert result, (
+            "King (0,2)→(1,1) escape from Queen check at (0,5) must be accepted. "
+            "This is the exact move rejected by the pre-fix validator in game move 37."
+        )
