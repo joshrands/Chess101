@@ -58,13 +58,18 @@ sudo python3 GameManager.py --join 192.168.1.42
 ```bash
 .venv/bin/python -m pytest tests/ -q          # all tests
 .venv/bin/python -m pytest tests/ -v          # verbose
-.venv/bin/python -m pytest tests/test_gameplay.py -v   # chess logic only
-.venv/bin/python -m pytest tests/test_simulator.py -v  # simulator only
-.venv/bin/python -m pytest tests/test_board.py -v      # Board-level tests
+.venv/bin/python -m pytest tests/test_gameplay.py -v            # chess logic only
+.venv/bin/python -m pytest tests/test_simulator.py -v           # simulator only
+.venv/bin/python -m pytest tests/test_board.py -v               # Board-level tests
 .venv/bin/python -m pytest tests/test_network.py -v             # network protocol tests
 .venv/bin/python -m pytest tests/test_networked_runner.py -v    # NetworkedGameRunner online-play fixes + relay-reconnect board-reset guards
 .venv/bin/python -m pytest tests/test_online_flow.py -v         # E2E online flow: handshake → color-pick → war-games → playing
 .venv/bin/python -m pytest tests/test_relay.py -v               # relay server tests (see below)
+.venv/bin/python -m pytest tests/test_chessmatrix_scanning.py -v  # ChessMatrix barcode scanner (Python)
+
+# JS scanner — runs under Node.js, no npm install needed:
+node tests/test_chessmatrix_js.js
+node tests/test_chessmatrix_js.js --verbose
 ```
 
 `conftest.py` stubs out `rgbmatrix` and `smbus` so all test files run on Mac without Pi hardware.
@@ -145,13 +150,22 @@ Chess101/
 │   ├── server.py           # GameServer — asyncio WebSocket server in daemon thread
 │   ├── client.py           # GameClient — asyncio WebSocket client in daemon thread
 │   ├── discovery.py        # BeaconBroadcaster + BeaconListener — UDP LAN discovery
-│   └── mdns.py             # MdnsAdvertiser + MdnsListener — mDNS/DNS-SD via zeroconf
+│   ├── mdns.py             # MdnsAdvertiser + MdnsListener — mDNS/DNS-SD via zeroconf
+│   └── chessmatrix.py      # ChessMatrix 8×8 four-color barcode: encode/render/decode_frame
 │
 ├── simulator/
 │   ├── app.py              # GameRunner: Pygame event loop, phase state machine + Lobby
 │   ├── networked_runner.py # NetworkedGameRunner: multiplayer + SPECTATOR + physical_host
 │   ├── fake_rgbmatrix.py   # FakeFrameCanvas / FakeRGBMatrix backed by pygame.Surface
 │   └── sensor.py           # SimSensor(BoardSensor) — click-driven, no I2C
+│
+├── web/
+│   ├── sim.html            # Simulator web UI
+│   ├── spectator.html      # Spectator web UI
+│   └── chessmatrix-scanner.js  # Browser/Node.js ChessMatrix decoder (no dependencies)
+│
+├── tools/
+│   └── debug_quad_detection.py  # Step-by-step visual debugger for the ChessMatrix pipeline
 │
 ├── plans/multiplayer/      # Design docs for all multiplayer phases
 │   ├── README.md           # Overview, 7 modes, 3-phase roadmap
@@ -163,14 +177,17 @@ Chess101/
 │   └── phase-3-internet.md # Phase 3: relay server + internet play
 │
 └── tests/
-    ├── conftest.py          # Stubs rgbmatrix and smbus for all non-Pi tests
-    ├── test_gameplay.py     # Pure chess logic + GameRunner integration (headless)
-    ├── test_simulator.py    # Simulator-specific bug regression tests
-    ├── test_board.py        # Board-level tests (runs on Mac via conftest stubs)
-    ├── test_network.py             # Network protocol, beacon, and transport tests
-    ├── test_networked_runner.py    # NetworkedGameRunner online-play bug fixes
-    ├── test_online_flow.py         # E2E online flow over in-process relay (handshake → playing)
-    └── test_relay.py               # Relay server protocol, reconnect, and anti-cheat tests
+    ├── conftest.py                  # Stubs rgbmatrix and smbus for all non-Pi tests
+    ├── test_gameplay.py             # Pure chess logic + GameRunner integration (headless)
+    ├── test_simulator.py            # Simulator-specific bug regression tests
+    ├── test_board.py                # Board-level tests (runs on Mac via conftest stubs)
+    ├── test_network.py              # Network protocol, beacon, and transport tests
+    ├── test_networked_runner.py     # NetworkedGameRunner online-play bug fixes
+    ├── test_online_flow.py          # E2E online flow over in-process relay (handshake → playing)
+    ├── test_relay.py                # Relay server protocol, reconnect, and anti-cheat tests
+    ├── test_chessmatrix_scanning.py # ChessMatrix scanning pipeline (Python)
+    ├── test_chessmatrix_js.js       # ChessMatrix scanning pipeline (Node.js)
+    └── fixtures/chessmatrix/        # PNG fixtures: real phone photos + synthetics
 ```
 
 ## Architecture
@@ -246,6 +263,44 @@ Pass `skip_lobby=True` (or `--local` CLI flag) to start directly at COLOR_PICK. 
 - **`server.py`** / **`client.py`** — `GameServer` / `GameClient`: asyncio WebSocket transport in daemon threads. Both expose `send(msg: dict)` and `set_message_handler(cb)`.
 - **`discovery.py`** — `BeaconBroadcaster` sends a UDP broadcast every 2 s on port 65102. `BeaconListener` receives beacons, maintains a `games` dict, and prunes stale entries after 10 s.
 - **`mdns.py`** — `MdnsAdvertiser` registers a `_chess101._tcp.local.` mDNS service (via `zeroconf`). `MdnsListener` browses for services, maintaining `listener.games: dict[str, DiscoveredMdnsGame]`. Both degrade gracefully if `zeroconf` is not installed.
+
+### ChessMatrix Barcode (`network/chessmatrix.py`)
+
+ChessMatrix is a custom 8×8 four-color barcode used to share room codes between devices without typing.  Each cell is one of four colors (black, red, green, blue = dibit 0–3).  The 6-char room code (30 bits) is packed into 4 data bytes and protected by RS(8,4) Reed–Solomon ECC, giving 4 error-correction bytes and the ability to recover up to 2 wrong cells.
+
+**Encoding pipeline** (`encode(room_code) → 8×8 RGB grid`):
+1. `room_code_to_bytes` packs the 6-char all-alpha code into 4 bytes (5 bits per char, big-endian).
+2. `rs_encode` appends 4 RS parity bytes → 8-byte codeword.
+3. Each byte is split into 4 dibits; the 32 dibits fill the non-structural cells of the 8×8 grid.
+4. Structural cells (border finders, timing strips, anchor corners) are fixed.
+5. `render_to_led` / `render_to_canvas` write the grid to an LED matrix or Pygame surface.
+
+**Decoding pipeline** (`decode_frame(rgba, w, h) → room_code | None`):
+1. **Grayscale + normalize** — simple channel average, stretched to [0, 255].
+2. **Adaptive blur** — Gaussian blur with kernel scaled to image size.
+3. **Local binarize** (`_local_threshold`) — mean–variance threshold per region.
+4. **Centroid** — white-pixel centroid locates the barcode roughly.
+5. **Hough axes** (`_hough_axes`) — box-blurred binary → Canny → probabilistic Hough lines.  Two dominant peaks found independently in the unfolded [0°, 180°) histogram so genuinely non-perpendicular axes (shear/perspective) are detected correctly.  Box blur kernel is capped at 15 px to avoid over-smoothing high-resolution phone images.
+6. **Affine unshear** — builds a 2×2 basis from the two Hough axis directions, inverts it to produce an affine unshear transform centered at the centroid, warps the binary so both axis families are axis-aligned.
+7. **Inflate rect** (`_inflate_rect`) — grows an AABB from the centroid until each edge accumulates white pixels, finding the barcode bounds in unsheared space.
+8. **Back-transform + scale** — corners are mapped back to original image space, then scaled outward 4/3× to include the full border.
+9. **Perspective warp** (`_warp_to_canonical`) — four-point warp to a 128×128 canonical square; tries all four 90° rotations and picks the one where the bottom-left corner is the L-finder (solid black 2×2).
+10. **Calibration** (`_calibrate_and_decode`) — samples the 5 anchor cells (K, R, G, B, W) to build a color map; rejects frames where the luminance spread across anchors is < 60 (prevents all-zero false positives when the scene is uniform).
+11. **Classify + ECC** — each data cell is mapped to the nearest calibration color; 32 dibits → 8 bytes → RS decode → 4 data bytes → room code string.
+
+The JS implementation in `web/chessmatrix-scanner.js` mirrors this pipeline exactly (no dependencies, runs in browser or Node.js).
+
+**Debug tool** (`tools/debug_quad_detection.py`):
+
+Renders any pipeline stage to PNG for every fixture image.  Pass `--step N` (1–15) and optionally `--synth` to include synthetic frames.  Output goes to `tests/fixtures/chessmatrix_debug/`.
+
+```bash
+.venv/bin/python tools/debug_quad_detection.py --step 7        # oriented inflate-rect
+.venv/bin/python tools/debug_quad_detection.py --step 6 --synth # Hough axes on synthetics
+.venv/bin/python tools/debug_quad_detection.py                  # all stages (step 15 = decode)
+```
+
+Stage map: 1 grayscale · 2 normalize · 3 blur · 4 binarize · 5 centroid · 6 Hough axes · 7 oriented inflate · 8 outer rect · 9 rectify-binary · 10 rectify-color · 11 orient · 12 channel-norm · 13 cal-debug · 14 color-calibrate · 15 decode.
 
 ### Hardware Interface
 

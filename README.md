@@ -117,13 +117,18 @@ All tests run on Mac without Pi hardware. The test suite uses `conftest.py` to s
 .venv/bin/python -m pytest tests/ -v
 
 # Specific suites
-.venv/bin/python -m pytest tests/test_gameplay.py -v    # chess logic
-.venv/bin/python -m pytest tests/test_simulator.py -v   # simulator phase state machine
-.venv/bin/python -m pytest tests/test_board.py -v       # Board-level (Pi controller)
+.venv/bin/python -m pytest tests/test_gameplay.py -v             # chess logic
+.venv/bin/python -m pytest tests/test_simulator.py -v            # simulator phase state machine
+.venv/bin/python -m pytest tests/test_board.py -v                # Board-level (Pi controller)
 .venv/bin/python -m pytest tests/test_network.py -v              # network protocol, transport + NetworkedBoard
 .venv/bin/python -m pytest tests/test_networked_runner.py -v     # NetworkedGameRunner online-play fixes + relay-reconnect board-reset guards
 .venv/bin/python -m pytest tests/test_online_flow.py -v          # E2E online flow: handshake → color-pick → war-games → playing
 .venv/bin/python -m pytest tests/test_relay.py -v                # relay server (see modes below)
+.venv/bin/python -m pytest tests/test_chessmatrix_scanning.py -v # ChessMatrix barcode scanner (Python)
+
+# JS scanner tests (requires Node.js, no npm install needed)
+node tests/test_chessmatrix_js.js
+node tests/test_chessmatrix_js.js --verbose
 ```
 
 ### Relay test modes
@@ -184,6 +189,7 @@ Chess101/
 │   ├── mdns.py             # mDNS/DNS-SD advertiser + browser (zeroconf)
 │   ├── relay.py            # Internet relay server (room codes, reconnect, anti-cheat)
 │   ├── relay_client.py     # Relay client (wraps handshake, cold-start retry)
+│   ├── chessmatrix.py      # ChessMatrix 8×8 barcode: encode, render, decode_frame
 │   └── validator.py        # Server-side move validator (anti-cheat)
 │
 ├── simulator/              # Mac simulator
@@ -192,8 +198,46 @@ Chess101/
 │   ├── fake_rgbmatrix.py   # Pygame-backed LED canvas mock
 │   └── sensor.py           # Click-driven reed-switch mock
 │
+├── web/
+│   ├── sim.html            # Simulator web UI
+│   ├── spectator.html      # Spectator web UI
+│   └── chessmatrix-scanner.js  # Browser/Node.js ChessMatrix decoder (no dependencies)
+│
+├── tools/
+│   └── debug_quad_detection.py  # Visual debugger for ChessMatrix scanner pipeline (steps 1–15)
+│
 ├── plans/multiplayer/      # Design docs for multiplayer phases 1–3
-└── tests/                  # pytest suite (422 tests)
+└── tests/                  # pytest suite (183+ tests)
+    ├── fixtures/chessmatrix/    # Real-photo + synthetic PNG fixtures for scanner tests
+    └── test_chessmatrix_js.js   # Node.js test suite for chessmatrix-scanner.js
+```
+
+---
+
+## ChessMatrix Barcode Scanner
+
+ChessMatrix is a custom 8×8 four-color barcode used to share room codes.  The 6-character all-alpha room code is Reed–Solomon encoded (RS(8,4)) and packed into 32 dibit cells across the grid.
+
+The Python scanner lives in `network/chessmatrix.py` (`decode_frame`).  A pixel-identical JS implementation is in `web/chessmatrix-scanner.js` — it runs in the browser during the CODE_SCAN phase and has no external dependencies.
+
+**Scanner pipeline overview:**
+
+| Step | What happens |
+|---|---|
+| 1–4 | Grayscale → normalize → Gaussian blur → local binarize |
+| 5 | White-pixel centroid |
+| 6 | Box-blurred binary → Canny → probabilistic Hough, two independent axis peaks in [0°,180°) |
+| 7 | Affine unshear using both axis vectors; inflate AABB from centroid |
+| 8–10 | Scale corners outward 4/3×, perspective-warp to 128×128 canonical square |
+| 11 | Try 4 rotations; keep the one with the L-finder at bottom-left |
+| 12–15 | Sample 5 anchor cells for color calibration; classify each data cell; RS decode → room code |
+
+**Debug tool** — renders any pipeline stage to PNG for every fixture:
+
+```bash
+.venv/bin/python tools/debug_quad_detection.py --step 6        # Hough axes
+.venv/bin/python tools/debug_quad_detection.py --step 7        # oriented inflate-rect
+.venv/bin/python tools/debug_quad_detection.py --step 11       # final orientation
 ```
 
 ---
