@@ -80,6 +80,7 @@ a.back:hover{color:#00ff88}
 </div>
 
 <!-- Chess engine — loaded in both main thread and Web Worker -->
+<script src="chessmatrix-scanner.js"></script>
 <script id="chess-engine">
 'use strict';
 // ── Data structures ──────────────────────────────────────────────────────────
@@ -1307,17 +1308,9 @@ async function startSimScan() {
   const wrap = document.getElementById('scan-video-wrap');
   const note = document.getElementById('scan-note');
   wrap.style.display = 'flex';
-  note.textContent = 'Loading scanner…';
+  note.textContent = 'Starting camera…';
 
-  let mod;
-  try {
-    mod = await import('https://cdn.jsdelivr.net/npm/chessmatrix/chessmatrix.js');
-  } catch(_) {
-    note.textContent = 'ChessMatrix library unavailable — type code above.';
-    return;
-  }
-
-  _simScanner = new mod.ChessMatrixScanner({
+  _simScanner = new ChessMatrixScanner({
     videoEl: video,
     canvasEl: canvas,
     onDecode(letters) {

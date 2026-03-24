@@ -254,6 +254,7 @@
   </div>
 </div>
 
+<script src="chessmatrix-scanner.js"></script>
 <script>
 // ── Constants ──────────────────────────────────────────────────────────────
 const CELL  = 60;   // px per board cell
@@ -554,17 +555,9 @@ async function startScan(onCodeFound) {
   const scanArea   = document.getElementById('scan-area');
   const scanStatus = document.getElementById('scan-status');
   scanArea.style.display = 'flex';
-  scanStatus.textContent = 'Loading scanner…';
+  scanStatus.textContent = 'Starting camera…';
 
-  let mod;
-  try {
-    mod = await import('https://cdn.jsdelivr.net/npm/chessmatrix/chessmatrix.js');
-  } catch (_) {
-    scanStatus.textContent = 'ChessMatrix library unavailable — type code manually.';
-    return;
-  }
-
-  _scanner = new mod.ChessMatrixScanner({
+  _scanner = new ChessMatrixScanner({
     videoEl:  video,
     canvasEl: canvas,
     onDecode(letters) {

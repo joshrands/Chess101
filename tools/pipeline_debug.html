@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>ChessMatrix Pipeline Debugger</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #1a1a1a; color: #eee; font-family: monospace; font-size: 13px; }
+  h1 { padding: 12px 16px; background: #222; border-bottom: 1px solid #444; font-size: 16px; }
+  #controls { padding: 12px 16px; background: #2a2a2a; border-bottom: 1px solid #444;
+              display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+  #controls label { cursor: pointer; background: #444; padding: 6px 14px;
+                    border-radius: 4px; border: 1px solid #666; }
+  #controls label:hover { background: #555; }
+  #controls input[type=file] { display: none; }
+  #status { color: #8f8; font-weight: bold; }
+  #stages { display: flex; flex-wrap: wrap; gap: 16px; padding: 16px;
+            align-items: flex-start; }
+  .stage { background: #222; border: 1px solid #444; border-radius: 6px;
+           overflow: hidden; min-width: 220px; }
+  .stage-header { padding: 6px 10px; background: #333; border-bottom: 1px solid #444;
+                  font-weight: bold; color: #adf; font-size: 12px; }
+  .stage canvas { display: block; }
+  .stage-info { padding: 6px 10px; font-size: 11px; color: #aaa;
+                max-width: 300px; line-height: 1.5; word-break: break-all; }
+  .ok   { color: #8f8; }
+  .warn { color: #fa8; }
+  .err  { color: #f66; }
+</style>
+</head>
+<body>
+<h1>ChessMatrix Pipeline Debugger</h1>
+<div id="controls">
+  <label>Load Image <input type="file" id="fileInput" accept="image/*"></label>
+  <button id="cameraBtn" style="background:#444;border:1px solid #666;color:#eee;
+    padding:6px 14px;border-radius:4px;cursor:pointer;font-family:monospace">
+    Use Camera Frame
+  </button>
+  <span id="status">Load an image to begin.</span>
+</div>
+<div id="stages"></div>
+
+<!-- hidden camera elements -->
+<video id="video" autoplay muted playsinline style="display:none;width:320px;height:240px"></video>
+<canvas id="camCanvas" style="display:none" width="320" height="240"></canvas>
+
+<script src="../web/chessmatrix-scanner.js"></script>
+<script>
+'use strict';
+
+// chessmatrix-scanner.js is loaded as a plain <script> before this block.
+// All its top-level `const` declarations are accessible in this shared global scope.
+// (They are NOT window properties, but are reachable as bare identifiers.)
+
+// ── Stage rendering helpers ─────────────────────────────────────────────────
+function makeStage(title, w, h) {
+  const div = document.createElement('div');
+  div.className = 'stage';
+  div.innerHTML = `<div class="stage-header">${title}</div>`;
+  const canvas = document.createElement('canvas');
+  canvas.width  = w;
+  canvas.height = h;
+  div.appendChild(canvas);
+  const info = document.createElement('div');
+  info.className = 'stage-info';
+  div.appendChild(info);
+  document.getElementById('stages').appendChild(div);
+  return { canvas, ctx: canvas.getContext('2d'), info };
+}
+
+function uint8ToImageData(arr, w, h) {
+  const id = new ImageData(w, h);
+  id.data.set(arr);
+  return id;
+}
+
+function grayToRGBA(gray, w, h) {
+  const rgba = new Uint8Array(w * h * 4);
+  for (let i = 0; i < w * h; i++) {
+    const v = gray[i];
+    rgba[i*4]=v; rgba[i*4+1]=v; rgba[i*4+2]=v; rgba[i*4+3]=255;
+  }
+  return rgba;
+}
+
+// Draw RGBA data onto a canvas, optionally scaled
+function drawRGBA(ctx, rgba, srcW, srcH, dstW, dstH) {
+  const tmp = document.createElement('canvas');
+  tmp.width = srcW; tmp.height = srcH;
+  tmp.getContext('2d').putImageData(uint8ToImageData(rgba, srcW, srcH), 0, 0);
+  ctx.drawImage(tmp, 0, 0, dstW, dstH);
+}
+
+// ── Main pipeline visualisation ─────────────────────────────────────────────
+function runPipeline(rgba, origW, origH) {
+  document.getElementById('stages').innerHTML = '';
+
+  const DISPLAY = 300; // max display size per stage
+  const scaleD  = Math.min(DISPLAY / origW, DISPLAY / origH);
+  const dW = Math.round(origW * scaleD);
+  const dH = Math.round(origH * scaleD);
+
+  // ── Stage 1: Original ───────────────────────────────────────────────────
+  {
+    const { canvas, ctx, info } = makeStage('1 · Original', dW, dH);
+    drawRGBA(ctx, rgba, origW, origH, dW, dH);
+    info.textContent = `${origW}×${origH} px`;
+  }
+
+  // ── Stage 2: Grayscale ──────────────────────────────────────────────────
+  const gray = toGray(rgba, origW * origH);
+  {
+    const { canvas, ctx, info } = makeStage('2 · Grayscale', dW, dH);
+    drawRGBA(ctx, grayToRGBA(gray, origW, origH), origW, origH, dW, dH);
+    let mn=Infinity, mx=-Infinity;
+    for(const v of gray){if(v<mn)mn=v;if(v>mx)mx=v;}
+    info.textContent = `min=${mn.toFixed(1)} max=${mx.toFixed(1)}`;
+  }
+
+  // ── Stage 3: Normalized ─────────────────────────────────────────────────
+  const norm = normalize(gray);
+  {
+    const { canvas, ctx, info } = makeStage('3 · Normalized', dW, dH);
+    drawRGBA(ctx, grayToRGBA(norm, origW, origH), origW, origH, dW, dH);
+    info.textContent = `uint8 [0..255]`;
+  }
+
+  // ── Stage 4: Binary ─────────────────────────────────────────────────────
+  const blur1 = boxFilter(new Float32Array(norm), origW, origH, 1);
+  const bin   = localThreshold(blur1, origW, origH);
+  let whitePct;
+  {
+    const { canvas, ctx, info } = makeStage('4 · Binary threshold', dW, dH);
+    drawRGBA(ctx, grayToRGBA(bin, origW, origH), origW, origH, dW, dH);
+    const nWhite = bin.reduce((s,v) => s + (v ? 1 : 0), 0);
+    whitePct = (nWhite / (origW * origH) * 100).toFixed(1);
+    info.innerHTML = `<span class="${+whitePct>5&&+whitePct<50?'ok':'warn'}">${whitePct}% white</span>`;
+  }
+
+  // ── Stage 5: Hough angle detection ─────────────────────────────────────
+  const centroid = imageCentroid(bin, origW, origH);
+  const axes     = centroid ? houghAxes(norm, origW, origH) : null;
+  {
+    const { canvas, ctx, info } = makeStage('5 · Hough axes', dW, dH);
+    drawRGBA(ctx, grayToRGBA(bin, origW, origH), origW, origH, dW, dH);
+    if (centroid) {
+      const [cx, cy] = centroid;
+      // Draw centroid dot
+      ctx.fillStyle = '#f00';
+      ctx.beginPath();
+      ctx.arc(cx*scaleD, cy*scaleD, 5, 0, Math.PI*2);
+      ctx.fill();
+    }
+    if (axes) {
+      const [a1, a2] = axes;
+      const [cx, cy] = centroid;
+      const L = Math.max(dW, dH) * 0.4;
+      function drawAngleLine(angDeg, color) {
+        const rad = angDeg * Math.PI / 180;
+        const dx = Math.cos(rad) * L, dy = Math.sin(rad) * L;
+        ctx.strokeStyle = color; ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(cx*scaleD - dx, cy*scaleD - dy);
+        ctx.lineTo(cx*scaleD + dx, cy*scaleD + dy);
+        ctx.stroke();
+      }
+      drawAngleLine(a1, '#0f0');
+      drawAngleLine(a2, '#00f');
+      info.innerHTML = `centroid=(${cx.toFixed(0)},${cy.toFixed(0)}) `
+        + `<span class="ok">axes=[${a1}°, ${a2}°]  align=${a1-90}°</span>`;
+    } else {
+      info.innerHTML = `<span class="err">No axes found</span>`;
+    }
+  }
+
+  if (!centroid || !axes) return;
+  const [cx, cy] = centroid;
+  const [a1] = axes;
+  const align = a1 - 90;
+
+  // ── Stage 6: Axis-aligned binary ────────────────────────────────────────
+  const rotB = rotateBin(bin, origW, origH, cx, cy, align);
+  {
+    const { canvas, ctx, info } = makeStage('6 · Rotated binary (+align)', dW, dH);
+    drawRGBA(ctx, grayToRGBA(rotB, origW, origH), origW, origH, dW, dH);
+    info.textContent = `Rotated by align=${align.toFixed(1)}°. Code should appear axis-aligned.`;
+  }
+
+  // ── Stage 7: Inflated rect ──────────────────────────────────────────────
+  const [left, top, right, bot] = inflateRect(rotB, origW, origH, cx, cy);
+  {
+    const { canvas, ctx, info } = makeStage('7 · Inflated rect (rotated space)', dW, dH);
+    drawRGBA(ctx, grayToRGBA(rotB, origW, origH), origW, origH, dW, dH);
+    ctx.strokeStyle = '#0f0'; ctx.lineWidth = 2;
+    ctx.strokeRect(left*scaleD, top*scaleD, (right-left)*scaleD, (bot-top)*scaleD);
+    info.textContent = `left=${left} top=${top} right=${right} bot=${bot}  `
+      + `size=${right-left}×${bot-top}`;
+  }
+
+  // ── Stage 8: Outer corners on original ─────────────────────────────────
+  const cornersResult = getOuterCornersH(bin, origW, origH, norm);
+  {
+    const { canvas, ctx, info } = makeStage('8 · Outer corners (original)', dW, dH);
+    drawRGBA(ctx, rgba, origW, origH, dW, dH);
+    if (cornersResult) {
+      const { ordered, H } = cornersResult;
+      const labels = ['TL','TR','BR','BL'];
+      const colors = ['#ff0','#0ff','#f0f','#f80'];
+      // Draw polygon
+      ctx.strokeStyle = '#0f0'; ctx.lineWidth = 2;
+      ctx.beginPath();
+      ordered.forEach(([px,py], i) =>
+        i === 0 ? ctx.moveTo(px*scaleD, py*scaleD) : ctx.lineTo(px*scaleD, py*scaleD));
+      ctx.closePath(); ctx.stroke();
+      // Label corners
+      ordered.forEach(([px,py], i) => {
+        ctx.fillStyle = colors[i];
+        ctx.fillRect(px*scaleD-4, py*scaleD-4, 8, 8);
+        ctx.fillStyle = colors[i];
+        ctx.font = '11px monospace';
+        ctx.fillText(labels[i], px*scaleD+6, py*scaleD+4);
+      });
+      info.innerHTML = ordered.map(([x,y],i)=>
+        `<span style="color:${colors[i]}">${labels[i]}=[${x.toFixed(0)},${y.toFixed(0)}]</span>`
+      ).join(' ');
+    } else {
+      info.innerHTML = `<span class="err">No corners found</span>`;
+    }
+  }
+  if (!cornersResult) return;
+
+  // ── Stage 9: Warped RGBA ────────────────────────────────────────────────
+  const N = WARP_SIZE;
+  const warpedRGBA = warpRGBA(rgba, origW, origH, cornersResult.H, N, N);
+  {
+    const { canvas, ctx, info } = makeStage('9 · Warped RGBA', N, N);
+    if (warpedRGBA) {
+      ctx.putImageData(uint8ToImageData(warpedRGBA, N, N), 0, 0);
+      // Draw 8×8 grid overlay
+      ctx.strokeStyle = 'rgba(255,255,0,0.4)'; ctx.lineWidth = 1;
+      const cell = N / 8;
+      for (let i = 0; i <= 8; i++) {
+        ctx.beginPath(); ctx.moveTo(i*cell,0); ctx.lineTo(i*cell,N); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(0,i*cell); ctx.lineTo(N,i*cell); ctx.stroke();
+      }
+      info.innerHTML = `<span class="ok">${N}×${N} warped. Yellow = 8×8 grid.</span>`;
+    } else {
+      info.innerHTML = `<span class="err">warpRGBA returned null</span>`;
+    }
+  }
+
+  // ── Stage 10: Warped binary + white centroid ────────────────────────────
+  const warpedBin = warpBin(bin, origW, origH, cornersResult.H, N, N);
+  let warpedCentroid = null, nearestCorner = null, kRot = 0;
+  if (warpedBin) {
+    let sx=0, sy=0, wn=0;
+    for (let y=0;y<N;y++) for(let x=0;x<N;x++) if(warpedBin[y*N+x]){sx+=x;sy+=y;wn++;}
+    if (wn) warpedCentroid = [sx/wn, sy/wn];
+    const CORNERS = {TL:[0,0], TR:[N,0], BL:[0,N], BR:[N,N]};
+    let minD = Infinity;
+    for (const [name, [ccx, ccy]] of Object.entries(CORNERS)) {
+      if (!warpedCentroid) break;
+      const d = (warpedCentroid[0]-ccx)**2 + (warpedCentroid[1]-ccy)**2;
+      if (d < minD) { minD = d; nearestCorner = name; }
+    }
+    kRot = {TL:3, TR:2, BL:0, BR:1}[nearestCorner] || 0;
+  }
+  {
+    const { canvas, ctx, info } = makeStage('10 · Warped binary + centroid', N, N);
+    if (warpedBin) {
+      ctx.putImageData(uint8ToImageData(grayToRGBA(warpedBin, N, N), N, N), 0, 0);
+      // Draw centroid
+      if (warpedCentroid) {
+        ctx.fillStyle = '#f00';
+        ctx.beginPath();
+        ctx.arc(warpedCentroid[0], warpedCentroid[1], 6, 0, Math.PI*2);
+        ctx.fill();
+        // Draw nearest corner label
+        const cPts = {TL:[0,0],TR:[N,0],BL:[0,N],BR:[N,N]};
+        const cpt = cPts[nearestCorner];
+        ctx.strokeStyle = '#0f0'; ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(cpt[0], cpt[1], 12, 0, Math.PI*2);
+        ctx.stroke();
+      }
+      const nW = warpedBin.reduce((s,v)=>s+(v?1:0),0);
+      const wPct = (nW/(N*N)*100).toFixed(1);
+      info.innerHTML = warpedCentroid
+        ? `white=${wPct}% centroid=(${warpedCentroid[0].toFixed(1)},${warpedCentroid[1].toFixed(1)}) `
+          + `<span class="ok">→ nearest corner: ${nearestCorner} → k=${kRot}</span><br>`
+          + `<em>L-finder should be nearest corner (BL expected for standard orientation)</em>`
+        : `<span class="err">No white pixels in warped binary!</span>`;
+    } else {
+      info.innerHTML = `<span class="err">warpBin returned null</span>`;
+    }
+  }
+
+  // ── Stage 11: Oriented RGBA (after rot90) ───────────────────────────────
+  const oriented = warpedRGBA ? rot90RGBA(warpedRGBA, N, kRot) : null;
+  {
+    const { canvas, ctx, info } = makeStage('11 · Oriented RGBA (rot90 k=' + kRot + ')', N, N);
+    if (oriented) {
+      ctx.putImageData(uint8ToImageData(oriented, N, N), 0, 0);
+      // Draw 8×8 grid
+      ctx.strokeStyle = 'rgba(255,255,0,0.3)'; ctx.lineWidth = 1;
+      const cell = N / 8;
+      for (let i = 0; i <= 8; i++) {
+        ctx.beginPath(); ctx.moveTo(i*cell,0); ctx.lineTo(i*cell,N); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(0,i*cell); ctx.lineTo(N,i*cell); ctx.stroke();
+      }
+      info.innerHTML = `<span class="ok">After orientation correction. L-finder should be at LEFT and BOTTOM.</span>`;
+    } else {
+      info.innerHTML = `<span class="err">oriented is null</span>`;
+    }
+  }
+
+  if (!oriented) return;
+
+  // ── Stage 12: Calibration cell sampling ────────────────────────────────
+  {
+    const { canvas, ctx, info } = makeStage('12 · Calibration cells', N, N);
+    ctx.putImageData(uint8ToImageData(oriented, N, N), 0, 0);
+    const cell = N / 8;
+    const r = 2; // patch half-size for display
+    const labels = ['WHITE', 'K', 'R', 'G', 'B'];
+    const expected = [[235,235,235],[10,10,10],[220,40,40],[40,180,40],[40,40,220]];
+    let infoLines = [];
+    CAL_CELLS.forEach(([row, col, refRGB], idx) => {
+      const [pcx, pcy] = cellCenterPx(row, col);
+      const sampled = sampleCell(oriented, N, row, col, 5);
+      const exp = expected[idx];
+      const dist = Math.sqrt((sampled[0]-exp[0])**2+(sampled[1]-exp[1])**2+(sampled[2]-exp[2])**2);
+      const ok = dist < 60;
+      // Highlight the cell
+      ctx.strokeStyle = ok ? '#0f0' : '#f00';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(col*cell, row*cell, cell, cell);
+      ctx.fillStyle = ok ? '#0f08' : '#f008';
+      ctx.fillRect(col*cell, row*cell, cell, cell);
+      // Label
+      ctx.fillStyle = '#fff'; ctx.font = '9px monospace';
+      ctx.fillText(labels[idx], col*cell+2, row*cell+cell/2);
+      const sR = sampled.map(v=>v.toFixed(0));
+      infoLines.push(
+        `<span class="${ok?'ok':'err'}">(${row},${col})=${labels[idx]}: `
+        + `got=[${sR}] exp=[${exp}] Δ=${dist.toFixed(0)}</span>`
+      );
+    });
+    info.innerHTML = infoLines.join('<br>');
+  }
+
+  // ── Stage 13: Full colour grid classification ───────────────────────────
+  {
+    const { canvas, ctx, info } = makeStage('13 · Color grid classification', N, N);
+    ctx.putImageData(uint8ToImageData(oriented, N, N), 0, 0);
+    const cell = N / 8;
+    // Compute calibration references
+    const sampled = CAL_CELLS.map(([r,c]) => sampleCell(oriented, N, r, c));
+    const colorLabels = ['-1','0','1','2','3'];
+    const overlayColors = ['rgba(255,255,255,0.5)','rgba(0,0,0,0.5)',
+                           'rgba(220,40,40,0.5)','rgba(40,180,40,0.5)','rgba(40,40,220,0.5)'];
+    const dibits = [];
+    let gridOk = true;
+    for (let row = 0; row < 8; row++) {
+      for (let col = 0; col < 8; col++) {
+        const [pcx, pcy] = cellCenterPx(row, col);
+        const i = (Math.round(pcy)*N + Math.round(pcx)) * 4;
+        const pr = oriented[i], pg = oriented[i+1], pb = oriented[i+2];
+        let minD = Infinity, nearest = 0;
+        for (let k = 0; k < sampled.length; k++) {
+          const [sr,sg,sb] = sampled[k];
+          const d = (pr-sr)**2 + (pg-sg)**2 + (pb-sb)**2;
+          if (d < minD) { minD = d; nearest = k; }
+        }
+        const cm = Math.max(0, CAL_CM[nearest]);
+        dibits.push(cm);
+        ctx.fillStyle = overlayColors[nearest];
+        ctx.fillRect(col*cell, row*cell, cell, cell);
+        ctx.fillStyle = '#fff'; ctx.font = '9px monospace';
+        ctx.fillText(colorLabels[nearest], col*cell+2, row*cell+cell/2);
+      }
+    }
+    // Highlight data cells
+    ctx.strokeStyle = 'rgba(255,255,0,0.6)'; ctx.lineWidth = 1;
+    DATA_CELLS.forEach(([r,c]) => {
+      ctx.strokeRect(c*cell, r*cell, cell, cell);
+    });
+    info.innerHTML = `Data cells (yellow border): ${DATA_CELLS.length} positions`;
+  }
+
+  // ── Stage 14: Final result ──────────────────────────────────────────────
+  {
+    const { canvas, ctx, info } = makeStage('14 · Result', dW, 60);
+    ctx.fillStyle = '#111';
+    ctx.fillRect(0, 0, dW, 60);
+    const code = calibrateAndDecode(oriented, N);
+    const valid = code && code.length === 6;
+    ctx.fillStyle = valid ? '#4f4' : '#f44';
+    ctx.font = 'bold 28px monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText(valid ? code : (code || 'null'), dW/2, 40);
+    info.innerHTML = valid
+      ? `<span class="ok">Decoded: ${code}</span>`
+      : `<span class="err">Decode failed: ${JSON.stringify(code)}</span>`;
+  }
+
+  // Also run the full pipeline to double-check
+  const full = decodeFrame(rgba, origW, origH);
+  document.getElementById('status').innerHTML =
+    full ? `<span class="ok">decodeFrame → "${full}"</span>`
+         : `<span class="err">decodeFrame → null</span>`;
+}
+
+// ── File input ─────────────────────────────────────────────────────────────
+document.getElementById('fileInput').addEventListener('change', e => {
+  const file = e.target.files[0]; if (!file) return;
+  const img = new Image();
+  img.onload = () => {
+    const c = document.createElement('canvas');
+    c.width = img.naturalWidth; c.height = img.naturalHeight;
+    const ctx = c.getContext('2d');
+    ctx.drawImage(img, 0, 0);
+    const { data } = ctx.getImageData(0, 0, c.width, c.height);
+    document.getElementById('status').textContent = `Processing ${file.name}…`;
+    setTimeout(() => runPipeline(data, c.width, c.height), 20);
+  };
+  img.src = URL.createObjectURL(file);
+  e.target.value = '';
+});
+
+// ── Camera capture ─────────────────────────────────────────────────────────
+let _stream = null;
+document.getElementById('cameraBtn').addEventListener('click', async () => {
+  const btn = document.getElementById('cameraBtn');
+  const video = document.getElementById('video');
+  const camCanvas = document.getElementById('camCanvas');
+
+  if (_stream) {
+    // Capture current frame
+    const ctx = camCanvas.getContext('2d');
+    ctx.drawImage(video, 0, 0, camCanvas.width, camCanvas.height);
+    const { data } = ctx.getImageData(0, 0, camCanvas.width, camCanvas.height);
+    document.getElementById('status').textContent = 'Processing camera frame…';
+    setTimeout(() => runPipeline(data, camCanvas.width, camCanvas.height), 20);
+  } else {
+    try {
+      _stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { ideal: 'environment' }, width: {ideal:640}, height:{ideal:480} }
+      });
+      video.srcObject = _stream;
+      video.style.display = 'block';
+      video.style.position = 'fixed';
+      video.style.top = '48px'; video.style.right = '0';
+      video.style.width = '200px'; video.style.height = '150px';
+      video.style.border = '2px solid #0f0'; video.style.zIndex = '999';
+      await video.play();
+      camCanvas.width = video.videoWidth || 640;
+      camCanvas.height = video.videoHeight || 480;
+      btn.textContent = 'Capture Frame';
+      btn.style.background = '#2a5';
+    } catch(err) {
+      document.getElementById('status').innerHTML =
+        `<span class="err">Camera error: ${err.message}</span>`;
+    }
+  }
+});
+</script>
+</body>
+</html>
