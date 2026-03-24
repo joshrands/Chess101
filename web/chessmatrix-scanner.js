@@ -389,16 +389,16 @@ function getOuterCornersH(bin, w, h, norm) {
   const mcy = (corners[0][1]+corners[1][1]+corners[2][1]+corners[3][1]) / 4;
   const outer = corners.map(([px,py]) => [(px-mcx)*4/3+mcx, (py-mcy)*4/3+mcy]);
 
-  // Order: TL(min x+y), TR(min y-x), BR(max x+y), BL(max y-x)
-  const sums = outer.map(([x,y]) => x+y);
-  const difs = outer.map(([x,y]) => y-x);
+  // Order corners clockwise from topmost by angle from centroid.
+  // Angular sort is robust for any quadrilateral, including 45° diamonds
+  // where sum/difference ordering produces degenerate (duplicate) corners.
+  const angles = outer.map(([px,py]) => Math.atan2(px-mcx, mcy-py)); // CW from north
+  const sortedIdx = [0,1,2,3].sort((a,b) => angles[a]-angles[b]);
+  const cw = sortedIdx.map(i => outer[i]); // [top, right, bottom, left] for a diamond
+  // Reorder to [TL, TR, BR, BL]: find the topmost (min y) as TL start
+  const topI = cw.reduce((mi,p,i) => p[1] < cw[mi][1] ? i : mi, 0);
+  const ordered = [0,1,2,3].map(i => cw[(topI+i) % 4]);
   const N = WARP_SIZE - 1;
-  const ordered = [
-    outer[sums.indexOf(Math.min(...sums))],  // TL
-    outer[difs.indexOf(Math.min(...difs))],  // TR
-    outer[sums.indexOf(Math.max(...sums))],  // BR
-    outer[difs.indexOf(Math.max(...difs))],  // BL
-  ];
 
   const H = computeH(ordered, [[0,0],[N,0],[N,N],[0,N]]);
   return H ? { ordered, H } : null;

@@ -282,7 +282,7 @@ for (const code of ['ABCDEF', 'TESTCM', 'ZZZZZZ', 'AAAAAA']) {
 
 // ── Tests: synthetic rotated ──────────────────────────────────────────────
 console.log('\nSynthetic rotated');
-for (const [angle, strict] of [[15, true], [45, false], [90, true], [180, true]]) {
+for (const [angle, strict] of [[15, true], [45, true], [90, true], [180, true]]) {
   test(`synthetic_rotated_${angle}deg`, () => {
     const base  = syntheticFrame('ABCDEF', 20, 80);
     const frame = rotateFrame(base, angle);

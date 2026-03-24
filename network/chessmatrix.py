@@ -240,10 +240,11 @@ def _local_threshold(
 
 
 def _order_quad_corners(pts: "np.ndarray") -> "np.ndarray":
-    """Return 4 corners in (TL, TR, BR, BL) order.
+    """Return 4 corners in (TL, TR, BR, BL) order via angular CW sort.
 
-    TL has the smallest x+y sum; BR has the largest.
-    TR has the smallest y-x difference; BL has the largest.
+    Sorts corners clockwise from centroid (atan2 from north), then picks the
+    starting corner as the one with minimum (x+y), breaking ties by minimum y.
+    This handles both axis-aligned rectangles and 45° diamonds correctly.
 
     Args:
         pts: (4, 2) array of corner coordinates (x, y).
@@ -253,152 +254,226 @@ def _order_quad_corners(pts: "np.ndarray") -> "np.ndarray":
     """
     import numpy as np
     pts = pts.reshape(4, 2).astype(np.float32)
-    s = pts.sum(axis=1)
-    d = np.diff(pts, axis=1).flatten()
-    ordered = np.zeros((4, 2), dtype=np.float32)
-    ordered[0] = pts[np.argmin(s)]   # TL: smallest x+y
-    ordered[2] = pts[np.argmax(s)]   # BR: largest x+y
-    ordered[1] = pts[np.argmin(d)]   # TR: smallest y-x
-    ordered[3] = pts[np.argmax(d)]   # BL: largest y-x
-    return ordered
+    cx, cy = pts.mean(axis=0)
+    angles = np.arctan2(pts[:, 0] - cx, cy - pts[:, 1])  # CW from north
+    cw_idx = np.argsort(angles)
+    cw = pts[cw_idx]
+    # Find TL: smallest (x+y), break ties by smallest y (handles diamonds)
+    top_i = int(np.lexsort((cw[:, 1], cw[:, 0] + cw[:, 1]))[0])
+    idx = [(top_i + i) % 4 for i in range(4)]
+    return cw[idx]  # TL, TR, BR, BL
 
 
-def _fix_timing_notch(pts: "np.ndarray") -> "np.ndarray | None":
-    """Collapse a 5-corner timing-strip notch into a true 4-corner quad.
+# ── Inflate-rect detection pipeline ──────────────────────────────────────────
 
-    The ChessMatrix timing strip creates a small step at one corner,
-    causing contour approximation to return a 5-point polygon.  If exactly
-    one edge is substantially shorter than the remaining four (< 40% of their
-    mean length), that edge is the notch; its bounding lines are extended to
-    their intersection to recover the true corner.
+def _inflate_rect(
+    binary: "np.ndarray",
+    cx: float,
+    cy: float,
+    tolerance: float = 0.08,
+) -> "tuple[int, int, int, int]":
+    """Grow an axis-aligned rect from (cx, cy) until each edge hits white content.
 
-    Args:
-        pts: (5, 2) float32 array.
+    Expands one pixel at a time in each direction, stopping a side when the
+    fraction of white pixels on that edge reaches *tolerance*.
 
     Returns:
-        (4, 2) float32 array with the notch collapsed, or ``None`` if no
-        clear notch edge is found.
+        (left, top, right, bottom) pixel coordinates.
     """
-    import numpy as np
+    h, w = binary.shape
+    top = bottom = int(cy)
+    left = right = int(cx)
 
-    if len(pts) != 5:
-        return None
+    def _wf_h(row: int, l: int, r: int) -> float:
+        return float(binary[row, l:r + 1].mean()) / 255.0
 
-    pts = pts.reshape(5, 2).astype(np.float32)
+    def _wf_v(col: int, t: int, b: int) -> float:
+        return float(binary[t:b + 1, col].mean()) / 255.0
 
-    edges = np.array([
-        float(np.linalg.norm(pts[(i + 1) % 5] - pts[i]))
-        for i in range(5)
-    ])
+    changed = True
+    while changed:
+        changed = False
+        if top > 0 and _wf_h(top - 1, left, right) < tolerance:
+            top -= 1;    changed = True
+        if bottom < h - 1 and _wf_h(bottom + 1, left, right) < tolerance:
+            bottom += 1; changed = True
+        if left > 0 and _wf_v(left - 1, top, bottom) < tolerance:
+            left -= 1;   changed = True
+        if right < w - 1 and _wf_v(right + 1, top, bottom) < tolerance:
+            right += 1;  changed = True
 
-    min_idx  = int(np.argmin(edges))
-    min_len  = edges[min_idx]
-    other_mean = (edges.sum() - min_len) / 4.0
-
-    if min_len >= other_mean * 0.4:
-        return None   # no clear notch — genuine pentagon
-
-    # Extend the edge *before* the notch and the edge *after* it; intersect.
-    p_before     = pts[(min_idx - 1) % 5]
-    p_notch_end  = pts[(min_idx + 1) % 5]
-    p_after      = pts[(min_idx + 2) % 5]
-
-    d1 = pts[min_idx] - p_before          # direction: edge leading into notch
-    d2 = p_after - p_notch_end            # direction: edge leaving notch
-
-    A = np.array([[d1[0], -d2[0]],
-                  [d1[1], -d2[1]]], dtype=np.float64)
-    b = (p_notch_end - p_before).astype(np.float64)
-
-    try:
-        t = np.linalg.solve(A, b)[0]
-    except np.linalg.LinAlgError:
-        return None
-
-    true_corner = (p_before + t * d1).astype(np.float32)
-
-    return np.array([
-        p_before,
-        true_corner,
-        p_after,
-        pts[(min_idx + 3) % 5],
-    ], dtype=np.float32)
+    return left, top, right, bottom
 
 
-def _find_chessmatrix_quads(gray_f: "np.ndarray") -> list:
-    """Return a list of quad candidates found in a grayscale image.
+def _hough_axes(binary: "np.ndarray") -> "tuple[float, float] | None":
+    """Return (angle1_deg, angle2_deg) dominant perpendicular axes, or None.
 
-    Applies Canny edge detection then searches contours for quadrilaterals
-    (or 5-corner polygons with a timing-strip notch).  Candidates are
-    returned in descending area order.
-
-    Args:
-        gray_f: 2-D float32 array normalised to [0, 1].
-
-    Returns:
-        List of (4, 2) float32 corner arrays in (TL, TR, BR, BL) order.
-
-    Raises:
-        ValueError: If *gray_f* is not a 2-D array (e.g. a color image was
-            passed).  The error message contains "grayscale".
+    Runs probabilistic Hough on Canny edges of *binary*, buckets segment angles
+    into 1° bins weighted by length, folds to [0°, 90°), and returns the peak
+    bin plus its perpendicular.
     """
     import cv2
     import numpy as np
 
-    if gray_f.ndim != 2:
-        raise ValueError(
-            f"_find_chessmatrix_quads requires a 2-D grayscale array; "
-            f"got shape {gray_f.shape}.  Convert to grayscale first."
-        )
+    edges = cv2.Canny(binary, 30, 100)
+    lines = cv2.HoughLinesP(edges, rho=1, theta=np.pi / 180,
+                            threshold=20, minLineLength=10, maxLineGap=5)
+    if lines is None:
+        return None
 
-    gray_u8 = (np.clip(gray_f, 0.0, 1.0) * 255).astype(np.uint8)
-    h, w    = gray_u8.shape
-    k       = max(3, int(min(h, w) * 0.015)) | 1   # adaptive radius, must be odd
-    blurred = cv2.GaussianBlur(gray_u8, (k, k), 0)
-    binary  = _local_threshold(blurred)
-    edges    = cv2.Canny(binary, 30, 100)
+    hist = np.zeros(180, dtype=np.float32)
+    for x1, y1, x2, y2 in lines[:, 0]:
+        angle = float(np.degrees(np.arctan2(y2 - y1, x2 - x1)) % 180)
+        hist[int(angle)] += float(np.hypot(x2 - x1, y2 - y1))
 
-    contours, _ = cv2.findContours(edges, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
-
-    img_area = gray_f.shape[0] * gray_f.shape[1]
-    min_area = img_area * 0.01
-
-    quads: list = []
-    for cnt in sorted(contours, key=cv2.contourArea, reverse=True):
-        if cv2.contourArea(cnt) < min_area:
-            break
-        peri   = cv2.arcLength(cnt, True)
-        approx = cv2.approxPolyDP(cnt, 0.02 * peri, True)
-        n = len(approx)
-        if n == 4:
-            quads.append(_order_quad_corners(
-                approx.reshape(4, 2).astype(np.float32)
-            ))
-        elif n == 5:
-            fixed = _fix_timing_notch(approx.reshape(5, 2).astype(np.float32))
-            if fixed is not None:
-                quads.append(_order_quad_corners(fixed))
-    return quads
+    folded = hist[:90] + hist[90:]
+    a1 = int(np.argmax(folded))
+    return float(a1), float((a1 + 90) % 180)
 
 
-def _find_chessmatrix_quad(gray_f: "np.ndarray") -> "np.ndarray | None":
-    """Return the best quad candidate, or ``None`` if none found.
+def _detect_barcode_corners(frame: "np.ndarray") -> "np.ndarray | None":
+    """Run the inflate-rect pipeline and return outer (4/3-scaled) corners.
 
-    Delegates to :func:`_find_chessmatrix_quads` and returns the first
-    (largest-area) result.
+    Pipeline:
+      1. Simple-average grayscale → contrast-normalize → adaptive blur
+      2. Local mean-variance binarize
+      3. White-pixel centroid
+      4. Probabilistic Hough to find dominant axes
+      5. Rotate binary to axis-aligned, inflate rect from centroid
+      6. Un-rotate corners, scale 4/3 outward from inner centroid
+      7. Angular-sort → TL/TR/BR/BL order
 
     Args:
-        gray_f: 2-D float32 array normalised to [0, 1].
+        frame: BGR uint8 image (H×W×3).
 
     Returns:
         (4, 2) float32 corner array in (TL, TR, BR, BL) order, or ``None``.
-
-    Raises:
-        ValueError: If *gray_f* is not 2-D (proxied from
-            :func:`_find_chessmatrix_quads`).
     """
-    quads = _find_chessmatrix_quads(gray_f)
-    return quads[0] if quads else None
+    import cv2
+    import numpy as np
+
+    gray_avg = np.mean(frame.astype(np.float32), axis=2)
+    norm = cv2.normalize(gray_avg, None, 0, 255, cv2.NORM_MINMAX, cv2.CV_8U)
+    h, w = norm.shape
+    k = max(3, int(min(h, w) * 0.015)) | 1
+    blurred = cv2.GaussianBlur(norm, (k, k), 0)
+    binary = _local_threshold(blurred)
+
+    white = np.argwhere(binary > 0)
+    if len(white) == 0:
+        return None
+    cy_c, cx_c = white.mean(axis=0)
+    cx_c, cy_c = float(cx_c), float(cy_c)
+
+    axes = _hough_axes(binary)
+    if axes is None:
+        return None
+
+    a1, _ = axes
+    align = a1 - 90.0
+    M = cv2.getRotationMatrix2D((cx_c, cy_c), align, 1.0)
+    rot = cv2.warpAffine(binary, M, (w, h), flags=cv2.INTER_NEAREST)
+    l, t, r, b = _inflate_rect(rot, cx_c, cy_c)
+
+    M_inv = cv2.getRotationMatrix2D((cx_c, cy_c), -align, 1.0)
+    corners_rot = np.float32([[l, t], [r, t], [r, b], [l, b]])
+    corners = (M_inv @ np.hstack([corners_rot,
+                                  np.ones((4, 1), dtype=np.float32)]).T).T  # (4, 2)
+
+    center = corners.mean(axis=0)
+    outer = (corners - center) * (4.0 / 3.0) + center
+    return _order_quad_corners(outer)
+
+
+# ── Post-detection pipeline: warp → orient → calibrate → classify ────────────
+
+# Anchor cell positions in the canonical oriented image (L-finder at BL).
+# (row, col) for: K=black, R=red, G=green, B=blue
+_CAL_ANCHORS: "list[tuple[int, int]]" = [(1, 1), (1, 6), (6, 1), (6, 6)]
+
+
+def _warp_to_canonical(
+    frame: "np.ndarray",
+    corners: "np.ndarray",
+    size: int = _GRID_SIZE,
+) -> "np.ndarray | None":
+    """Perspective-warp *frame* using *corners*, then orient so L-finder is at BL.
+
+    Args:
+        frame:   BGR uint8 image.
+        corners: (4, 2) float32 in TL/TR/BR/BL order.
+        size:    Output square side length (default ``_GRID_SIZE`` = 128).
+
+    Returns:
+        (*size*, *size*, 3) uint8 BGR image with the L-finder at bottom-left,
+        or ``None`` if orientation cannot be determined.
+    """
+    import cv2
+    import numpy as np
+
+    n = float(size)
+    dst = np.float32([[0, 0], [n - 1, 0], [n - 1, n - 1], [0, n - 1]])
+    H = cv2.getPerspectiveTransform(corners.astype(np.float32), dst)
+    warped_color = cv2.warpPerspective(frame, H, (size, size))
+
+    # Recompute binary from frame for orientation detection
+    gray_avg = np.mean(frame.astype(np.float32), axis=2)
+    norm = cv2.normalize(gray_avg, None, 0, 255, cv2.NORM_MINMAX, cv2.CV_8U)
+    h_f, w_f = norm.shape
+    k = max(3, int(min(h_f, w_f) * 0.015)) | 1
+    blurred = cv2.GaussianBlur(norm, (k, k), 0)
+    binary = _local_threshold(blurred)
+    warped_binary = cv2.warpPerspective(binary, H, (size, size),
+                                        flags=cv2.INTER_NEAREST)
+
+    white = np.argwhere(warped_binary > 0)
+    if len(white) == 0:
+        return None
+    ry, rx = white.mean(axis=0)
+    cp = {'TL': (0.0, 0.0), 'TR': (n, 0.0), 'BL': (0.0, n), 'BR': (n, n)}
+    l_corner = min(cp, key=lambda name: (rx - cp[name][0]) ** 2
+                                      + (ry - cp[name][1]) ** 2)
+    k_rot = {'TL': 1, 'TR': 2, 'BL': 0, 'BR': 3}[l_corner]
+    return np.ascontiguousarray(np.rot90(warped_color, k=k_rot))
+
+
+def _sample_cell_rgb(
+    warped: "np.ndarray",
+    row: int,
+    col: int,
+    cell_px: int,
+    patch: int = 5,
+) -> "tuple[int, int, int]":
+    """Return mean (R, G, B) of a *patch*×*patch* region at the cell centre."""
+    import numpy as np
+    cx = col * cell_px + cell_px // 2
+    cy = row * cell_px + cell_px // 2
+    r = patch // 2
+    bgr = warped[cy - r:cy + r + 1, cx - r:cx + r + 1].astype(np.float32).mean(axis=(0, 1))
+    return int(bgr[2]), int(bgr[1]), int(bgr[0])  # R, G, B
+
+
+def _build_calibration(
+    warped: "np.ndarray",
+    cell_px: int,
+) -> "list[tuple[int, int, int]]":
+    """Sample the four fixed-color anchor cells; return [(R,G,B)] for K, R, G, B."""
+    return [_sample_cell_rgb(warped, r, c, cell_px) for r, c in _CAL_ANCHORS]
+
+
+def _classify_cell(
+    r: int,
+    g: int,
+    b: int,
+    cal: "list[tuple[int, int, int]]",
+) -> int:
+    """Return 0–3 (K/R/G/B) for the nearest calibration color (L2 distance)."""
+    best_d, best_i = float('inf'), 0
+    for i, (cr, cg, cb) in enumerate(cal):
+        d = (r - cr) ** 2 + (g - cg) ** 2 + (b - cb) ** 2
+        if d < best_d:
+            best_d, best_i = d, i
+    return best_i
 
 
 # ── Public decode API ────────────────────────────────────────────────────────
@@ -416,22 +491,24 @@ def decode_frame(frame: "np.ndarray") -> "str | None":
 
 
 def decode_frame_debug(frame: "np.ndarray") -> dict:
-    """Detect a ChessMatrix barcode and return intermediate pipeline data.
+    """Detect and decode a ChessMatrix barcode, returning intermediate data.
 
-    Pipeline (step 1 — detection only):
+    Pipeline:
         1. Assert BGR uint8 input.
-        2. Convert to float32 grayscale normalised to [0, 1] (``gray_f``).
-        3. Canny edge detection (``edges``).
-        4. Contour-based quad search (``quad``).
+        2. Grayscale (luminance) → float32 [0, 1] for ``gray_f`` / ``edges``.
+        3. Inflate-rect detection → outer ``quad`` corners.
+        4. Perspective warp + L-finder orientation → ``warped`` (128×128 BGR).
+        5. 4-color calibration from anchor cells → ``cal``.
+        6. Cell classification + RS decode → ``grid``, ``code``.
 
     Returns a dict with keys:
-        ``code``   – str | None
+        ``code``   – 6-char room code string, or None
         ``gray_f`` – float32 H×W array normalised to [0, 1]
         ``edges``  – uint8 H×W Canny edge map
-        ``quad``   – (4,2) float32 corner array (TL/TR/BR/BL), or None
-        ``warped`` – 128×128 BGR canonical image, or None (not yet impl.)
-        ``cal``    – list of 4 (R,G,B) tuples, or None (not yet impl.)
-        ``grid``   – 8×8 list[list[int]], or None (not yet impl.)
+        ``quad``   – (4,2) float32 outer corner array (TL/TR/BR/BL), or None
+        ``warped`` – (_GRID_SIZE, _GRID_SIZE, 3) BGR canonical image, or None
+        ``cal``    – list of 4 (R,G,B) tuples [K,R,G,B], or None
+        ``grid``   – 8×8 list[list[int]] (0–3), or None
     """
     try:
         import cv2
@@ -444,28 +521,42 @@ def decode_frame_debug(frame: "np.ndarray") -> dict:
 
     assert frame.ndim == 3 and frame.shape[2] == 3, \
         "frame must be a 3-channel BGR uint8 image"
-    assert frame.dtype == np.uint8, \
-        "frame must be uint8"
+    assert frame.dtype == np.uint8, "frame must be uint8"
 
     gray   = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-    assert gray.ndim == 2 and gray.dtype == np.uint8
-
     gray_f = gray.astype(np.float32) / 255.0
-    assert gray_f.dtype == np.float32
-    assert gray_f.ndim == 2
 
     blurred = cv2.GaussianBlur(gray, (5, 5), 0)
     binary  = _local_threshold(blurred)
     edges   = cv2.Canny(binary, 30, 100)
 
-    quad = _find_chessmatrix_quad(gray_f)
+    quad   = _detect_barcode_corners(frame)
+    warped = None
+    cal    = None
+    grid   = None
+    code   = None
+
+    if quad is not None:
+        warped = _warp_to_canonical(frame, quad)
+        if warped is not None:
+            cal  = _build_calibration(warped, _CELL_PX)
+            grid = [
+                [_classify_cell(*_sample_cell_rgb(warped, r, c, _CELL_PX), cal)
+                 for c in range(8)]
+                for r in range(8)
+            ]
+            try:
+                import chessmatrix as _cm  # type: ignore[import]
+                code = bytes_to_room_code(_cm.decode(grid))
+            except Exception:
+                code = None
 
     return {
-        "code":   None,
+        "code":   code,
         "gray_f": gray_f,
         "edges":  edges,
         "quad":   quad,
-        "warped": None,
-        "cal":    None,
-        "grid":   None,
+        "warped": warped,
+        "cal":    cal,
+        "grid":   grid,
     }

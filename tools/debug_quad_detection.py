@@ -270,14 +270,16 @@ def _get_outer_corners(pipeline):
     center = corners.astype(np.float32).mean(axis=0)
     outer  = ((corners.astype(np.float32) - center) * (4.0 / 3.0) + center)
 
-    # Order: TL has smallest x+y, BR largest; TR smallest y-x, BL largest
-    s   = outer.sum(axis=1)
-    d   = np.diff(outer, axis=1).flatten()
-    ordered = np.zeros((4, 2), dtype=np.float32)
-    ordered[0] = outer[np.argmin(s)]   # TL
-    ordered[2] = outer[np.argmax(s)]   # BR
-    ordered[1] = outer[np.argmin(d)]   # TR
-    ordered[3] = outer[np.argmax(d)]   # BL
+    # Order corners clockwise from topmost by angle from centroid.
+    # Angular sort is robust for any quadrilateral, including 45° diamonds
+    # where sum/difference ordering produces degenerate (duplicate) corners.
+    cx_o, cy_o = center
+    angles  = np.arctan2(outer[:, 0] - cx_o, cy_o - outer[:, 1])  # CW from north
+    cw_idx  = np.argsort(angles)
+    cw      = outer[cw_idx]                   # clockwise from topmost
+    top_i   = int(np.lexsort((cw[:, 1], cw[:, 0] + cw[:, 1]))[0])  # TL: min(x+y), tiebreak by y
+    idx     = [(top_i + i) % 4 for i in range(4)]
+    ordered = cw[idx]                         # TL, TR, BR, BL
 
     n = float(_WARP_SIZE)
     dst = np.float32([[0, 0], [n-1, 0], [n-1, n-1], [0, n-1]])
