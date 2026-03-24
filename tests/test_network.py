@@ -659,15 +659,13 @@ class TestChessMatrix:
 
     def test_boundary_values(self):
         from network.chessmatrix import room_code_to_bytes, bytes_to_room_code
-        # Minimum: AAAAAA → 0
+        # Minimum: AAAAAA → all zero bits → 0x00000000
         assert room_code_to_bytes("AAAAAA") == b"\x00\x00\x00\x00"
         assert bytes_to_room_code(b"\x00\x00\x00\x00") == "AAAAAA"
-        # Maximum: ZZZZZZ → 26^6 - 1 = 308 915 775 = 0x126_7B08F
-        import struct
-        max_val = 26 ** 6 - 1
-        max_bytes = struct.pack(">I", max_val)
-        assert room_code_to_bytes("ZZZZZZ") == max_bytes
-        assert bytes_to_room_code(max_bytes) == "ZZZZZZ"
+        # Maximum: ZZZZZZ with 5-bit packing → 0xCE739CE4
+        # 25 packed six times: 11001_11001_11001_11001_11001_11001 << 2
+        assert room_code_to_bytes("ZZZZZZ") == b"\xce\x73\x9c\xe4"
+        assert bytes_to_room_code(b"\xce\x73\x9c\xe4") == "ZZZZZZ"
 
     def test_invalid_inputs(self):
         import pytest
@@ -695,36 +693,56 @@ class TestChessMatrix:
             raw[row][col] = val
         return raw
 
-    def test_unknown_color_index_renders_as_white(self):
-        """Color values outside 0-3 (structural / border cells) render as white."""
+    def test_dark_mode_structural_inversion(self):
+        """Dark mode inverts structural border cells: K→white, WHITE(-1)→near-black."""
         from unittest.mock import patch
         import importlib
-        # All cells return value 4 (not a data color — simulates white border cells)
-        raw = [[4] * 8 for _ in range(8)]
+        # Structural border: col 0 and row 7 are all K=0 (finder bars);
+        # row 0 and col 7 alternate K=0 and WHITE=-1 (timing strips).
+        # Fill everything with K=0 so every structural cell hits the K→white branch,
+        # and every interior cell hits the normal _CM_RGB[0] = (10,10,10) branch.
+        raw = [[0] * 8 for _ in range(8)]
         with patch.dict("sys.modules", {"chessmatrix": type("cm", (), {"encode": staticmethod(lambda d: raw)})()} ):
             import network.chessmatrix as cm_mod
             importlib.reload(cm_mod)
             grid = cm_mod.encode("AAAAAA")
-        assert all(
-            grid[r][c] == (255, 255, 255)
-            for r in range(8) for c in range(8)
-        ), "All unknown-index cells should render as white"
+        # Structural cells: K=0 → inverted to white
+        assert grid[0][0] == (235, 235, 235), "structural K → white (row=0, col=0)"
+        assert grid[7][3] == (235, 235, 235), "structural K → white (row=7, col=3)"
+        assert grid[4][0] == (235, 235, 235), "structural K → white (row=4, col=0)"
+        # Interior cells: K=0 → (10, 10, 10) unchanged
+        assert grid[3][3] == (10, 10, 10), "interior K stays near-black"
+        assert grid[5][2] == (10, 10, 10), "interior K stays near-black"
+
+    def test_dark_mode_white_sentinel_in_structural_position(self):
+        """WHITE sentinel (-1) in a structural border position → near-black (inverted)."""
+        from unittest.mock import patch
+        import importlib
+        raw = [[-1] * 8 for _ in range(8)]
+        with patch.dict("sys.modules", {"chessmatrix": type("cm", (), {"encode": staticmethod(lambda d: raw)})()} ):
+            import network.chessmatrix as cm_mod
+            importlib.reload(cm_mod)
+            grid = cm_mod.encode("AAAAAA")
+        # Structural -1 → inverted to near-black
+        assert grid[0][2] == (10, 10, 10), "structural WHITE(-1) → near-black"
+        assert grid[7][5] == (10, 10, 10), "structural WHITE(-1) → near-black"
+        # Interior -1 → (235, 235, 235)
+        assert grid[3][4] == (235, 235, 235), "interior WHITE(-1) → light gray"
 
     def test_data_colors_map_correctly(self):
-        """0=black, 1=red, 2=green, 3=blue in the encode output."""
+        """0=black, 1=red, 2=green, 3=blue map to correct RGB for interior cells."""
         from unittest.mock import patch
         import importlib
-        # raw[row][col]: put each color at a distinct (row=0, col) position
-        raw = self._make_raw({(0, 0): 0, (0, 1): 1, (0, 2): 2, (0, 3): 3})
+        # Use interior positions (rows 2-5, cols 2-5) to avoid dark-mode border inversion.
+        raw = self._make_raw({(2, 2): 0, (2, 3): 1, (2, 4): 2, (2, 5): 3})
         with patch.dict("sys.modules", {"chessmatrix": type("cm", (), {"encode": staticmethod(lambda d: raw)})()} ):
             import network.chessmatrix as cm_mod
             importlib.reload(cm_mod)
             grid = cm_mod.encode("AAAAAA")
-        # Library is row-major: raw[row][col] → grid[row][col] directly
-        assert grid[0][0] == (0,   0,   0),   "BLACK at grid[0][0]"
-        assert grid[0][1] == (220, 0,   0),   "RED at grid[0][1]"
-        assert grid[0][2] == (0,   180, 0),   "GREEN at grid[0][2]"
-        assert grid[0][3] == (0,   0,   220), "BLUE at grid[0][3]"
+        assert grid[2][2] == (10,  10,  10),  "BLACK at interior cell"
+        assert grid[2][3] == (220, 40,  40),  "RED at interior cell"
+        assert grid[2][4] == (40,  180, 40),  "GREEN at interior cell"
+        assert grid[2][5] == (40,  40,  220), "BLUE at interior cell"
 
     def test_encode_preserves_row_major_layout(self):
         """Library raw[row][col] passes through directly to grid[row][col].
@@ -739,5 +757,5 @@ class TestChessMatrix:
             import network.chessmatrix as cm_mod
             importlib.reload(cm_mod)
             grid = cm_mod.encode("AAAAAA")
-        assert grid[5][2] == (220, 0, 0), "Sentinel RED must appear at grid[row=5][col=2]"
-        assert grid[2][5] == (0, 0, 0),   "Transposed position grid[row=2][col=5] must be black"
+        assert grid[5][2] == (220, 40, 40), "Sentinel RED must appear at grid[row=5][col=2]"
+        assert grid[2][5] == (10, 10, 10), "Transposed position grid[row=2][col=5] must be black"

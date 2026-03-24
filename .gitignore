@@ -9,3 +9,4 @@ build/
 .mypy_cache/
 .claude/
 .venv/
+tests/fixtures/chessmatrix_debug/*
