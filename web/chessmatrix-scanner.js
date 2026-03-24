@@ -472,6 +472,13 @@ function calibrateAndDecode(oriented, N) {
   // Sample the 5 anchor cells to get per-image calibration references
   const sampled = CAL_CELLS.map(([r, c]) => sampleCell(oriented, N, r, c));
 
+  // Reject degenerate calibration: a real ChessMatrix must have K (dark) and
+  // WHITE (bright) anchor cells that differ by at least 60 brightness units.
+  // If all anchors look the same (uniform scene, no barcode), we'd otherwise
+  // classify every cell as color 0 → all-zero RS codeword → false "AAAAAA".
+  const lum = sampled.map(([r, g, b]) => 0.299 * r + 0.587 * g + 0.114 * b);
+  if (Math.max(...lum) - Math.min(...lum) < 60) return null;
+
   // For every cell center: find nearest calibration sample, map to cm value
   const grid = Array.from({length: 8}, () => new Array(8).fill(0));
   for (let row = 0; row < 8; row++) {
