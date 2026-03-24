@@ -66,36 +66,44 @@ def _render_centroid(frame, pipeline):
 
 
 def _hough_axes(binary):
-    """Find the two dominant perpendicular orientations via Hough lines.
+    """Find the two dominant line directions via Hough lines.
 
-    Runs probabilistic Hough on the binary image edges, buckets each line
-    segment's angle into 1° bins, folds the histogram to [0°,90°) (since
-    0° and 180° are the same line direction), then picks the peak bin as
-    axis1 and the bin 90° away as axis2.
+    Angles are in [0, 180).  Peaks are found in the full unfolded histogram so
+    that sheared axes (not 90° apart) are detected correctly.  After finding
+    a1 (the global peak) its ±15° neighbourhood is suppressed and a2 is the
+    next largest peak.
 
     Returns (angle1_deg, angle2_deg) or None if no lines found.
     """
-    edges = cv2.Canny(binary, 30, 100)
+    h, w = binary.shape
+    k = max(3, min(int(min(h, w) * 0.015), 15)) | 1
+    smoothed = cv2.boxFilter(binary, -1, (k, k))
+    edges = cv2.Canny(smoothed, 30, 100)
     lines = cv2.HoughLinesP(edges, rho=1, theta=np.pi/180,
                              threshold=20, minLineLength=10, maxLineGap=5)
     if lines is None:
         return None
 
-    # Accumulate angles into 1° bins over [0, 180)
     hist = np.zeros(180, dtype=np.float32)
     for x1, y1, x2, y2 in lines[:, 0]:
         angle = np.degrees(np.arctan2(y2 - y1, x2 - x1)) % 180
         hist[int(angle)] += np.hypot(x2 - x1, y2 - y1)   # weight by length
 
-    # Fold to [0, 90): bin b and bin b+90 are the same axis family
-    folded = hist[:90] + hist[90:]
-    a1 = int(np.argmax(folded))
-    a2 = (a1 + 90) % 180
+    # Find two dominant peaks in [0,180) without folding
+    a1 = int(np.argmax(hist))
+    suppressed = hist.copy()
+    for d in range(-15, 16):
+        suppressed[(a1 + d) % 180] = 0
+    a2 = int(np.argmax(suppressed))
     return float(a1), float(a2)
 
 
 def _render_hough(frame, pipeline):
-    out   = cv2.cvtColor(pipeline["binary"], cv2.COLOR_GRAY2BGR)
+    binary = pipeline["binary"]
+    h_b, w_b = binary.shape
+    k = max(3, min(int(min(h_b, w_b) * 0.015), 15)) | 1
+    smoothed = cv2.boxFilter(binary, -1, (k, k))
+    out   = cv2.cvtColor(smoothed, cv2.COLOR_GRAY2BGR)
     h_img, w_img = out.shape[:2]
     c     = pipeline["centroid"]
     if c is None:
@@ -171,31 +179,36 @@ def _render_oriented_inflate(frame, pipeline):
         return out
 
     cx, cy = float(c[0]), float(c[1])
-    a1, _  = axes
+    a1, a2 = axes
+    a1_rad, a2_rad = np.radians(a1), np.radians(a2)
+    u1 = np.array([np.cos(a1_rad), np.sin(a1_rad)], dtype=np.float64)
+    u2 = np.array([np.cos(a2_rad), np.sin(a2_rad)], dtype=np.float64)
+    A = np.column_stack([u2, u1])
+    if abs(np.linalg.det(A)) < 0.05:
+        u2 = np.array([-np.sin(a1_rad), np.cos(a1_rad)], dtype=np.float64)
+        A = np.column_stack([u2, u1])
+    M2 = np.linalg.inv(A)
 
-    # Rotate binary so the code axes are horizontal/vertical.
-    # a1 is the angle of the dominant Hough lines; rotating by -(a1-90)
-    # aligns those lines with the vertical axis.
-    align = a1 - 90
-    M     = cv2.getRotationMatrix2D((cx, cy), align, 1.0)
-    rot   = cv2.warpAffine(pipeline["binary"], M, (w_img, h_img),
-                           flags=cv2.INTER_NEAREST)
+    def _aff(m, px, py):
+        return np.float32([[m[0,0], m[0,1], px - m[0,0]*px - m[0,1]*py],
+                           [m[1,0], m[1,1], py - m[1,0]*px - m[1,1]*py]])
 
-    l, t, r, b = _inflate_rect_tolerant(rot, cx, cy)
+    M_fwd = _aff(M2, cx, cy)
+    M_inv = _aff(A,  cx, cy)
+    unsheared = cv2.warpAffine(pipeline["binary"], M_fwd, (w_img, h_img),
+                               flags=cv2.INTER_NEAREST)
+    l, t, r, b = _inflate_rect_tolerant(unsheared, cx, cy)
 
-    # Transform the 4 corners back to original image space
-    M_inv = cv2.getRotationMatrix2D((cx, cy), -align, 1.0)
-    corners_rot = np.float32([[l, t], [r, t], [r, b], [l, b]])
+    corners_u   = np.float32([[l, t], [r, t], [r, b], [l, b]])
     ones        = np.ones((4, 1), dtype=np.float32)
-    corners_h   = np.hstack([corners_rot, ones])
-    corners_orig = (M_inv @ corners_h.T).T.astype(np.int32)  # (4,2)
+    corners_orig = (M_inv @ np.hstack([corners_u, ones]).T).T.astype(np.int32)
 
     cv2.polylines(out, [corners_orig.reshape(-1, 1, 2)],
                   isClosed=True, color=(0, 255, 0), thickness=2)
     for pt in corners_orig:
         cv2.circle(out, tuple(pt), 4, (0, 0, 255), -1)
     cv2.circle(out, (int(cx), int(cy)), 4, (0, 0, 255), -1)
-    cv2.putText(out, f"oriented rect  angle={a1:.0f}deg", (6, h_img - 8),
+    cv2.putText(out, f"axes {a1:.0f}deg / {a2:.0f}deg", (6, h_img - 8),
                 cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 200, 0), 1)
     return out
 
@@ -210,20 +223,30 @@ def _get_oriented_corners(pipeline):
         return None
 
     cx, cy   = float(c[0]), float(c[1])
-    a1, _    = axes
-    align    = a1 - 90
+    a1, a2   = axes
     h_img, w_img = pipeline["binary"].shape
+    a1_rad, a2_rad = np.radians(a1), np.radians(a2)
+    u1 = np.array([np.cos(a1_rad), np.sin(a1_rad)], dtype=np.float64)
+    u2 = np.array([np.cos(a2_rad), np.sin(a2_rad)], dtype=np.float64)
+    A = np.column_stack([u2, u1])
+    if abs(np.linalg.det(A)) < 0.05:
+        u2 = np.array([-np.sin(a1_rad), np.cos(a1_rad)], dtype=np.float64)
+        A = np.column_stack([u2, u1])
+    M2 = np.linalg.inv(A)
 
-    M     = cv2.getRotationMatrix2D((cx, cy), align, 1.0)
-    rot   = cv2.warpAffine(pipeline["binary"], M, (w_img, h_img),
-                           flags=cv2.INTER_NEAREST)
-    l, t, r, b = _inflate_rect_tolerant(rot, cx, cy)
+    def _aff(m, px, py):
+        return np.float32([[m[0,0], m[0,1], px - m[0,0]*px - m[0,1]*py],
+                           [m[1,0], m[1,1], py - m[1,0]*px - m[1,1]*py]])
 
-    M_inv       = cv2.getRotationMatrix2D((cx, cy), -align, 1.0)
-    corners_rot = np.float32([[l, t], [r, t], [r, b], [l, b]])
-    ones        = np.ones((4, 1), dtype=np.float32)
-    corners_h   = np.hstack([corners_rot, ones])
-    corners     = (M_inv @ corners_h.T).T.astype(np.int32)
+    M_fwd = _aff(M2, cx, cy)
+    M_inv = _aff(A,  cx, cy)
+    unsheared = cv2.warpAffine(pipeline["binary"], M_fwd, (w_img, h_img),
+                               flags=cv2.INTER_NEAREST)
+    l, t, r, b = _inflate_rect_tolerant(unsheared, cx, cy)
+
+    corners_u = np.float32([[l, t], [r, t], [r, b], [l, b]])
+    ones      = np.ones((4, 1), dtype=np.float32)
+    corners   = (M_inv @ np.hstack([corners_u, ones]).T).T.astype(np.int32)
     return corners, int(cx), int(cy)
 
 

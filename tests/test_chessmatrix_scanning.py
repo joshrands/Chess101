@@ -556,15 +556,18 @@ def test_decode_synthetic_perspective_plus_noise() -> None:
 
 @pytest.mark.xfail(
     reason=(
-        "The inflate-rect algorithm uses a single centroid-based search; it has no "
-        "multi-candidate loop to skip distractors.  A scene with a large competing "
-        "rectangle will pull the centroid off the barcode."
+        "Future work: implement multi-candidate centroid search.  The inflate-rect "
+        "algorithm finds a single barcode region by computing the white-pixel centroid "
+        "of the entire binary frame.  A large competing rectangle shifts that centroid "
+        "away from the barcode, causing detection to fail.  Fixing this requires a "
+        "multi-candidate loop (e.g. iterate over connected components or Hough clusters, "
+        "attempt decode on each, return first success)."
     ),
     strict=False,
 )
 @pytest.mark.parametrize("code", ["ABCDEF", "ZZZZZZ", "TESTQR"])
 def test_decode_with_distractor_rectangle(code: str) -> None:
-    """inflate-rect does not support multi-candidate distractor rejection."""
+    """inflate-rect does not support multi-candidate distractor rejection (future work)."""
     pytest.importorskip("cv2")
     frame = _make_frame_with_distractor(code, cell_px=20, pad=40)
     assert _decode(frame) == code, \
@@ -810,19 +813,6 @@ _FIXTURE_PARAMS = _fixture_params()
 )
 @pytest.mark.parametrize("img_path,expected_code", _FIXTURE_PARAMS,
                          ids=[p.name for p, _ in _FIXTURE_PARAMS])
-@pytest.mark.xfail(
-    reason=(
-        "The real-photo fixture shows the ChessMatrix displayed on a device "
-        "screen embedded in a larger scene.  The current detector finds the "
-        "device screen as the highest-scoring candidate (larger, roughly "
-        "square) rather than the barcode within it.  The multi-candidate "
-        "decode loop is not yet able to locate the barcode as a separate "
-        "contour because its data cells merge with surrounding UI content "
-        "after OTSU thresholding.  A hierarchical search (crop from device "
-        "screen, re-run detector) is required to fix this case."
-    ),
-    strict=False,
-)
 def test_decode_fixture_image(img_path: Path, expected_code: str) -> None:
     """decode_frame decodes a real-world photo of a ChessMatrix barcode."""
     cv2 = pytest.importorskip("cv2")

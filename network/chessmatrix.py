@@ -306,16 +306,20 @@ def _inflate_rect(
 
 
 def _hough_axes(binary: "np.ndarray") -> "tuple[float, float] | None":
-    """Return (angle1_deg, angle2_deg) dominant perpendicular axes, or None.
+    """Return (angle1_deg, angle2_deg) — the two dominant line directions, or None.
 
-    Runs probabilistic Hough on Canny edges of *binary*, buckets segment angles
-    into 1° bins weighted by length, folds to [0°, 90°), and returns the peak
-    bin plus its perpendicular.
+    Angles are in [0, 180).  The two peaks are found independently in the
+    full unfolded histogram so that genuinely non-perpendicular axes (shear)
+    are detected correctly.  After finding a1 (the global peak), its ±15°
+    neighbourhood is suppressed and a2 is the next largest peak.
     """
     import cv2
     import numpy as np
 
-    edges = cv2.Canny(binary, 30, 100)
+    h, w = binary.shape
+    k = max(3, min(int(min(h, w) * 0.015), 15)) | 1
+    smoothed = cv2.boxFilter(binary, -1, (k, k))
+    edges = cv2.Canny(smoothed, 30, 100)
     lines = cv2.HoughLinesP(edges, rho=1, theta=np.pi / 180,
                             threshold=20, minLineLength=10, maxLineGap=5)
     if lines is None:
@@ -326,9 +330,14 @@ def _hough_axes(binary: "np.ndarray") -> "tuple[float, float] | None":
         angle = float(np.degrees(np.arctan2(y2 - y1, x2 - x1)) % 180)
         hist[int(angle)] += float(np.hypot(x2 - x1, y2 - y1))
 
-    folded = hist[:90] + hist[90:]
-    a1 = int(np.argmax(folded))
-    return float(a1), float((a1 + 90) % 180)
+    # Find two dominant peaks in the full [0,180) space (no folding),
+    # so sheared axes that are not 90° apart are captured correctly.
+    a1 = int(np.argmax(hist))
+    suppressed = hist.copy()
+    for d in range(-15, 16):
+        suppressed[(a1 + d) % 180] = 0
+    a2 = int(np.argmax(suppressed))
+    return float(a1), float(a2)
 
 
 def _detect_barcode_corners(frame: "np.ndarray") -> "np.ndarray | None":
@@ -369,13 +378,31 @@ def _detect_barcode_corners(frame: "np.ndarray") -> "np.ndarray | None":
     if axes is None:
         return None
 
-    a1, _ = axes
-    align = a1 - 90.0
-    M = cv2.getRotationMatrix2D((cx_c, cy_c), align, 1.0)
-    rot = cv2.warpAffine(binary, M, (w, h), flags=cv2.INTER_NEAREST)
-    l, t, r, b = _inflate_rect(rot, cx_c, cy_c)
+    a1, a2 = axes
+    a1_rad = np.radians(a1)
+    a2_rad = np.radians(a2)
+    # u1 is the direction we want to map to vertical (0,1)
+    # u2 is the direction we want to map to horizontal (1,0)
+    u1 = np.array([np.cos(a1_rad), np.sin(a1_rad)], dtype=np.float64)
+    u2 = np.array([np.cos(a2_rad), np.sin(a2_rad)], dtype=np.float64)
+    # A maps (1,0)→u2, (0,1)→u1  so  A^{-1} maps u2→(1,0), u1→(0,1)
+    A = np.column_stack([u2, u1])
+    if abs(np.linalg.det(A)) < 0.05:
+        # Degenerate (axes nearly parallel): assume u2 is perpendicular to u1
+        u2 = np.array([-np.sin(a1_rad), np.cos(a1_rad)], dtype=np.float64)
+        A = np.column_stack([u2, u1])
+    M2 = np.linalg.inv(A)
+    # Build 2×3 affine matrices centered at (cx_c, cy_c)
+    def _affine2x3(m2x2, cx, cy):
+        return np.float32([
+            [m2x2[0, 0], m2x2[0, 1], cx - m2x2[0, 0] * cx - m2x2[0, 1] * cy],
+            [m2x2[1, 0], m2x2[1, 1], cy - m2x2[1, 0] * cx - m2x2[1, 1] * cy],
+        ])
+    M_fwd = _affine2x3(M2, cx_c, cy_c)   # original → unsheared
+    M_inv = _affine2x3(A,  cx_c, cy_c)   # unsheared → original
+    unsheared = cv2.warpAffine(binary, M_fwd, (w, h), flags=cv2.INTER_NEAREST)
+    l, t, r, b = _inflate_rect(unsheared, cx_c, cy_c)
 
-    M_inv = cv2.getRotationMatrix2D((cx_c, cy_c), -align, 1.0)
     corners_rot = np.float32([[l, t], [r, t], [r, b], [l, b]])
     corners = (M_inv @ np.hstack([corners_rot,
                                   np.ones((4, 1), dtype=np.float32)]).T).T  # (4, 2)
