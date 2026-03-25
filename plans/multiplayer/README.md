@@ -66,6 +66,7 @@ Deliverables:
 | `phase-1-lan-sim.md` | Phase 1 step-by-step implementation tasks |
 | `phase-2-physical.md` | Phase 2 step-by-step implementation tasks |
 | `phase-3-internet.md` | Phase 3 step-by-step implementation tasks |
+| `phase-3-chessmatrix-hardware.md` | Phase 3 ChessMatrix hardware UX — status, implementation notes, test coverage |
 
 ---
 

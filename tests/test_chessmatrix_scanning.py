@@ -840,3 +840,169 @@ def test_decode_fixture_image_debug_quad_found(img_path: Path,
     assert result["quad"] is not None, (
         f"{img_path.name}: quad not found"
     )
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Board-entry helper tests
+# (network.chessmatrix: grid_from_cell_state, render_beam_frame)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+from network.chessmatrix import (  # noqa: E402
+    grid_from_cell_state,
+    DATA_CELLS,
+    room_code_to_bytes,
+    bytes_to_room_code,
+    render_beam_frame,
+    _BEAM_DIM,
+    _BEAM_FULL,
+)
+
+
+class _RecordCanvas:
+    """Minimal canvas stub that records SetPixel calls."""
+
+    def __init__(self) -> None:
+        self.pixels: dict = {}
+
+    def SetPixel(self, x: int, y: int, r: int, g: int, b: int) -> None:
+        self.pixels[(x, y)] = (r, g, b)
+
+    def cell_color(self, row: int, col: int) -> tuple:
+        """Return the color of the top-left pixel in board cell (row, col)."""
+        return self.pixels.get((row * 4, col * 4), (0, 0, 0))
+
+
+# ── grid_from_cell_state ──────────────────────────────────────────────────────
+
+class TestGridFromCellState:
+    def test_grid_is_8x8(self) -> None:
+        grid = grid_from_cell_state({})
+        assert len(grid) == 8
+        assert all(len(row) == 8 for row in grid)
+
+    def test_border_cells_are_zero(self) -> None:
+        grid = grid_from_cell_state({})
+        for row in range(8):
+            for col in range(8):
+                if row in (0, 7) or col in (0, 7):
+                    assert grid[row][col] == 0, f"border ({row},{col}) should be 0"
+
+    def test_anchors_are_fixed(self) -> None:
+        grid = grid_from_cell_state({})
+        assert grid[1][1] == 0   # K anchor
+        assert grid[1][6] == 1   # R anchor
+        assert grid[6][1] == 2   # G anchor
+        assert grid[6][6] == 3   # B anchor
+
+    def test_anchors_not_overridden_by_locked(self) -> None:
+        """Anchor positions in the locked dict must not clobber canonical values."""
+        locked = {(1, 1): 3, (1, 6): 2, (6, 1): 1, (6, 6): 0}
+        grid = grid_from_cell_state(locked)
+        assert grid[1][1] == 0
+        assert grid[1][6] == 1
+        assert grid[6][1] == 2
+        assert grid[6][6] == 3
+
+    def test_locked_data_cells_reflected(self) -> None:
+        locked = {(1, 2): 1, (3, 4): 2, (5, 5): 3}
+        grid = grid_from_cell_state(locked)
+        assert grid[1][2] == 1
+        assert grid[3][4] == 2
+        assert grid[5][5] == 3
+
+    def test_unlocked_data_cells_default_to_zero(self) -> None:
+        grid = grid_from_cell_state({})
+        for row, col in DATA_CELLS:
+            assert grid[row][col] == 0, f"unlocked data cell ({row},{col}) should be 0"
+
+
+@pytest.mark.parametrize("code", ["AAAAAA", "ZZZZZZ", "ABCDEF", "MMMMMM", "XKCDQR"])
+def test_grid_from_cell_state_round_trip(code: str) -> None:
+    """Encode → extract locked cells → grid_from_cell_state → decode == original code."""
+    _cm = pytest.importorskip("chessmatrix")
+    payload = room_code_to_bytes(code)
+    raw: list[list[int]] = _cm.encode(payload)
+    # Build locked dict from the raw color-index grid (non-zero data cells only)
+    locked = {
+        (row, col): raw[row][col]
+        for row, col in DATA_CELLS
+        if raw[row][col] != 0
+    }
+    grid = grid_from_cell_state(locked)
+    assert bytes_to_room_code(_cm.decode(grid)) == code
+
+
+# ── render_beam_frame color invariants ───────────────────────────────────────
+
+class TestRenderBeamFrameColors:
+    """Verify render_beam_frame color invariants regardless of beam position."""
+
+    def test_promoted_corner_renders_full_brightness(self) -> None:
+        """A promoted (prior-phase) corner cell must show at FULL color."""
+        c = _RecordCanvas()
+        render_beam_frame(
+            c, locked={}, current_color=2,
+            beam_phase=0.0, blink_on=True,
+            active_corner=(6, 1),   # green is the active corner
+            corner_color=2,
+            promoted=frozenset({1}),   # red is promoted
+        )
+        assert c.cell_color(1, 6) == _BEAM_FULL[1], (
+            "promoted red corner should render at FULL red"
+        )
+
+    def test_locked_cell_never_darker_than_dim(self) -> None:
+        """Locked cell pixel must be >= DIM base on every channel for any beam position."""
+        locked = {(1, 2): 1}   # red-locked data cell
+        for beam_phase in [0.0, 0.1, 0.3, 0.5, 0.9]:
+            c = _RecordCanvas()
+            render_beam_frame(
+                c, locked=locked, current_color=2,
+                beam_phase=beam_phase, blink_on=True,
+                active_corner=(6, 1), corner_color=2,
+            )
+            r, g, b = c.cell_color(1, 2)
+            dr, dg, db = _BEAM_DIM[1]
+            assert r >= dr, f"beam_phase={beam_phase}: red channel {r} < DIM {dr}"
+            assert g >= dg, f"beam_phase={beam_phase}: green channel {g} < DIM {dg}"
+            assert b >= db, f"beam_phase={beam_phase}: blue channel {b} < DIM {db}"
+
+    def test_fading_color_at_zero_shows_dim(self) -> None:
+        """At fade_frac=0 the fading cell rests at DIM (beam far away)."""
+        locked = {(2, 2): 1}
+        c = _RecordCanvas()
+        # beam_phase=0.99 puts beam at index ~31 — far from (2,2) at index 5
+        render_beam_frame(
+            c, locked=locked, current_color=1,
+            beam_phase=0.99, blink_on=True,
+            active_corner=(1, 6), corner_color=1,
+            fade_frac=0.0, fading_color=1,
+        )
+        assert c.cell_color(2, 2) == _BEAM_DIM[1]
+
+    def test_fading_color_at_one_shows_full(self) -> None:
+        """At fade_frac=1 the fading cell has fully promoted to FULL brightness."""
+        locked = {(2, 2): 1}
+        c = _RecordCanvas()
+        render_beam_frame(
+            c, locked=locked, current_color=1,
+            beam_phase=0.99, blink_on=True,
+            active_corner=(1, 6), corner_color=1,
+            fade_frac=1.0, fading_color=1,
+        )
+        assert c.cell_color(2, 2) == _BEAM_FULL[1]
+
+    def test_additive_blending_cross_color(self) -> None:
+        """Green beam on red-locked cell should add green, making it brighter."""
+        locked = {(1, 2): 1}   # red locked
+        c = _RecordCanvas()
+        # beam_phase=0.0 puts beam at index 0, which is DATA_CELLS[0] = (1,2)
+        render_beam_frame(
+            c, locked=locked, current_color=2,   # green beam
+            beam_phase=0.0, blink_on=True,
+            active_corner=(6, 1), corner_color=2,
+        )
+        r, g, b = c.cell_color(1, 2)
+        # Should be brighter than DIM in at least the green channel (additive)
+        dr, dg, db = _BEAM_DIM[1]
+        assert g > dg, f"green beam on red cell should add green: got g={g}, DIM g={dg}"

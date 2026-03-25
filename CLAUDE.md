@@ -62,10 +62,10 @@ sudo python3 GameManager.py --join 192.168.1.42
 .venv/bin/python -m pytest tests/test_simulator.py -v           # simulator only
 .venv/bin/python -m pytest tests/test_board.py -v               # Board-level tests
 .venv/bin/python -m pytest tests/test_network.py -v             # network protocol tests
-.venv/bin/python -m pytest tests/test_networked_runner.py -v    # NetworkedGameRunner online-play fixes + relay-reconnect board-reset guards
+.venv/bin/python -m pytest tests/test_networked_runner.py -v    # NetworkedGameRunner: online-play fixes, relay-reconnect guards, CODE_SCAN_BOARD state machine
 .venv/bin/python -m pytest tests/test_online_flow.py -v         # E2E online flow: handshake → color-pick → war-games → playing
 .venv/bin/python -m pytest tests/test_relay.py -v               # relay server tests (see below)
-.venv/bin/python -m pytest tests/test_chessmatrix_scanning.py -v  # ChessMatrix barcode scanner (Python)
+.venv/bin/python -m pytest tests/test_chessmatrix_scanning.py -v  # ChessMatrix barcode scanner + board-entry helpers (grid_from_cell_state, render_beam_frame)
 
 # JS scanner — runs under Node.js, no npm install needed:
 node tests/test_chessmatrix_js.js
@@ -186,9 +186,22 @@ Chess101/
     ├── test_networked_runner.py     # NetworkedGameRunner online-play bug fixes
     ├── test_online_flow.py          # E2E online flow over in-process relay (handshake → playing)
     ├── test_relay.py                # Relay server protocol, reconnect, and anti-cheat tests
-    ├── test_chessmatrix_scanning.py # ChessMatrix scanning pipeline (Python)
+    ├── test_chessmatrix_scanning.py # ChessMatrix scanning pipeline (Python) + board-entry helpers
     ├── test_chessmatrix_js.js       # ChessMatrix scanning pipeline (Node.js)
     └── fixtures/chessmatrix/        # PNG fixtures: real phone photos + synthetics
+
+    # test_chessmatrix_scanning.py board-entry sections:
+    #   TestGridFromCellState     — grid_from_cell_state: border/anchor/data cell correctness
+    #   test_grid_from_cell_state_round_trip — encode→locked→grid_from_cell_state→decode round-trip
+    #   TestRenderBeamFrameColors — promoted corners at FULL, locked cells never below DIM,
+    #                               fading_color lerp DIM→FULL, additive cross-color blending
+
+    # test_networked_runner.py CODE_SCAN_BOARD section:
+    #   TestCodeScanBoardStateMachine — all six corner-click transitions, data cell toggle/untoggle,
+    #                                   wait-state click ignored, ESC/T keyboard shortcuts,
+    #                                   typing sub-mode (buffer fill, C goes to buffer not camera,
+    #                                   Enter advances), decode round-trip to NAME_ENTRY,
+    #                                   three-color corner sequence
 ```
 
 ## Architecture
