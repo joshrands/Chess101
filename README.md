@@ -107,47 +107,14 @@ The `rgbmatrix` library must be compiled on the Pi from source — see [rpi-rgb-
 
 ## Running Tests
 
-All tests run on Mac without Pi hardware. The test suite uses `conftest.py` to stub `rgbmatrix` and `smbus` before any game code is imported.
+All tests run on Mac without Pi hardware. See [tests/README.md](tests/README.md) for the full test suite documentation — what each file covers, fixture reference, relay run modes, and a guide for adding new tests.
 
 ```bash
 # Run everything
 .venv/bin/python -m pytest tests/ -q
 
-# Verbose output
-.venv/bin/python -m pytest tests/ -v
-
-# Specific suites
-.venv/bin/python -m pytest tests/test_gameplay.py -v             # chess logic
-.venv/bin/python -m pytest tests/test_simulator.py -v            # simulator phase state machine
-.venv/bin/python -m pytest tests/test_board.py -v                # Board-level (Pi controller)
-.venv/bin/python -m pytest tests/test_network.py -v              # network protocol, transport + NetworkedBoard
-.venv/bin/python -m pytest tests/test_networked_runner.py -v     # NetworkedGameRunner online-play fixes + relay-reconnect board-reset guards
-.venv/bin/python -m pytest tests/test_online_flow.py -v          # E2E online flow: handshake → color-pick → war-games → playing
-.venv/bin/python -m pytest tests/test_relay.py -v                # relay server (see modes below)
-.venv/bin/python -m pytest tests/test_chessmatrix_scanning.py -v # ChessMatrix barcode scanner (Python)
-
 # JS scanner tests (requires Node.js, no npm install needed)
 node tests/test_chessmatrix_js.js
-node tests/test_chessmatrix_js.js --verbose
-```
-
-### Relay test modes
-
-`test_relay.py` spins up an in-process relay by default — no Docker or network access needed:
-
-```bash
-# Default — in-process relay, fast:
-.venv/bin/python -m pytest tests/test_relay.py -v
-
-# Docker — builds chess101-relay image, runs a container for the session:
-.venv/bin/python -m pytest tests/test_relay.py -v --relay-docker
-
-# External relay — point at any running relay (local Docker or live):
-docker run -d -p 8765:8765 -e RELAY_PORT=8765 chess101-relay
-RELAY_URL=ws://127.0.0.1:8765 .venv/bin/python -m pytest tests/test_relay.py -v
-
-# Post-deploy smoke test against the live relay:
-RELAY_URL=wss://relay.chess101.net .venv/bin/python -m pytest tests/test_relay.py -v
 ```
 
 ---
@@ -208,7 +175,7 @@ Chess101/
 │   └── pipeline_debug.html      # Browser: interactive step-by-step JS pipeline debugger
 │
 ├── plans/multiplayer/      # Design docs for multiplayer phases 1–3
-└── tests/                  # pytest suite (670+ tests)
+└── tests/                  # pytest suite (670+ tests) — see tests/README.md
     ├── fixtures/chessmatrix/    # Real-photo + synthetic PNG fixtures for scanner tests
     └── test_chessmatrix_js.js   # Node.js test suite for chessmatrix-scanner.js
 ```

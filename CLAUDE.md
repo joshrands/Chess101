@@ -74,6 +74,8 @@ node tests/test_chessmatrix_js.js --verbose
 
 `conftest.py` stubs out `rgbmatrix` and `smbus` so all test files run on Mac without Pi hardware.
 
+The canonical test documentation lives in **`tests/README.md`**. Keep it up to date whenever tests change (see "Keeping test documentation current" below).
+
 ### Relay tests — three run modes
 
 `test_relay.py` spins up an in-process relay by default (no Docker required):
@@ -92,6 +94,35 @@ RELAY_URL=ws://127.0.0.1:8765 .venv/bin/python -m pytest tests/test_relay.py -v
 # Post-deploy smoke test against the live relay:
 RELAY_URL=wss://relay.chess101.net .venv/bin/python -m pytest tests/test_relay.py -v
 ```
+
+## Keeping test documentation current
+
+`tests/README.md` is the canonical reference for the test suite. It must stay in sync with the test code. Update it whenever any of the following change:
+
+### When to update
+
+| Change | What to update in tests/README.md |
+|---|---|
+| New test file added | Add a row to the file index table; add a full file description section |
+| Test file deleted | Remove its row from the file index and its description section |
+| New test class or major test area added | Add it to the relevant file's description (class table or bullet) |
+| Test class renamed or removed | Update the class table in the file's description |
+| New fixture added to `conftest.py` | Add a row to the fixtures table in the `conftest.py` description |
+| Fixture removed or renamed | Update or remove that row |
+| New relay run mode | Add it to the "Relay test modes" section |
+| New real-photo fixture added to `tests/fixtures/chessmatrix/` | No change needed — the directory note already explains auto-discovery |
+| New BUG LOCK-IN added | Mention it in the relevant class description |
+
+### What NOT to update
+
+Do not copy individual test function signatures or implementation details into `tests/README.md`. It documents *what* each file covers at the class/area level, not *how* every test is written. Keep descriptions at the granularity of test classes and major thematic groups.
+
+### How to update efficiently
+
+1. Read the current `tests/README.md` file index table to see what exists.
+2. Read the module-level docstring of the changed test file — the docstrings are the authoritative per-file summary and should be reflected in `tests/README.md`.
+3. Edit only the affected rows and sections; do not rewrite unrelated parts.
+4. Keep the file index "Lines" column approximately accurate (exact count not required).
 
 ## Type Checking
 
