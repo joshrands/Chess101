@@ -175,29 +175,42 @@ function runPipeline(rgba, origW, origH) {
 
   if (!centroid || !axes) return;
   const [cx, cy] = centroid;
-  const [a1] = axes;
-  const align = a1 - 90;
+  const [a1, a2, v1, v2] = axes;
 
-  // ── Stage 6: Axis-aligned binary ────────────────────────────────────────
-  const rotB = rotateBin(bin, origW, origH, cx, cy, align);
+  // ── Stage 6: Unsheared binary ────────────────────────────────────────────
+  // Use the same shear/rotation branch as getOuterCornersH so stages 6→7→8 are coherent.
+  // Build affine basis A = [u1 | u2] directly from the two detected axes.
+  // a1, a2 are folded to [0,90) so both unit vectors are in the first quadrant.
+  const r1 = a1 * Math.PI / 180, r2 = a2 * Math.PI / 180;
+  const u1 = [Math.cos(r1), Math.sin(r1)];
+  const u2 = [Math.cos(r2), Math.sin(r2)];
+  const A = [[u1[0], u2[0]], [u1[1], u2[1]]];
+  const alignedB = applyAffineBin(bin, origW, origH, cx, cy, A);
+  const backFn = (px, py) => {
+    const dx = px - cx, dy = py - cy;
+    return [A[0][0]*dx + A[0][1]*dy + cx, A[1][0]*dx + A[1][1]*dy + cy];
+  };
+  const alignDesc = `A=[[${A[0].map(v=>v.toFixed(3))}],[${A[1].map(v=>v.toFixed(3))}]]  axes=[${a1}°,${a2}°]  v2/v1=${(v2/v1).toFixed(2)}`;
   {
-    const { canvas, ctx, info } = makeStage('6 · Rotated binary (+align)', dW, dH);
-    drawRGBA(ctx, grayToRGBA(rotB, origW, origH), origW, origH, dW, dH);
-    info.textContent = `Rotated by align=${align.toFixed(1)}°. Code should appear axis-aligned.`;
+    const { canvas, ctx, info } = makeStage('6 · Unsheared binary', dW, dH);
+    drawRGBA(ctx, grayToRGBA(alignedB, origW, origH), origW, origH, dW, dH);
+    info.textContent = alignDesc;
   }
 
-  // ── Stage 7: Inflated rect ──────────────────────────────────────────────
-  const [left, top, right, bot] = inflateRect(rotB, origW, origH, cx, cy);
+  // ── Stage 7: Inflated rect (unsheared space) ────────────────────────────
+  const [left, top, right, bot] = inflateRect(alignedB, origW, origH, cx, cy);
   {
-    const { canvas, ctx, info } = makeStage('7 · Inflated rect (rotated space)', dW, dH);
-    drawRGBA(ctx, grayToRGBA(rotB, origW, origH), origW, origH, dW, dH);
+    const { canvas, ctx, info } = makeStage('7 · Inflated rect (unsheared space)', dW, dH);
+    drawRGBA(ctx, grayToRGBA(alignedB, origW, origH), origW, origH, dW, dH);
     ctx.strokeStyle = '#0f0'; ctx.lineWidth = 2;
     ctx.strokeRect(left*scaleD, top*scaleD, (right-left)*scaleD, (bot-top)*scaleD);
+    // Also draw the back-transformed corners on the unsheared binary
+    const unshCorners = [[left,top],[right,top],[right,bot],[left,bot]];
     info.textContent = `left=${left} top=${top} right=${right} bot=${bot}  `
       + `size=${right-left}×${bot-top}`;
   }
 
-  // ── Stage 8: Outer corners on original ─────────────────────────────────
+  // ── Stage 8: Outer corners on original (back-transformed from stage 7) ──
   const cornersResult = getOuterCornersH(bin, origW, origH, norm);
   {
     const { canvas, ctx, info } = makeStage('8 · Outer corners (original)', dW, dH);

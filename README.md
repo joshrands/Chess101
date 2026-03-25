@@ -204,10 +204,11 @@ Chess101/
 │   └── chessmatrix-scanner.js  # Browser/Node.js ChessMatrix decoder (no dependencies)
 │
 ├── tools/
-│   └── debug_quad_detection.py  # Visual debugger for ChessMatrix scanner pipeline (steps 1–15)
+│   ├── debug_quad_detection.py  # Python: renders pipeline stages to PNG for every fixture
+│   └── pipeline_debug.html      # Browser: interactive step-by-step JS pipeline debugger
 │
 ├── plans/multiplayer/      # Design docs for multiplayer phases 1–3
-└── tests/                  # pytest suite (183+ tests)
+└── tests/                  # pytest suite (670+ tests)
     ├── fixtures/chessmatrix/    # Real-photo + synthetic PNG fixtures for scanner tests
     └── test_chessmatrix_js.js   # Node.js test suite for chessmatrix-scanner.js
 ```
@@ -218,7 +219,7 @@ Chess101/
 
 ChessMatrix is a custom 8×8 four-color barcode used to share room codes.  The 6-character all-alpha room code is Reed–Solomon encoded (RS(8,4)) and packed into 32 dibit cells across the grid.
 
-The Python scanner lives in `network/chessmatrix.py` (`decode_frame`).  A pixel-identical JS implementation is in `web/chessmatrix-scanner.js` — it runs in the browser during the CODE_SCAN phase and has no external dependencies.
+The Python scanner lives in `network/chessmatrix.py` (`decode_frame`).  A JS implementation is in `web/chessmatrix-scanner.js` — it runs in the browser during the CODE_SCAN phase and has no external dependencies.  Both implementations follow the same pipeline and produce equivalent results.
 
 **Scanner pipeline overview:**
 
@@ -226,18 +227,22 @@ The Python scanner lives in `network/chessmatrix.py` (`decode_frame`).  A pixel-
 |---|---|
 | 1–4 | Grayscale → normalize → Gaussian blur → local binarize |
 | 5 | White-pixel centroid |
-| 6 | Box-blurred binary → Canny → probabilistic Hough, two independent axis peaks in [0°,180°) |
-| 7 | Affine unshear using both axis vectors; inflate AABB from centroid |
-| 8–10 | Scale corners outward 4/3×, perspective-warp to 128×128 canonical square |
+| 6 | Axis detection: Python uses box-blurred binary → Canny → HoughLinesP; JS uses Sobel gradients → [0°,180°) histogram.  Both find two independent dominant axis angles. |
+| 7 | Build affine basis A = [u1 \| u2] from both axis vectors; apply inverse warp to unshear; inflate AABB from centroid |
+| 8–10 | Back-transform AABB corners to original space; scale 4/3× outward; perspective-warp to 128×128 canonical square |
 | 11 | Try 4 rotations; keep the one with the L-finder at bottom-left |
 | 12–15 | Sample 5 anchor cells for color calibration; classify each data cell; RS decode → room code |
 
-**Debug tool** — renders any pipeline stage to PNG for every fixture:
+**Debug tools:**
 
 ```bash
+# Python: renders any pipeline stage to PNG for every fixture
 .venv/bin/python tools/debug_quad_detection.py --step 6        # Hough axes
 .venv/bin/python tools/debug_quad_detection.py --step 7        # oriented inflate-rect
 .venv/bin/python tools/debug_quad_detection.py --step 11       # final orientation
+
+# Browser: step-by-step visual debugger for the JS pipeline
+open tools/pipeline_debug.html                                  # load any image or camera frame
 ```
 
 ---

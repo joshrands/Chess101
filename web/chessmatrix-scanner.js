@@ -216,8 +216,14 @@ function imageCentroid(bin, w, h) {
 }
 
 // ── Hough angle detection (gradient on normalised gray) ────────────────────
-// norm: Uint8Array of normalised [0..255] grayscale — using the smooth float
-// values avoids binary staircase artefacts that defeat diagonal detection.
+// norm: Uint8Array of normalised [0..255] grayscale.
+//
+// Uses a full [0°,180°) histogram so both axis families always produce
+// separate peaks regardless of rotation or shear:
+//   upright → 0° and 90°,  rotated 15° → 15° and 105°,  shear → 0° and 78°.
+// a1 = dominant peak, a2 = second peak (suppressing ±5° around a1).
+//
+// Returns [a1, a2, votes1, votes2]  (a1,a2 in [0°,180°))  or  null.
 function houghAxes(norm, w, h) {
   const hist = new Float32Array(180);
   for (let y = 1; y < h-1; y++) {
@@ -229,17 +235,21 @@ function houghAxes(norm, w, h) {
                 - norm[(y+1)*w+(x-1)] - 2*norm[(y+1)*w+x] - norm[(y+1)*w+(x+1)];
       const mag = Math.sqrt(gx*gx + gy*gy);
       if (mag < 100) continue;
-      // Gradient is perpendicular to edge; subtract 90° to get line direction
-      let ang = ((Math.atan2(gy, gx) * 180 / Math.PI - 90) % 180 + 180) % 180;
+      // Line direction = perpendicular to gradient; swap args to get line angle
+      // matching Python's arctan2(dy, dx) convention on line-segment vectors.
+      const ang = ((Math.atan2(gx, gy) * 180 / Math.PI) % 180 + 180) % 180;
       hist[Math.min(179, ang | 0)] += mag;
     }
   }
-  // Fold to [0,90)
-  const folded = new Float32Array(90);
-  for (let i = 0; i < 90; i++) folded[i] = hist[i] + hist[(i+90) % 180];
   let a1 = 0;
-  for (let i = 1; i < 90; i++) if (folded[i] > folded[a1]) a1 = i;
-  return folded[a1] > 0 ? [a1, (a1 + 90) % 180] : null;
+  for (let i = 1; i < 180; i++) if (hist[i] > hist[a1]) a1 = i;
+  if (hist[a1] === 0) return null;
+  // Find second peak independently after suppressing ±5° around a1.
+  const sup = hist.slice();
+  for (let d = -5; d <= 5; d++) sup[((a1 + d) % 180 + 180) % 180] = 0;
+  let a2 = 0;
+  for (let i = 1; i < 180; i++) if (sup[i] > sup[a2]) a2 = i;
+  return [a1, a2, hist[a1], sup[a2]];
 }
 
 // ── Inflate rect (tolerant) ────────────────────────────────────────────────
@@ -283,6 +293,27 @@ function rotateBin(bin, w, h, cx, cy, deg) {
       const dx = x - cx, dy = y - cy;
       const sx = (cos * dx + sin * dy + cx) | 0;
       const sy = (-sin * dx + cos * dy + cy) | 0;
+      if (sx >= 0 && sx < w && sy >= 0 && sy < h)
+        out[y*w+x] = bin[sy*w+sx];
+    }
+  }
+  return out;
+}
+
+// ── Binary affine warp (nearest-neighbour inverse mapping) ─────────────────
+// m is the 2×2 matrix used for inverse mapping: for each dst pixel (x,y),
+// the source pixel is at  m * (x-cx, y-cy) + (cx, cy).
+// To apply a forward transform F (maps original→dst), pass m = F^{-1}.
+// To apply an unshear (maps dst→axis-aligned), pass m = A  (the forward shear
+// basis matrix), which is exactly the inverse of the unshear transform.
+function applyAffineBin(bin, w, h, cx, cy, m) {
+  const [a, b, c, d] = [m[0][0], m[0][1], m[1][0], m[1][1]];
+  const out = new Uint8Array(w * h);
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const dx = x - cx, dy = y - cy;
+      const sx = (a * dx + b * dy + cx) | 0;
+      const sy = (c * dx + d * dy + cy) | 0;
       if (sx >= 0 && sx < w && sy >= 0 && sy < h)
         out[y*w+x] = bin[sy*w+sx];
     }
@@ -368,20 +399,22 @@ function getOuterCornersH(bin, w, h, norm) {
   const c = imageCentroid(bin, w, h); if (!c) return null;
   const [cx, cy] = c;
   const axes = houghAxes(norm || bin, w, h); if (!axes) return null;
-  const [a1] = axes;
-  const align = a1 - 90;
+  const [a1, a2, v1, v2] = axes;
 
-  // Rotate binary to axis-align the code, then inflate rect
-  const rotB = rotateBin(bin, w, h, cx, cy, align);
-  const [left, top, right, bot] = inflateRect(rotB, w, h, cx, cy);
-
-  // Rotate corners back (inverse rotation = -align)
-  const rad = -align * Math.PI / 180;
-  const cos = Math.cos(rad), sin = Math.sin(rad);
-  function back(px, py) {
+  // Build affine basis A = [u1 | u2] from the two detected axes.
+  // a1, a2 are folded to [0,90) so both unit vectors are in the first quadrant.
+  // applyAffineBin samples src at A*(dst-c)+c, unshearing the image.
+  const r1 = a1 * Math.PI / 180, r2 = a2 * Math.PI / 180;
+  const u1 = [Math.cos(r1), Math.sin(r1)];
+  const u2 = [Math.cos(r2), Math.sin(r2)];
+  const A = [[u1[0], u2[0]], [u1[1], u2[1]]];
+  const unsheared = applyAffineBin(bin, w, h, cx, cy, A);
+  const back = (px, py) => {
     const dx = px - cx, dy = py - cy;
-    return [dx*cos - dy*sin + cx, dx*sin + dy*cos + cy];
-  }
+    return [A[0][0]*dx + A[0][1]*dy + cx, A[1][0]*dx + A[1][1]*dy + cy];
+  };
+
+  const [left, top, right, bot] = inflateRect(unsheared, w, h, cx, cy);
   const corners = [back(left,top), back(right,top), back(right,bot), back(left,bot)];
 
   // Scale 4/3 from centroid to get outer rect
@@ -590,6 +623,7 @@ if (typeof module !== 'undefined') {
     _imageCentroid: imageCentroid,
     _houghAxes: houghAxes,
     _rotateBin: rotateBin,
+    _applyAffineBin: applyAffineBin,
     _inflateRect: inflateRect,
     _getOuterCornersH: getOuterCornersH,
     _warpRGBA: warpRGBA,

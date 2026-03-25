@@ -186,6 +186,34 @@ function syntheticFrame(code, cellPx=20, pad=40) {
   return { data: rgba, width: total, height: total };
 }
 
+// ── Affine horizontal shear (matches _make_frame_shear in Python tests) ────
+// shearX: horizontal shift per unit y-distance from centre (positive = lean right)
+function shearFrame(frame, shearX) {
+  const { data, width: w, height: h } = frame;
+  const cy = h / 2;
+  const out = new Uint8Array(w * h * 4);
+  for (let i = 0; i < w * h; i++) {
+    out[i*4]=180; out[i*4+1]=180; out[i*4+2]=180; out[i*4+3]=255;
+  }
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      // Inverse shear: source x = x - shearX*(y - cy)
+      const fsx = x - shearX * (y - cy);
+      const x0 = Math.floor(fsx), x1 = x0 + 1;
+      if (x0 >= 0 && x1 < w && y >= 0 && y < h) {
+        const wx = fsx - x0;
+        const di = (y*w+x)*4;
+        for (let c = 0; c < 3; c++) {
+          const a = data[(y*w+x0)*4+c], b = data[(y*w+x1)*4+c];
+          out[di+c] = (a*(1-wx) + b*wx + 0.5) | 0;
+        }
+        out[di+3] = 255;
+      }
+    }
+  }
+  return { data: out, width: w, height: h };
+}
+
 // ── Affine frame rotator (matches cv2.warpAffine in Python tests) ──────────
 function rotateFrame(frame, angleDeg) {
   const { data, width: w, height: h } = frame;
@@ -255,7 +283,7 @@ for (const name of abcdefFixtures) {
   test(name.replace('.png', ''), () => {
     const { data, width, height } = loadPNG(path.join(FIXTURES, name));
     const code = decodeFrame(data, width, height);
-    if (code === null) skip('orientation not found');
+    assert(code !== null, 'orientation not found');
     assertEqual(code, 'ABCDEF');
   });
 }
@@ -265,7 +293,7 @@ console.log('\nFixture image — TESTCM');
 test('TESTCM_matrix', () => {
   const { data, width, height } = loadPNG(path.join(FIXTURES, 'TESTCM_matrix.png'));
   const code = decodeFrame(data, width, height);
-  if (code === null) skip('orientation not found');
+  assert(code !== null, 'orientation not found');
   assertEqual(code, 'TESTCM');
 });
 
@@ -282,19 +310,26 @@ for (const code of ['ABCDEF', 'TESTCM', 'ZZZZZZ', 'AAAAAA']) {
 
 // ── Tests: synthetic rotated ──────────────────────────────────────────────
 console.log('\nSynthetic rotated');
-for (const [angle, strict] of [[15, true], [45, true], [90, true], [180, true]]) {
+for (const angle of [15, 45, 90, 180]) {
   test(`synthetic_rotated_${angle}deg`, () => {
     const base  = syntheticFrame('ABCDEF', 20, 80);
     const frame = rotateFrame(base, angle);
     const got   = decodeFrame(frame.data, frame.width, frame.height);
-    if (got === null) {
-      if (strict) throw new Error(`orientation not found at ${angle}°`);
-      skip(`orientation not found at ${angle}° (known limitation)`);
-    }
-    if (got !== 'ABCDEF') {
-      if (strict) throw new Error(`angle=${angle}: decoded ${JSON.stringify(got)}`);
-      skip(`angle=${angle}: decoded ${JSON.stringify(got)} (known limitation)`);
-    }
+    assert(got !== null, `orientation not found at ${angle}°`);
+    assertEqual(got, 'ABCDEF');
+  });
+}
+
+// ── Tests: synthetic shear ────────────────────────────────────────────────
+console.log('\nSynthetic shear');
+for (const shear of [0.1, 0.2]) {
+  const tag = String(shear).replace('.', '_');
+  test(`synthetic_shear_${tag}`, () => {
+    const base  = syntheticFrame('ABCDEF', 20, 80);
+    const frame = shearFrame(base, shear);
+    const got   = decodeFrame(frame.data, frame.width, frame.height);
+    assert(got !== null, `shear=${shear}: decode returned null`);
+    assertEqual(got, 'ABCDEF');
   });
 }
 

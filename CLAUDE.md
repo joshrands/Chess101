@@ -165,7 +165,8 @@ Chess101/
 │   └── chessmatrix-scanner.js  # Browser/Node.js ChessMatrix decoder (no dependencies)
 │
 ├── tools/
-│   └── debug_quad_detection.py  # Step-by-step visual debugger for the ChessMatrix pipeline
+│   ├── debug_quad_detection.py  # Python: renders pipeline stages to PNG for every fixture
+│   └── pipeline_debug.html      # Browser: interactive step-by-step JS pipeline debugger
 │
 ├── plans/multiplayer/      # Design docs for all multiplayer phases
 │   ├── README.md           # Overview, 7 modes, 3-phase roadmap
@@ -280,25 +281,27 @@ ChessMatrix is a custom 8×8 four-color barcode used to share room codes between
 2. **Adaptive blur** — Gaussian blur with kernel scaled to image size.
 3. **Local binarize** (`_local_threshold`) — mean–variance threshold per region.
 4. **Centroid** — white-pixel centroid locates the barcode roughly.
-5. **Hough axes** (`_hough_axes`) — box-blurred binary → Canny → probabilistic Hough lines.  Two dominant peaks found independently in the unfolded [0°, 180°) histogram so genuinely non-perpendicular axes (shear/perspective) are detected correctly.  Box blur kernel is capped at 15 px to avoid over-smoothing high-resolution phone images.
-6. **Affine unshear** — builds a 2×2 basis from the two Hough axis directions, inverts it to produce an affine unshear transform centered at the centroid, warps the binary so both axis families are axis-aligned.
+5. **Hough axes** — Python (`_hough_axes`): box-blurred binary → Canny → probabilistic Hough lines, two dominant peaks in unfolded [0°, 180°) histogram.  JS (`houghAxes`): Sobel gradients on normalised grayscale → [0°, 180°) magnitude-weighted histogram, two independent peaks.  Both find the two dominant axis angles robustly for upright, rotated, and sheared barcodes.
+6. **Affine unshear** — builds basis matrix A = [u1 | u2] from the two axis unit vectors (both in [0°, 180°) so the first-quadrant direction is always used directly).  `applyAffineBin` with A as inverse mapping unshears the binary; both axis families become axis-aligned.
 7. **Inflate rect** (`_inflate_rect`) — grows an AABB from the centroid until each edge accumulates white pixels, finding the barcode bounds in unsheared space.
 8. **Back-transform + scale** — corners are mapped back to original image space, then scaled outward 4/3× to include the full border.
 9. **Perspective warp** (`_warp_to_canonical`) — four-point warp to a 128×128 canonical square; tries all four 90° rotations and picks the one where the bottom-left corner is the L-finder (solid black 2×2).
 10. **Calibration** (`_calibrate_and_decode`) — samples the 5 anchor cells (K, R, G, B, W) to build a color map; rejects frames where the luminance spread across anchors is < 60 (prevents all-zero false positives when the scene is uniform).
 11. **Classify + ECC** — each data cell is mapped to the nearest calibration color; 32 dibits → 8 bytes → RS decode → 4 data bytes → room code string.
 
-The JS implementation in `web/chessmatrix-scanner.js` mirrors this pipeline exactly (no dependencies, runs in browser or Node.js).
+The JS implementation in `web/chessmatrix-scanner.js` follows the same pipeline with equivalent logic (no external dependencies, runs in browser and Node.js).
 
-**Debug tool** (`tools/debug_quad_detection.py`):
+**Debug tools:**
 
-Renders any pipeline stage to PNG for every fixture image.  Pass `--step N` (1–15) and optionally `--synth` to include synthetic frames.  Output goes to `tests/fixtures/chessmatrix_debug/`.
+`tools/debug_quad_detection.py` — renders any pipeline stage to PNG for every fixture image.  Pass `--step N` (1–15) and optionally `--synth`.  Output goes to `tests/fixtures/chessmatrix_debug/`.
 
 ```bash
 .venv/bin/python tools/debug_quad_detection.py --step 7        # oriented inflate-rect
 .venv/bin/python tools/debug_quad_detection.py --step 6 --synth # Hough axes on synthetics
 .venv/bin/python tools/debug_quad_detection.py                  # all stages (step 15 = decode)
 ```
+
+`tools/pipeline_debug.html` — interactive browser-based step-by-step debugger for the JS pipeline.  Load any image or use a live camera frame; shows each stage (binary, axes, unshear, inflated rect, outer corners, warp, orientation, calibration, decode).
 
 Stage map: 1 grayscale · 2 normalize · 3 blur · 4 binarize · 5 centroid · 6 Hough axes · 7 oriented inflate · 8 outer rect · 9 rectify-binary · 10 rectify-color · 11 orient · 12 channel-norm · 13 cal-debug · 14 color-calibrate · 15 decode.
 
