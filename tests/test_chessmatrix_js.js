@@ -13,8 +13,8 @@ const fs   = require('fs');
 const path = require('path');
 const zlib = require('zlib');
 
-const { decodeFrame, gfMul, GEN_POLY, DATA_CELLS, CAL_CELLS, CAL_CM } =
-  require('../web/chessmatrix-scanner.js');
+const scanner = require('../web/chessmatrix-scanner.js');
+const { decodeFrame, gfMul, GEN_POLY, DATA_CELLS, CAL_CELLS, CAL_CM } = scanner;
 
 const VERBOSE  = process.argv.includes('--verbose');
 const FIXTURES = path.join(__dirname, 'fixtures', 'chessmatrix');
@@ -332,6 +332,105 @@ for (const shear of [0.1, 0.2]) {
     assertEqual(got, 'ABCDEF');
   });
 }
+
+// ── Helper: build a 128×128 RGBA image with specific grid cells painted ────
+function makeWarpedCells(entries, N = 128, defaultVal = 0) {
+  // entries: array of [[row, col], brightness]  (brightness 0–255, painted as gray)
+  const cellPx = N / 8;
+  const half   = Math.floor(cellPx / 2);
+  const img    = new Uint8Array(N * N * 4);
+  for (let i = 0; i < N * N; i++) {
+    img[i*4] = defaultVal; img[i*4+1] = defaultVal;
+    img[i*4+2] = defaultVal; img[i*4+3] = 255;
+  }
+  for (const [[r, c], v] of entries) {
+    const cy = r * cellPx + half, cx = c * cellPx + half;
+    for (let dy = -half; dy < half; dy++) {
+      for (let dx = -half; dx < half; dx++) {
+        const py = cy + dy, px = cx + dx;
+        if (py >= 0 && py < N && px >= 0 && px < N) {
+          const i = (py * N + px) * 4;
+          img[i] = v; img[i+1] = v; img[i+2] = v; img[i+3] = 255;
+        }
+      }
+    }
+  }
+  return img;
+}
+
+// ── Tests: timing-strip guard — adversarial ────────────────────────────────
+console.log('\nTiming-strip guard — adversarial');
+
+test('timing_strip_ok_rejects_uniform_gray', () => {
+  const flat = new Uint8Array(128 * 128 * 4);
+  for (let i = 0; i < 128*128*4; i += 4) { flat[i]=128; flat[i+1]=128; flat[i+2]=128; flat[i+3]=255; }
+  assert(!scanner._timingStripOk(flat, 128), 'uniform gray should be rejected');
+});
+
+test('timing_strip_ok_rejects_solid_white', () => {
+  const white = new Uint8Array(128 * 128 * 4).fill(255);
+  assert(!scanner._timingStripOk(white, 128), 'solid white should be rejected');
+});
+
+test('timing_strip_ok_accepts_real_barcode', () => {
+  const { data: rgba, width: w, height: h } = syntheticFrame('ABCDEF');
+  const gray = scanner._toGray(rgba, w * h);
+  const norm = scanner._normalize(gray);
+  const blur = scanner._boxFilter(new Float32Array(norm), w, h, 1);
+  const bin  = scanner._localThreshold(blur, w, h);
+  const ori  = scanner._getOrientedRGBA(rgba, bin, w, h, norm);
+  assert(ori !== null, 'oriented image not found from real barcode');
+  assert(scanner._timingStripOk(ori, scanner._WARP_SIZE), 'real barcode should pass timing strip check');
+});
+
+test('timing_strip_ok_col7_solid_rejects', () => {
+  // Row 0 alternates perfectly but col 7 is solid mid-gray → both required → false
+  const entries = [];
+  for (let c = 0; c < 8; c++) entries.push([[0, c], c % 2 === 0 ? 255 : 0]);
+  for (let r = 0; r < 8; r++) entries.push([[r, 7], 128]);
+  assert(!scanner._timingStripOk(makeWarpedCells(entries), 128), 'solid col 7 should reject');
+});
+
+test('timing_strip_ok_row0_solid_rejects', () => {
+  // Col 7 alternates perfectly but row 0 is solid mid-gray → both required → false
+  const entries = [];
+  for (let r = 0; r < 8; r++) entries.push([[r, 7], r % 2 === 0 ? 255 : 0]);
+  for (let c = 0; c < 8; c++) entries.push([[0, c], 128]);
+  assert(!scanner._timingStripOk(makeWarpedCells(entries), 128), 'solid row 0 should reject');
+});
+
+test('timing_strip_ok_below_threshold', () => {
+  // Row 0 fine; col 7 has only 4/7 alternating pairs (needs ≥5) → false
+  // Col 7: [B D B D B B B B] → adjacent pairs TTTTFFF → 4/7 differ
+  const col7vals = [255, 0, 255, 0, 255, 255, 255, 255];
+  const entries = [];
+  for (let c = 0; c < 8; c++) entries.push([[0, c], c % 2 === 0 ? 255 : 0]);
+  for (let r = 0; r < 8; r++) entries.push([[r, 7], col7vals[r]]);
+  assert(!scanner._timingStripOk(makeWarpedCells(entries), 128), 'below-threshold strip should reject');
+});
+
+test('timing_strip_ok_at_threshold', () => {
+  // Both strips: [B D B D B D D D] → adjacent pairs TTTTTFF → 5/7 differ → accepted
+  const strip = [255, 0, 255, 0, 255, 0, 0, 0];
+  const entries = [];
+  for (let c = 0; c < 8; c++) entries.push([[0, c], strip[c]]);
+  for (let r = 0; r < 8; r++) entries.push([[r, 7], strip[r]]);
+  assert(scanner._timingStripOk(makeWarpedCells(entries), 128), 'at-threshold strip should be accepted');
+});
+
+test('timing_strip_blocks_all_zero_decode', () => {
+  // All-black warped → timing strip fails (AAAAAA false-positive regression).
+  // Without the guard, all cells classify as K(0) → 32 zero dibits → false "AAAAAA".
+  const allBlack = new Uint8Array(128 * 128 * 4); // all zeros → alpha=0 too, but RGB=0
+  assert(!scanner._timingStripOk(allBlack, 128), 'all-black warped should be rejected');
+});
+
+test('decode_aaaaaa_real_barcode', () => {
+  // AAAAAA is a valid room code; a real AAAAAA barcode must still decode correctly.
+  const frame = syntheticFrame('AAAAAA');
+  const got = decodeFrame(frame.data, frame.width, frame.height);
+  assertEqual(got, 'AAAAAA');
+});
 
 // ── Summary ────────────────────────────────────────────────────────────────
 const total = passed + failed + skipped;

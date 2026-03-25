@@ -48,7 +48,7 @@ class MoveFlags:
         is_capture: True if the destination cell held an opponent piece.
         is_en_passant: True if a pawn captured via en passant.
         is_castling: True if this is a castling king move.
-        is_promotion: True if a pawn reached the back rank (auto-promotes to Queen).
+        is_promotion: True if a pawn reached the back rank (player selects Queen/Knight/Bishop/Rook).
         captured_at: (row, col) of the captured pawn for en passant; None otherwise.
         rook_from: (row, col) of the rook before castling; None otherwise.
         rook_to: (row, col) of the rook after castling; None otherwise.

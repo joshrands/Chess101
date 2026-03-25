@@ -588,6 +588,99 @@ def test_decode_returns_none_for_solid_color_frame() -> None:
     assert _decode(np.full((240, 320, 3), 128, dtype=np.uint8)) is None
 
 
+def _make_warped_cells(
+    brightness_map: "dict[tuple[int, int], int]",
+    default: int = 0,
+) -> "np.ndarray":
+    """Build a 128×128 BGR image with grid cells set to given brightness values (0–255).
+
+    Args:
+        brightness_map: {(row, col): brightness} for cells to paint explicitly.
+        default: brightness for all other pixels.
+    """
+    cell_px = 16  # == _CELL_PX
+    img = np.full((128, 128, 3), default, dtype=np.uint8)
+    half = cell_px // 2
+    for (r, c), v in brightness_map.items():
+        cy, cx = r * cell_px + half, c * cell_px + half
+        img[cy - half: cy + half, cx - half: cx + half] = v
+    return img
+
+
+def test_timing_strip_ok_rejects_uniform_warped() -> None:
+    """Uniform mid-gray warped image → no alternating pattern → rejected."""
+    from network.chessmatrix import _timing_strip_ok, _CELL_PX
+    assert _timing_strip_ok(np.full((128, 128, 3), 128, dtype=np.uint8), _CELL_PX) is False
+
+
+def test_timing_strip_ok_rejects_solid_white() -> None:
+    """All-white warped image → no alternating pattern → rejected."""
+    from network.chessmatrix import _timing_strip_ok, _CELL_PX
+    assert _timing_strip_ok(np.full((128, 128, 3), 255, dtype=np.uint8), _CELL_PX) is False
+
+
+def test_timing_strip_ok_accepts_real_barcode() -> None:
+    """Warped image from a real encoded barcode → timing strips alternate → accepted."""
+    pytest.importorskip("cv2")
+    from network.chessmatrix import _timing_strip_ok, _CELL_PX
+    warped = _debug(_make_frame_padded("ABCDEF", cell_px=20, pad=40))["warped"]
+    assert warped is not None
+    assert _timing_strip_ok(warped, _CELL_PX) is True
+
+
+def test_timing_strip_ok_col7_solid_rejects() -> None:
+    """Row 0 alternates perfectly but col 7 is solid → both strips required → False."""
+    from network.chessmatrix import _timing_strip_ok, _CELL_PX
+    cells: dict[tuple[int, int], int] = {(0, c): (255 if c % 2 == 0 else 0) for c in range(8)}
+    cells.update({(r, 7): 128 for r in range(8)})  # solid mid-gray col 7
+    assert _timing_strip_ok(_make_warped_cells(cells), _CELL_PX) is False
+
+
+def test_timing_strip_ok_row0_solid_rejects() -> None:
+    """Col 7 alternates perfectly but row 0 is solid → both strips required → False."""
+    from network.chessmatrix import _timing_strip_ok, _CELL_PX
+    cells: dict[tuple[int, int], int] = {(r, 7): (255 if r % 2 == 0 else 0) for r in range(8)}
+    cells.update({(0, c): 128 for c in range(8)})  # solid mid-gray row 0
+    assert _timing_strip_ok(_make_warped_cells(cells), _CELL_PX) is False
+
+
+def test_timing_strip_ok_below_threshold() -> None:
+    """Row 0 fine but col 7 has only 4/7 alternating pairs (< ≥5 threshold) → False."""
+    from network.chessmatrix import _timing_strip_ok, _CELL_PX
+    # Col 7: [B D B D B B B B] → adjacent pairs TTTTFFF → 4/7 differ
+    col7 = [255, 0, 255, 0, 255, 255, 255, 255]
+    cells: dict[tuple[int, int], int] = {(0, c): (255 if c % 2 == 0 else 0) for c in range(8)}
+    cells.update({(r, 7): col7[r] for r in range(8)})
+    assert _timing_strip_ok(_make_warped_cells(cells), _CELL_PX) is False
+
+
+def test_timing_strip_ok_at_threshold() -> None:
+    """Both strips have exactly 5/7 alternating pairs (minimum passing score) → True."""
+    from network.chessmatrix import _timing_strip_ok, _CELL_PX
+    # [B D B D B D D D] → adjacent pairs TTTTTFF → 5/7 differ
+    strip = [255, 0, 255, 0, 255, 0, 0, 0]
+    cells: dict[tuple[int, int], int] = {(0, c): strip[c] for c in range(8)}
+    cells.update({(r, 7): strip[r] for r in range(8)})
+    assert _timing_strip_ok(_make_warped_cells(cells), _CELL_PX) is True
+
+
+def test_timing_strip_blocks_all_zero_decode() -> None:
+    """All-black warped → timing strip fails (AAAAAA false-positive regression test).
+
+    Without the timing-strip guard, a uniform dark warped image causes all cells to
+    classify as K (0) → 32 zero dibits → RS decode → false "AAAAAA".
+    The guard must catch this before calibration runs.
+    """
+    from network.chessmatrix import _timing_strip_ok, _CELL_PX
+    assert _timing_strip_ok(np.zeros((128, 128, 3), dtype=np.uint8), _CELL_PX) is False
+
+
+def test_decode_aaaaaa_real_barcode() -> None:
+    """AAAAAA is a valid room code; a real AAAAAA barcode must still decode correctly."""
+    pytest.importorskip("cv2")
+    assert _decode(_make_frame_padded("AAAAAA", cell_px=20, pad=40)) == "AAAAAA"
+
+
 def test_decode_frame_missing_opencv(monkeypatch: pytest.MonkeyPatch) -> None:
     import sys, importlib
     monkeypatch.setitem(sys.modules, "cv2", None)  # type: ignore[arg-type]

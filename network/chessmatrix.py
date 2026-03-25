@@ -940,6 +940,31 @@ def _sample_cell_rgb(
     return int(bgr[2]), int(bgr[1]), int(bgr[0])  # R, G, B
 
 
+def _timing_strip_ok(warped: "np.ndarray", cell_px: int) -> bool:
+    """Return True if the timing strips in the oriented warped image alternate.
+
+    Row 0 (top) and column 7 (right) of a ChessMatrix always carry an
+    alternating black/white pattern.  Checking this before colour calibration
+    rejects non-barcode images that accidentally produce a valid perspective
+    warp.  Requires ≥5 of 7 adjacent cell pairs to differ (tolerates noise).
+    """
+    import numpy as np
+    gray = np.mean(warped, axis=2)
+    half = cell_px // 2
+
+    def bright(r: int, c: int) -> bool:
+        return float(gray[r * cell_px + half, c * cell_px + half]) > 127.0
+
+    row0 = [bright(0, c) for c in range(8)]
+    col7 = [bright(r, 7) for r in range(8)]
+
+    def alternates(seq: "list[bool]") -> bool:
+        pairs = sum(seq[i] != seq[i + 1] for i in range(len(seq) - 1))
+        return pairs >= 5  # ≥5/7 adjacent pairs must differ
+
+    return alternates(row0) and alternates(col7)
+
+
 def _build_calibration(
     warped: "np.ndarray",
     cell_px: int,
@@ -1026,17 +1051,18 @@ def decode_frame_debug(frame: "np.ndarray") -> dict:
     if quad is not None:
         warped = _warp_to_canonical(frame, quad)
         if warped is not None:
-            cal  = _build_calibration(warped, _CELL_PX)
-            grid = [
-                [_classify_cell(*_sample_cell_rgb(warped, r, c, _CELL_PX), cal)
-                 for c in range(8)]
-                for r in range(8)
-            ]
-            try:
-                import chessmatrix as _cm  # type: ignore[import]
-                code = bytes_to_room_code(_cm.decode(grid))
-            except Exception:
-                code = None
+            if _timing_strip_ok(warped, _CELL_PX):
+                cal  = _build_calibration(warped, _CELL_PX)
+                grid = [
+                    [_classify_cell(*_sample_cell_rgb(warped, r, c, _CELL_PX), cal)
+                     for c in range(8)]
+                    for r in range(8)
+                ]
+                try:
+                    import chessmatrix as _cm  # type: ignore[import]
+                    code = bytes_to_room_code(_cm.decode(grid))
+                except Exception:
+                    code = None
 
     return {
         "code":   code,

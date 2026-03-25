@@ -78,9 +78,9 @@ The `relay_url` fixture (in `conftest.py`) selects the mode automatically: `RELA
 | `test_networked_runner.py` | NetworkedGameRunner: reconnect, CODE_SCAN_BOARD state machine | 1163 |
 | `test_online_flow.py` | E2E: relay handshake → color-pick → war-games → playing | 459 |
 | `test_relay.py` | Relay protocol, forwarding, reconnect, anti-cheat | 1116 |
-| `test_chessmatrix_scanning.py` | ChessMatrix scanner: all pipeline stages + E2E (Python) | 1066 |
+| `test_chessmatrix_scanning.py` | ChessMatrix scanner: all pipeline stages + E2E (Python) | 1159 |
 | `test_chessmatrix_pipeline.py` | ChessMatrix pipeline via OpenCV debug tools | 190 |
-| `test_chessmatrix_js.js` | ChessMatrix scanner (JavaScript / Node.js) | — |
+| `test_chessmatrix_js.js` | ChessMatrix scanner (JavaScript / Node.js) | 442 |
 
 ---
 
@@ -309,6 +309,8 @@ Tests `network.chessmatrix.decode_frame` at both per-stage and end-to-end levels
 
 **Per-stage tests** verify each of the 15 pipeline steps in isolation (grayscale, normalize, blur, binarize, centroid, Hough axes, unshear, inflate rect, back-transform, perspective warp, orientation, channel normalization, calibration debug, color calibration, decode).
 
+**Timing-strip guard** — `_timing_strip_ok` unit tests: rejects uniform-gray and solid-white warped images; verifies that *both* strips must alternate (each tested independently); checks below-threshold (4/7 pairs) rejects and at-threshold (5/7 pairs) accepts; confirms that an all-black warped image is rejected (AAAAAA false-positive regression). Also verifies that a real AAAAAA barcode still decodes correctly (valid code, not just a false positive).
+
 **End-to-end tests:**
 
 | Section | Coverage |
@@ -352,7 +354,7 @@ node tests/test_chessmatrix_js.js            # summary output
 node tests/test_chessmatrix_js.js --verbose  # per-test output
 ```
 
-Covers the same pipeline stages as the Python scanner: synthetic clean frames, rotation, perspective, noise, and real-photo fixtures.
+Covers the same pipeline stages as the Python scanner: synthetic clean frames, rotation, perspective, noise, and real-photo fixtures. Also includes a **timing-strip guard** section with the same adversarial unit tests as the Python suite (uniform gray/white rejected, both strips required independently, below/at threshold boundary cases, AAAAAA false-positive regression, real AAAAAA decodes correctly).
 
 ---
 

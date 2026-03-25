@@ -532,6 +532,33 @@ function calibrateAndDecode(oriented, N) {
   return decodeColorGrid(grid);
 }
 
+// ── Timing-strip structural guard ─────────────────────────────────────────
+function timingStripOk(oriented, N) {
+  // Row 0 (top) and column 7 (right) of a ChessMatrix always carry an
+  // alternating black/white pattern.  Checking this before colour calibration
+  // rejects non-barcode images that accidentally produce a valid perspective
+  // warp.  Requires ≥5 of 7 adjacent cell pairs to differ (tolerates noise).
+  const cellPx = N / 8;
+  const half   = Math.floor(cellPx / 2);
+
+  function bright(r, c) {
+    const cy = r * cellPx + half, cx = c * cellPx + half;
+    const i  = (cy * N + cx) * 4;
+    return (oriented[i] + oriented[i + 1] + oriented[i + 2]) / 3 > 127;
+  }
+
+  const row0 = Array.from({length: 8}, (_, c) => bright(0, c));
+  const col7 = Array.from({length: 8}, (_, r) => bright(r, 7));
+
+  function alternates(seq) {
+    let pairs = 0;
+    for (let i = 0; i < seq.length - 1; i++) if (seq[i] !== seq[i + 1]) pairs++;
+    return pairs >= 5;
+  }
+
+  return alternates(row0) && alternates(col7);
+}
+
 // ── Top-level frame decoder ────────────────────────────────────────────────
 function decodeFrame(rgba, w, h) {
   const gray   = toGray(rgba, w * h);
@@ -540,6 +567,7 @@ function decodeFrame(rgba, w, h) {
   const bin    = localThreshold(blur1, w, h);
   const ori    = getOrientedRGBA(rgba, bin, w, h, norm);
   if (!ori) return null;
+  if (!timingStripOk(ori, WARP_SIZE)) return null;  // structural guard
   const code   = calibrateAndDecode(ori, WARP_SIZE);
   return (code && code.length === 6) ? code : null;
 }
@@ -630,6 +658,7 @@ if (typeof module !== 'undefined') {
     _warpBin: warpBin,
     _rot90RGBA: rot90RGBA,
     _getOrientedRGBA: getOrientedRGBA,
+    _timingStripOk: timingStripOk,
     _calibrateAndDecode: calibrateAndDecode,
     _sampleCell: sampleCell,
     _cellCenterPx: cellCenterPx,

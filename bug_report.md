@@ -243,6 +243,4 @@ Design debts not locked in by tests but worth tracking.
 | OPEN-01 | Two players can pick the same colour — `_get_team_pieces` would merge both teams |
 | OPEN-02 | Vestigial `days_*_since_injury` / `double_*_jeopardy` attrs in `Board.__init__` — dead code |
 | OPEN-03 | En passant capture depends on `move()` return value; silent failure if `None` returned unexpectedly |
-| OPEN-04 | Pawn always auto-promotes to Queen — no player choice of underpromotion |
 | OPEN-05 | No draw warning when approaching fifty-move or threefold limits |
-| OPEN-06 | ChessMatrix scanner produces false-positive room codes from non-barcode images (e.g. a face). Affects `network/chessmatrix.py` `decode_frame()`, the JS scanner (`web/chessmatrix-scanner.js`), and `_render_code_scan` in `simulator/networked_runner.py`. Root cause: luminance-spread threshold in `_calibrate_and_decode` (currently 60) is too low — uniform or low-contrast scenes still pass calibration. Fix: raise threshold and/or add a structural-pattern sanity check before committing a decode. Deferred — not blocking barcode entry work. |
