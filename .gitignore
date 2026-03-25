@@ -10,3 +10,4 @@ build/
 .claude/
 .venv/
 tests/fixtures/chessmatrix_debug/*
+**/.DS_Store
