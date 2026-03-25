@@ -244,3 +244,4 @@ Design debts not locked in by tests but worth tracking.
 | OPEN-02 | Vestigial `days_*_since_injury` / `double_*_jeopardy` attrs in `Board.__init__` — dead code |
 | OPEN-03 | En passant capture depends on `move()` return value; silent failure if `None` returned unexpectedly |
 | OPEN-05 | No draw warning when approaching fifty-move or threefold limits |
+| OPEN-07 | State leak between networked game sessions — legal move in a new online game rejected as illegal after completing a previous game. Likely stale board state, piece flags, turn tracking, or sequence numbers carried from the prior session. Suspected: `simulator/networked_runner.py`, `game/networked_board.py`, relay room state. |
