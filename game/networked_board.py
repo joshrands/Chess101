@@ -49,6 +49,7 @@ from pieces.pawn import Pawn
 
 if TYPE_CHECKING:
     from network.client import GameClient
+    from network.relay_client import RelayClient
     from network.server import GameServer
 
 logger = logging.getLogger(__name__)
@@ -69,8 +70,9 @@ class NetworkedBoard(Board):
 
     def __init__(
         self,
-        net: "GameServer | GameClient",
+        net: "GameServer | GameClient | RelayClient",
         local_team_key: str = "r",
+        relay: "RelayClient | None" = None,
         *args,
         **kwargs,
     ) -> None:
@@ -78,6 +80,9 @@ class NetworkedBoard(Board):
         # access them if needed.
         self._net = net
         self._local_team_key = local_team_key
+        # Relay client for online play (HOST: already has room code;
+        # GUEST: will call join_room inside _chessmatrix_input_ux)
+        self._relay: "RelayClient | None" = relay
 
         self._net_lock = threading.Lock()
         self._incoming: collections.deque = collections.deque()
@@ -421,6 +426,235 @@ class NetworkedBoard(Board):
             self.canvas = self.matrix.SwapOnVSync(self.canvas)
             _time.sleep(0.12)
 
+    # ── Online play helpers ────────────────────────────────────────────────────
+
+    def _show_chessmatrix_waiting(self, room_code: str) -> None:
+        """Display the ChessMatrix barcode on the LED matrix and block until
+        the relay peer connects.
+
+        Re-blits the barcode every 5 s so the display stays fresh.  Returns
+        as soon as ``_relay._peer_joined`` is set.
+        """
+        from network import chessmatrix as _cm_mod
+
+        grid = _cm_mod.encode(room_code)
+        relay = self._relay
+
+        def _blit() -> None:
+            self.canvas.Clear()
+            _cm_mod.render_to_led(grid, self.canvas)
+            self.canvas = self.matrix.SwapOnVSync(self.canvas)
+
+        _blit()
+        logger.info("Displaying ChessMatrix for room %s — waiting for peer...", room_code)
+
+        last_blit = time.time()
+        while relay is not None and not relay._peer_joined.is_set():  # type: ignore[attr-defined]
+            self._drain_incoming()
+            if time.time() - last_blit >= 5.0:
+                _blit()
+                last_blit = time.time()
+            time.sleep(0.1)
+
+        logger.info("Relay peer connected — proceeding")
+
+    def _chessmatrix_input_ux(self) -> "str | None":
+        """Reed-switch–driven ChessMatrix code entry for the Pi GUEST.
+
+        Mirrors the simulator's CODE_SCAN_BOARD flow using ``self.master``
+        for piece detection instead of mouse clicks.
+
+        Returns the decoded 6-character room code, or ``None`` on repeated
+        failure (user gave up / too many reed-switch errors).
+        """
+        from core.constants import CellOccupancy
+        from network import chessmatrix as _cm_mod
+        import chessmatrix as _cm_lib  # type: ignore[import]
+
+        _FADE_S      = 3.0
+        _INACT_S     = 5.0
+        _FRAME_S     = 1.0 / 30.0   # ~30 fps render loop
+        _MAX_RETRIES = 3
+
+        _CORNERS = {
+            "red":   (1, 6),
+            "green": (6, 1),
+            "blue":  (6, 6),
+        }
+        _COLOR_IDX = {"red": 1, "green": 2, "blue": 3}
+        _PHASE_ORDER = ["red", "green", "blue"]
+
+        def _cell_occupied(row: int, col: int) -> bool:
+            self.master.read_data()
+            return self.master.get_cell_state(row, col) == CellOccupancy.OCCUPIED
+
+        def _render(locked: dict, current_color: int, beam_phase: float,
+                    blink_on: bool, active_corner: "tuple|None",
+                    fade_frac: float, corner_pulsing: bool, pulse_t: float) -> None:
+            self.canvas.Clear()
+            _cm_mod.render_beam_frame(
+                self.canvas, locked, current_color, beam_phase,
+                blink_on, active_corner=active_corner, fade_frac=fade_frac,
+                corner_color=_COLOR_IDX.get(
+                    active_corner and next(
+                        (k for k, v in _CORNERS.items() if v == active_corner), None
+                    ) or "", 0
+                ) if active_corner else 0,
+                corner_pulsing=corner_pulsing,
+                pulse_t=pulse_t,
+            )
+            self.canvas = self.matrix.SwapOnVSync(self.canvas)
+
+        for _attempt in range(_MAX_RETRIES):
+            locked: dict = {}
+            pending: set = set()
+            last_activity: "float | None" = None
+            fade_start: "float | None" = None
+
+            # Step 0: clear the board of any pieces
+            logger.info("ChessMatrix input: clear all pieces from board")
+            while True:
+                self.master.read_data()
+                any_piece = any(
+                    self.master.get_cell_state(r, c) == CellOccupancy.OCCUPIED
+                    for r in range(8) for c in range(8)
+                )
+                if not any_piece:
+                    break
+                self.canvas.Clear()
+                _cm_mod.render_border_only(self.canvas)
+                for r in range(8):
+                    for c in range(8):
+                        if self.master.get_cell_state(r, c) == CellOccupancy.OCCUPIED:
+                            _cm_mod._set_cell(self.canvas, r, c, 255, 80, 0)  # orange warning
+                self.canvas = self.matrix.SwapOnVSync(self.canvas)
+                time.sleep(0.1)
+
+            # Steps 1–3: red → green → blue entry
+            for color_name in _PHASE_ORDER:
+                corner = _CORNERS[color_name]
+                color_idx = _COLOR_IDX[color_name]
+                cs = f"{color_name}_wait"
+                last_activity = None
+                fade_start = None
+                pending = set()
+
+                # Track previous reed-switch state to detect edges
+                prev_corner = False
+                prev_data: dict = {}
+
+                while True:
+                    now = time.time()
+                    beam_phase = (now % 0.8) / 0.8
+                    blink_on = (now % 0.5) < 0.25
+
+                    is_active = cs == f"{color_name}_active"
+                    is_fading = cs == f"{color_name}_fading"
+                    is_waiting = cs == f"{color_name}_wait"
+
+                    # Compute fade_frac
+                    fade_frac = 0.0
+                    if is_fading and fade_start is not None:
+                        fade_frac = min((now - fade_start) / _FADE_S, 1.0)
+                        if fade_frac >= 1.0:
+                            # Lock in pending cells
+                            for cell in pending:
+                                locked[cell] = color_idx
+                            logger.info("ChessMatrix: %s locked (%d cells)", color_name, len(pending))
+                            break  # advance to next color
+
+                    corner_pulsing = (
+                        is_active
+                        and last_activity is not None
+                        and (now - last_activity) >= _INACT_S
+                    )
+
+                    # Poll reed switches (edges only)
+                    self.master.read_data()
+                    cur_corner = self.master.get_cell_state(*corner) == CellOccupancy.OCCUPIED
+
+                    if is_waiting and cur_corner and not prev_corner:
+                        cs = f"{color_name}_active"
+                        last_activity = now
+                        pending = set()
+                        logger.info("ChessMatrix: %s corner placed — active", color_name)
+
+                    elif is_active:
+                        if not cur_corner and prev_corner:
+                            # Corner removed → start fade
+                            cs = f"{color_name}_fading"
+                            fade_start = now
+                            logger.info("ChessMatrix: %s corner removed — fading", color_name)
+                        else:
+                            # Check data cells for edge changes
+                            for cell in _cm_mod.DATA_CELLS:
+                                cur = self.master.get_cell_state(*cell) == CellOccupancy.OCCUPIED
+                                was = prev_data.get(cell, False)
+                                if cur and not was:
+                                    pending.add(cell)
+                                    last_activity = now
+                                elif not cur and was:
+                                    pending.discard(cell)
+                                    last_activity = now
+
+                    elif is_fading:
+                        if cur_corner and not prev_corner:
+                            # Corner replaced → cancel fade
+                            cs = f"{color_name}_active"
+                            fade_start = None
+                            last_activity = now
+                            logger.info("ChessMatrix: %s fade cancelled", color_name)
+
+                    prev_corner = cur_corner
+                    prev_data = {
+                        cell: (self.master.get_cell_state(*cell) == CellOccupancy.OCCUPIED)
+                        for cell in _cm_mod.DATA_CELLS
+                    }
+
+                    # Build display locked dict
+                    display_locked = dict(locked)
+                    if is_active or is_fading:
+                        for cell in pending:
+                            display_locked[cell] = color_idx
+
+                    active_beam_color = color_idx if (is_active or is_fading) else 0
+                    active_corner_pos = corner if not is_waiting else corner  # always show corner
+
+                    _render(
+                        display_locked,
+                        active_beam_color,
+                        beam_phase,
+                        blink_on,
+                        active_corner_pos,
+                        fade_frac,
+                        corner_pulsing,
+                        now,
+                    )
+                    time.sleep(_FRAME_S)
+
+            # Decode
+            try:
+                grid = _cm_mod.grid_from_cell_state(locked)
+                data = _cm_lib.decode(grid)
+                room_code = _cm_mod.bytes_to_room_code(data)
+                logger.info("ChessMatrix: decoded room code %s", room_code)
+                return room_code
+            except Exception as exc:
+                logger.warning("ChessMatrix: decode failed (%s) — retry %d/%d",
+                               exc, _attempt + 1, _MAX_RETRIES)
+                # Error flash
+                for _ in range(3):
+                    for rgb in ((255, 0, 0), (200, 200, 200)):
+                        self.canvas.Clear()
+                        _cm_mod.render_border_only(self.canvas)
+                        for r, c in _cm_mod.DATA_CELLS:
+                            _cm_mod._set_cell(self.canvas, r, c, *rgb)
+                        self.canvas = self.matrix.SwapOnVSync(self.canvas)
+                        time.sleep(0.12)
+
+        logger.error("ChessMatrix: max retries exceeded — aborting")
+        return None
+
     # ── run() override ─────────────────────────────────────────────────────────
 
     def run(self, skip_setup: bool = False, init_num: str = "") -> None:  # noqa: ARG002
@@ -431,6 +665,31 @@ class NetworkedBoard(Board):
         then enters the alternating turn loop.
         """
         self.canvas = self.matrix.CreateFrameCanvas()
+
+        # ── Relay online play preamble ─────────────────────────────
+        if self._relay is not None:
+            if self._local_team_key == "r":
+                # HOST: create room, show ChessMatrix, wait for peer
+                room_code = self._relay.create_room(timeout=60.0)
+                if room_code is None:
+                    logger.error("Failed to create relay room — aborting")
+                    return
+                logger.info("Relay room created: %s", room_code)
+                self._show_chessmatrix_waiting(room_code)
+            else:
+                # GUEST: enter room code via reed-switch ChessMatrix input
+                room_code = self._chessmatrix_input_ux()
+                if room_code is None:
+                    logger.error("ChessMatrix input aborted — aborting")
+                    return
+                connected = self._relay.join_room(room_code, timeout=30.0)
+                if not connected:
+                    logger.error("Failed to join relay room %s — aborting", room_code)
+                    return
+                logger.info("Joined relay room: %s", room_code)
+            # Wire up message handler now that peer is connected
+            self._relay.set_message_handler(self._on_network_message)
+
         logger.info("NetworkedBoard: waiting for configuration from Sim...")
 
         # ── Wait for Sim-as-UI to send color + war_games choices ──

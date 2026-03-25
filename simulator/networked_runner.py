@@ -162,6 +162,15 @@ class NetworkedGameRunner(GameRunner):
         self._cv_capture: Optional[object] = None        # cv2.VideoCapture or None
         self._cv_last_frame: Optional[object] = None     # most recent BGR numpy frame
 
+        # Board-entry ChessMatrix state (CODE_SCAN_BOARD phase)
+        self._cs_locked: dict = {}            # (row,col) → color index 1=R,2=G,3=B
+        self._cs_pending: set = set()         # cells toggled in current entry phase
+        self._cs_phase: str = "red_wait"      # sub-state within CODE_SCAN_BOARD
+        self._cs_fade_start: Optional[float] = None   # time.monotonic() when fade began
+        self._cs_last_activity: Optional[float] = None  # time of last toggle or corner click
+        self._cs_excite_times: dict = {}      # (row,col) → time.monotonic() of last toggle-on
+        self._cs_typing: bool = False         # keyboard text-entry sub-mode
+
         # Call parent AFTER setting our attrs so _reset() can reference them.
         # LOCAL role shows the Lobby so the player can choose a mode;
         # network roles skip the Lobby and go straight to NAME_ENTRY.
@@ -233,22 +242,14 @@ class NetworkedGameRunner(GameRunner):
             logger.info("Lobby: Host Online selected (relay: %s)", self._relay_url)
 
         elif opt_idx == 5:
-            # Join Online — open camera scanner (fall back to text entry if no camera)
+            # Join Online — primary path is board-entry raster-beam UX
             self._room_code_input = ""
-            if _CV2_AVAILABLE:
-                self._close_camera()
-                cap = _cv2.VideoCapture(0)  # type: ignore[attr-defined]
-                if cap.isOpened():
-                    self._cv_capture = cap
-                    self.phase = Phase.CODE_SCAN
-                    logger.info("Lobby: Join Online — camera opened for ChessMatrix scan")
-                else:
-                    cap.release()
-                    self._entering_room_code = True
-                    logger.info("Lobby: Join Online — no camera, using text entry fallback")
-            else:
-                self._entering_room_code = True
-                logger.info("Lobby: Join Online — opencv unavailable, using text entry")
+            self._cs_locked = {}
+            self._cs_pending = set()
+            self._cs_phase = "red_wait"
+            self._cs_fade_start = None
+            self.phase = Phase.CODE_SCAN_BOARD
+            logger.info("Lobby: Join Online — board-entry mode")
 
     # ── Name entry ─────────────────────────────────────────────────────────────
 
@@ -276,6 +277,13 @@ class NetworkedGameRunner(GameRunner):
         self._entering_room_code = False
         self._room_code_input    = ""
         self._chessmatrix_grid   = None
+        self._cs_locked           = {}
+        self._cs_pending          = set()
+        self._cs_phase            = "red_wait"
+        self._cs_fade_start       = None
+        self._cs_last_activity    = None
+        self._cs_excite_times     = {}
+        self._cs_typing           = False
         self._close_camera()
         super()._reset()
 
@@ -1229,6 +1237,20 @@ class NetworkedGameRunner(GameRunner):
                 text(f"  {self._room_code}", pfont_md, _P_GOOD)
             sep()
 
+        # Board-entry ChessMatrix hints
+        if self.phase == Phase.CODE_SCAN_BOARD:
+            sep()
+            if self._cs_typing:
+                text("Type room code:", pfont_md, _P_TEXT)
+                display = self._room_code_input + "_" * (6 - len(self._room_code_input))
+                text(f"  {display}", pfont_md, _P_GOOD)
+                text("ESC: back to board", pfont_sm, _P_DIM)
+            else:
+                text("Board: click corners + cells", pfont_sm, _P_DIM)
+                text("T: type code  C: camera", pfont_sm, _P_DIM)
+                text("ESC: back to lobby", pfont_sm, _P_DIM)
+            sep()
+
         # Room code entry hint (join online from lobby)
         if self._entering_room_code:
             sep()
@@ -1488,6 +1510,264 @@ class NetworkedGameRunner(GameRunner):
                 screen.fill((0, 0, 0), (0, 0, board_px, board_px))
         else:
             screen.fill((0, 0, 0), (0, 0, board_px, board_px))
+
+    # ── CODE_SCAN_BOARD — board-entry ChessMatrix UX ──────────────────────
+
+    # Corner position for each entry phase sub-state
+    _CS_CORNERS: dict = {
+        "red_wait":    (1, 6),
+        "red_active":  (1, 6),
+        "red_fading":  (1, 6),
+        "green_wait":  (6, 1),
+        "green_active":(6, 1),
+        "green_fading":(6, 1),
+        "blue_wait":   (6, 6),
+        "blue_active": (6, 6),
+        "blue_fading": (6, 6),
+    }
+    _CS_COLORS: dict = {
+        "red_wait":    1,  "red_active":   1,  "red_fading":   1,
+        "green_wait":  2,  "green_active": 2,  "green_fading": 2,
+        "blue_wait":   3,  "blue_active":  3,  "blue_fading":  3,
+    }
+    _CS_FADE_S = 3.0         # seconds for the corner fade
+    _CS_INACTIVITY_S = 5.0  # seconds without a toggle before corner starts pulsing
+
+    def _handle_code_scan_board(self, event: "pygame.event.Event") -> None:
+        """Handle input during CODE_SCAN_BOARD phase."""
+        if event.type == pygame.KEYDOWN:
+            if self._cs_typing:
+                # ── Text-entry sub-mode: all keys go to the room code buffer ──
+                if event.key == pygame.K_ESCAPE:
+                    # ESC exits typing mode, back to board entry
+                    self._cs_typing = False
+                    self._room_code_input = ""
+                    return
+                if event.key in (pygame.K_BACKSPACE, pygame.K_DELETE):
+                    self._room_code_input = self._room_code_input[:-1]
+                    return
+                if event.key in (pygame.K_RETURN, pygame.K_KP_ENTER):
+                    code = self._room_code_input.upper().strip()
+                    if len(code) == 6 and code.isalpha():
+                        self._room_code = code
+                        self._role = NetworkRole.ONLINE_GUEST
+                        self._local_team_key = "l"
+                        self._cs_typing = False
+                        self.phase = Phase.NAME_ENTRY
+                        logger.info("CODE_SCAN_BOARD: room code typed manually: %s", code)
+                    return
+                # Any alpha char (including C) goes into the buffer
+                if event.unicode and event.unicode.isalpha() and len(self._room_code_input) < 6:
+                    self._room_code_input += event.unicode.upper()
+                return
+
+            # ── Board-scan mode ──────────────────────────────────────────────
+            if event.key == pygame.K_ESCAPE:
+                self.phase = Phase.LOBBY
+                return
+            if event.key == pygame.K_t:
+                # 'T' → keyboard text-entry sub-mode
+                self._cs_typing = True
+                self._room_code_input = ""
+                logger.info("CODE_SCAN_BOARD: entering keyboard text mode")
+                return
+            if event.key == pygame.K_c:
+                # 'C' → camera fallback
+                self._room_code_input = ""
+                if _CV2_AVAILABLE:
+                    self._close_camera()
+                    cap = _cv2.VideoCapture(0)  # type: ignore[attr-defined]
+                    if cap.isOpened():
+                        self._cv_capture = cap
+                        self.phase = Phase.CODE_SCAN
+                        logger.info("CODE_SCAN_BOARD: switching to camera scanner")
+                        return
+                    cap.release()
+                logger.info("CODE_SCAN_BOARD: camera unavailable")
+                return
+
+        if event.type != pygame.MOUSEBUTTONDOWN:
+            return
+
+        cell = self._px_to_cell(*event.pos)
+        if cell is None:
+            return
+        row, col = cell
+
+        cs = self._cs_phase
+        corner = self._CS_CORNERS.get(cs)
+        color  = self._CS_COLORS.get(cs, 0)
+
+        now_t = time.monotonic()
+
+        if cs in ("red_wait", "green_wait", "blue_wait"):
+            if (row, col) == corner:
+                self._cs_phase = cs.replace("_wait", "_active")
+                self._cs_pending = set()
+                self._cs_last_activity = now_t
+                logger.info("CODE_SCAN_BOARD: %s corner clicked — entry active", cs.split("_")[0])
+
+        elif cs in ("red_active", "green_active", "blue_active"):
+            if (row, col) == corner:
+                # User removes corner piece — start immediate 3 s fade
+                self._cs_phase = cs.replace("_active", "_fading")
+                self._cs_fade_start = now_t
+                logger.info("CODE_SCAN_BOARD: %s corner removed — 3 s fade started", cs.split("_")[0])
+            elif (row, col) in _chessmatrix.DATA_CELLS:
+                if (row, col) in self._cs_pending:
+                    self._cs_pending.discard((row, col))
+                    self._cs_excite_times.pop((row, col), None)
+                else:
+                    self._cs_pending.add((row, col))
+                    self._cs_excite_times[(row, col)] = now_t
+                self._cs_last_activity = now_t   # reset inactivity timer
+
+        elif cs in ("red_fading", "green_fading", "blue_fading"):
+            if (row, col) == corner:
+                # Re-place on corner: cancel fade, back to active
+                self._cs_phase = cs.replace("_fading", "_active")
+                self._cs_fade_start = None
+                self._cs_last_activity = now_t
+                logger.info("CODE_SCAN_BOARD: %s fade cancelled — back to active", cs.split("_")[0])
+
+    def _render_code_scan_board(self) -> None:
+        """Render the board-entry ChessMatrix screen with raster beam animation."""
+        import time as _time
+
+        cs = self._cs_phase
+        color = self._CS_COLORS.get(cs, 0)
+        corner = self._CS_CORNERS.get(cs)
+
+        # Advance fading sub-states
+        fade_frac = 0.0
+        if cs in ("red_fading", "green_fading", "blue_fading"):
+            elapsed = _time.monotonic() - (self._cs_fade_start or 0.0)
+            fade_frac = min(elapsed / self._CS_FADE_S, 1.0)
+            if fade_frac >= 1.0:
+                # Lock in: commit pending cells, advance to next phase
+                committed_color = self._CS_COLORS[cs]
+                for cell in self._cs_pending:
+                    self._cs_locked[cell] = committed_color
+                color_name = cs.split("_")[0]
+                next_map = {"red": "green_wait", "green": "blue_wait", "blue": "decoding"}
+                self._cs_phase = next_map[color_name]
+                self._cs_pending = set()
+                self._cs_fade_start = None
+                logger.info(
+                    "CODE_SCAN_BOARD: %s locked in (%d cells) → %s",
+                    color_name, sum(1 for v in self._cs_locked.values() if v == committed_color),
+                    self._cs_phase,
+                )
+                if self._cs_phase == "decoding":
+                    self._cs_do_decode()
+                    return
+                cs = self._cs_phase
+                color = self._CS_COLORS.get(cs, 0)
+                corner = self._CS_CORNERS.get(cs)
+                fade_frac = 0.0
+
+        now = _time.monotonic()
+        beam_phase = (now % 0.8) / 0.8
+
+        # Build combined locked dict: committed + current pending
+        display_locked = dict(self._cs_locked)
+        is_beam_active = cs.endswith("_active") or cs.endswith("_fading")
+        if color and is_beam_active:
+            for cell in self._cs_pending:
+                display_locked[cell] = color
+
+        # Only animate beam when actively in entry (not while waiting for corner)
+        active_beam_color = color if is_beam_active else 0
+
+        # Corner display mode
+        is_wait = cs.endswith("_wait")
+        # Blink only in wait states; active/fading use solid or pulse
+        blink_on = ((now % 0.5) < 0.25) if is_wait else True
+
+        # Inactivity pulse: fires after 5 s without a cell toggle (active states only)
+        last_act = self._cs_last_activity
+        corner_pulsing = (
+            cs.endswith("_active")
+            and last_act is not None
+            and (now - last_act) >= self._CS_INACTIVITY_S
+        )
+
+        # Cells toggled on within the last 150 ms flash at full brightness
+        extra_excite = frozenset(
+            cell for cell, t in self._cs_excite_times.items()
+            if now - t < 0.15
+        )
+
+        b = self._b
+        b.canvas.Clear()
+        _phase_fading_color = {"red_fading": 1, "green_fading": 2, "blue_fading": 3}
+        _phase_promoted = {
+            "green_wait": frozenset({1}), "green_active": frozenset({1}), "green_fading": frozenset({1}),
+            "blue_wait": frozenset({1, 2}), "blue_active": frozenset({1, 2}), "blue_fading": frozenset({1, 2}),
+            "decoding": frozenset({1, 2, 3}),
+        }
+        _chessmatrix.render_beam_frame(
+            b.canvas,
+            display_locked,
+            active_beam_color,
+            beam_phase,
+            blink_on,
+            active_corner=corner,
+            fade_frac=fade_frac,
+            corner_color=color,
+            corner_pulsing=corner_pulsing,
+            pulse_t=now,
+            extra_excite=extra_excite,
+            fading_color=_phase_fading_color.get(cs, 0),
+            promoted=_phase_promoted.get(cs, frozenset()),
+        )
+        b.matrix.blit_to_screen()
+
+    def _cs_do_decode(self) -> None:
+        """Decode the entered cell state; on success connect to relay, on failure flash error."""
+        import time as _time
+        try:
+            import chessmatrix as _cm  # type: ignore[import]
+            grid = _chessmatrix.grid_from_cell_state(self._cs_locked)
+            data = _cm.decode(grid)
+            room_code = _chessmatrix.bytes_to_room_code(data)
+        except Exception as exc:
+            logger.warning("CODE_SCAN_BOARD: decode failed — %s", exc)
+            self._cs_run_error_flash()
+            return
+
+        logger.info("CODE_SCAN_BOARD: decoded room code %s", room_code)
+        self._room_code = room_code
+        self._role = NetworkRole.ONLINE_GUEST
+        self._local_team_key = "l"
+        self.phase = Phase.NAME_ENTRY
+
+    def _cs_run_error_flash(self) -> None:
+        """Flash all 32 data cells red/white 3× then restart from red_wait."""
+        import time as _time
+        b = self._b
+        screen = b.matrix._screen
+
+        _FLASH_COLORS = [(255, 0, 0), (200, 200, 200)]
+        for _ in range(3):
+            for rgb in _FLASH_COLORS:
+                b.canvas.Clear()
+                _chessmatrix.render_border_only(b.canvas)
+                for row, col in _chessmatrix.DATA_CELLS:
+                    _chessmatrix._set_cell(b.canvas, row, col, *rgb)
+                b.matrix.blit_to_screen()
+                if screen is not None:
+                    pygame.display.flip()
+                _time.sleep(0.12)
+
+        # Reset to red_wait
+        self._cs_locked = {}
+        self._cs_pending = set()
+        self._cs_phase = "red_wait"
+        self._cs_fade_start = None
+        self._cs_last_activity = None
+        self._cs_excite_times = {}
+        logger.info("CODE_SCAN_BOARD: restarting entry after decode error")
 
     # ── _render override ───────────────────────────────────────────────────
 

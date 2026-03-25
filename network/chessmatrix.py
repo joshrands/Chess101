@@ -186,6 +186,248 @@ def render_to_led(grid: list[list[tuple[int, int, int]]], canvas: object) -> Non
                     canvas.SetPixel(row * 4 + di, col * 4 + dj, r, g, b)  # type: ignore[attr-defined]
 
 
+# ── Board-entry helpers ─────────────────────────────────────────────────────
+
+# Variable data cell positions (row-major, interior 6×6 minus the 4 anchors).
+# Index in this list maps to beam position 0–31.
+DATA_CELLS: list[tuple[int, int]] = [
+    (r, c) for r in range(1, 7) for c in range(1, 7)
+    if (r, c) not in {(1, 1), (1, 6), (6, 1), (6, 6)}
+]
+
+
+def _set_cell(canvas: object, row: int, col: int, r: int, g: int, b: int) -> None:
+    """Paint a single 4×4 LED block for board cell (row, col)."""
+    for di in range(4):
+        for dj in range(4):
+            canvas.SetPixel(row * 4 + di, col * 4 + dj, r, g, b)  # type: ignore[attr-defined]
+
+
+import math as _math
+
+
+def render_border_only(canvas: object) -> None:
+    """Paint the 28-cell structural border in dark-mode ChessMatrix colors.
+
+    The outer ring (row 0, row 7, col 0, col 7) is rendered with the
+    dark-mode inversion used by ``encode()``: original-BLACK cells become
+    bright white, original-WHITE/-1 cells become near-black.  The interior
+    6×6 is painted black (off).
+
+    This shows the fixed ChessMatrix anchor/timing pattern without needing
+    a room code — used during CODE_SCAN_BOARD before any data is entered.
+    """
+    try:
+        import chessmatrix as _cm  # type: ignore[import]
+    except ImportError:
+        # No chessmatrix package — paint a simple white border as fallback
+        for row in range(8):
+            for col in range(8):
+                if row in (0, 7) or col in (0, 7):
+                    _set_cell(canvas, row, col, 235, 235, 235)
+                else:
+                    _set_cell(canvas, row, col, 0, 0, 0)
+        return
+
+    # Use the canonical border from any encoded payload (border is payload-independent).
+    _DUMMY_PAYLOAD = b"\x00\x00\x00\x00"
+    raw: list[list[int]] = _cm.encode(_DUMMY_PAYLOAD)
+    _WHITE_RGB = (235, 235, 235)
+    _K_RGB     = (10,  10,  10)
+
+    for row in range(8):
+        for col in range(8):
+            if row in (0, 7) or col in (0, 7):
+                cell = raw[row][col]
+                rgb = _WHITE_RGB if cell == 0 else _K_RGB
+            else:
+                rgb = (0, 0, 0)
+            _set_cell(canvas, row, col, *rgb)
+
+
+# Color palette for beam rendering — full saturation
+_BEAM_FULL: dict[int, tuple[int, int, int]] = {
+    1: (255, 0,   0),    # RED
+    2: (0,   255, 0),    # GREEN
+    3: (0,   0,   255),  # BLUE
+}
+_BEAM_DIM: dict[int, tuple[int, int, int]] = {
+    1: (200, 0,   0),    # RED   ~80%
+    2: (0,   200, 0),    # GREEN ~80%
+    3: (0,   0,   200),  # BLUE  ~80%
+}
+
+# Additive excite colors: locked_color → (beam_color → excite_rgb)
+_BEAM_EXCITE: dict[tuple[int, int], tuple[int, int, int]] = {
+    (1, 2): (255, 255, 0),    # red locked, green beam  → yellow
+    (1, 3): (255, 0,   255),  # red locked, blue beam   → magenta
+    (2, 3): (0,   255, 255),  # green locked, blue beam → cyan
+    (2, 1): (255, 255, 0),    # green locked, red beam  → yellow
+    (3, 1): (255, 0,   255),  # blue locked, red beam   → magenta
+    (3, 2): (0,   255, 255),  # blue locked, green beam → cyan
+}
+
+
+def render_beam_frame(
+    canvas: object,
+    locked: dict,
+    current_color: int,
+    beam_phase: float,
+    blink_on: bool,
+    active_corner: "tuple[int,int] | None" = None,
+    fade_frac: float = 0.0,
+    corner_color: int = 0,
+    corner_pulsing: bool = False,
+    pulse_t: float = 0.0,
+    extra_excite: "frozenset | set" = frozenset(),
+    fading_color: int = 0,
+    promoted: "frozenset | set" = frozenset(),
+) -> None:
+    """Render one animation frame for the board-entry ChessMatrix UX.
+
+    Corner rendering modes (mutually exclusive, checked in order):
+      - fade_frac > 0  → straight linear fade to black (no blink, no pulse)
+      - corner_pulsing → slow sine-wave pulse (inactivity hint)
+      - blink_on       → hard on/off blink (wait state, action required)
+      - otherwise      → solid full brightness (active, recently used)
+    """
+    _corner_color = corner_color or current_color
+    render_border_only(canvas)
+
+    # K anchor (1,1) — always off
+    _set_cell(canvas, 1, 1, 0, 0, 0)
+
+    # Fixed anchor cells (R/G/B corners)
+    for (arow, acol), acolor in (((1, 6), 1), ((6, 1), 2), ((6, 6), 3)):
+        if (arow, acol) == active_corner and _corner_color:
+            br = _BEAM_FULL[_corner_color]
+            if fade_frac > 0.0:
+                # Fading out: straight linear fade, no pulse or blink
+                brightness = 1.0 - fade_frac
+            elif corner_pulsing:
+                # Inactivity hint: slow sine pulse 0.4 – 1.0
+                brightness = 0.7 + 0.3 * _math.sin(2.0 * _math.pi * pulse_t)
+            elif not blink_on:
+                # Wait state blink: off half
+                brightness = 0.0
+            else:
+                # Wait state blink: on half, OR active/solid (blink_on=True by default)
+                brightness = 1.0
+            _set_cell(canvas, arow, acol,
+                      int(br[0] * max(brightness, 0.0)),
+                      int(br[1] * max(brightness, 0.0)),
+                      int(br[2] * max(brightness, 0.0)))
+        elif (arow, acol) == active_corner:
+            _set_cell(canvas, arow, acol, 0, 0, 0)
+        elif acolor in promoted:
+            _set_cell(canvas, arow, acol, *_BEAM_FULL[acolor])
+        elif acolor in locked.values():
+            dim = _BEAM_DIM[acolor]
+            _set_cell(canvas, arow, acol, *dim)
+        else:
+            _set_cell(canvas, arow, acol, 0, 0, 0)
+
+    # Data cells — time-based decaying trail
+    # The beam sweeps all 32 cells in 0.8 s → _CELL_PERIOD seconds per cell.
+    # For each cell, compute how long ago the beam passed it; lerp from excite
+    # color down to base (locked) or off (unlocked) over _TRAIL_FADE_S seconds.
+    # All brightness is scaled by (1 - fade_frac) so the beam dims in sync with
+    # the corner during the phase-transition fade.
+    beam_idx_float = beam_phase * 32
+    _CELL_PERIOD       = 0.8 / 32    # seconds per cell
+    _TRAIL_FADE_S      = 0.5         # seconds to decay from excite to base/off
+    _beam_scale        = 1.0 - fade_frac   # applied to every data cell
+    _BEAM_HEAD_BRIGHTNESS = 0.5      # peak brightness of beam on unoccupied cells
+
+    for i, (row, col) in enumerate(DATA_CELLS):
+        cell_lock = locked.get((row, col), 0)
+
+        # Recently toggled-on: flash at full brightness (ignores fade_frac
+        # intentionally — toggle feedback should punch through the fade)
+        if (row, col) in extra_excite:
+            if cell_lock:
+                excite_rgb = _BEAM_EXCITE.get(
+                    (cell_lock, current_color or cell_lock), _BEAM_FULL[cell_lock]
+                )
+            else:
+                excite_rgb = _BEAM_FULL[current_color] if current_color else (200, 200, 200)
+            _set_cell(canvas, row, col, *excite_rgb)
+            continue
+
+        # How many seconds ago did the beam pass this cell?
+        trail_cells = (beam_idx_float - i) % 32
+        age_s = trail_cells * _CELL_PERIOD
+        frac = min(age_s / _TRAIL_FADE_S, 1.0)   # 0 = just hit, 1 = fully faded
+
+        if cell_lock:
+            # Locked cells are always at least their base color.
+            # Promoted cells (prior phase completed) → permanently at FULL brightness.
+            # Fading-color cells → lerp DIM→FULL as the corner fades out (fade_frac 0→1).
+            # All others → DIM.
+            if cell_lock in promoted:
+                base_rgb = _BEAM_FULL[cell_lock]
+            elif cell_lock == fading_color:
+                dim = _BEAM_DIM[cell_lock]
+                full = _BEAM_FULL[cell_lock]
+                base_rgb = (
+                    int(dim[0] + (full[0] - dim[0]) * fade_frac),
+                    int(dim[1] + (full[1] - dim[1]) * fade_frac),
+                    int(dim[2] + (full[2] - dim[2]) * fade_frac),
+                )
+            else:
+                base_rgb = _BEAM_DIM[cell_lock]
+            if current_color and age_s < _TRAIL_FADE_S:
+                beam_rgb = _BEAM_FULL[current_color]
+                peak_r = min(255, base_rgb[0] + int(beam_rgb[0] * _BEAM_HEAD_BRIGHTNESS))
+                peak_g = min(255, base_rgb[1] + int(beam_rgb[1] * _BEAM_HEAD_BRIGHTNESS))
+                peak_b = min(255, base_rgb[2] + int(beam_rgb[2] * _BEAM_HEAD_BRIGHTNESS))
+                r = int(peak_r * (1 - frac) + base_rgb[0] * frac)
+                g = int(peak_g * (1 - frac) + base_rgb[1] * frac)
+                b = int(peak_b * (1 - frac) + base_rgb[2] * frac)
+            else:
+                r, g, b = base_rgb
+            _set_cell(canvas, row, col, r, g, b)
+        elif current_color and age_s < _TRAIL_FADE_S:
+            # Unoccupied: bright head fading to black over _TRAIL_FADE_S
+            fc = _BEAM_FULL[current_color]
+            brightness = _BEAM_HEAD_BRIGHTNESS * (1.0 - frac) * _beam_scale
+            _set_cell(canvas, row, col,
+                      int(fc[0] * brightness),
+                      int(fc[1] * brightness),
+                      int(fc[2] * brightness))
+        else:
+            _set_cell(canvas, row, col, 0, 0, 0)
+
+
+def grid_from_cell_state(locked: dict) -> "list[list[int]]":
+    """Build an 8×8 color-index grid from user-entered cell state.
+
+    Border cells are set to 0 (the library ignores structural cells during
+    payload decode).  Calibration anchor cells use their fixed indices
+    (K=0, R=1, G=2, B=3).  Variable data cells are filled from *locked*
+    (0 = BLACK if absent).
+
+    Args:
+        locked: Dict mapping (row, col) → color index (1=R, 2=G, 3=B)
+                for cells the user has marked.
+
+    Returns:
+        An 8×8 ``list[list[int]]`` with values 0–3 suitable for
+        ``chessmatrix.decode()``.
+    """
+    # Calibration anchor positions in order K, R, G, B
+    _ANCHOR_IDX = {pos: i for i, pos in enumerate(_CAL_ANCHORS)}
+
+    grid: list[list[int]] = [[0] * 8 for _ in range(8)]
+    for row in range(1, 7):
+        for col in range(1, 7):
+            if (row, col) in _ANCHOR_IDX:
+                grid[row][col] = _ANCHOR_IDX[(row, col)]
+            else:
+                grid[row][col] = locked.get((row, col), 0)
+    return grid
+
+
 # ── CV constants ────────────────────────────────────────────────────────────
 
 _CELL_PX   = 16          # pixels per cell in the canonical warped image
