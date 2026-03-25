@@ -1,0 +1,40 @@
+(kicad_sch (version 20231120) (generator "python_script")
+
+  (uuid "00000000-0000-0000-0000-000000000001")
+
+  (title_block
+    (title "8x8 Reed Matrix Glass PCB - Adafruit 32x32 LED Overlay")
+    (company "Zach")
+    (date "2026-03")
+    (rev "1.0")
+  )
+
+  (symbol (lib_id "power:+3V3") (at 0 0 0) (unit 1)
+    (property "Reference" "#PWR?" (at 0 -3.81 0) (effects (font (size 1.27 1.27))))
+    (property "Value" "+3V3" (at 0 3.81 0) (effects (font (size 1.27 1.27))))
+  )
+
+  (symbol (lib_id "power:GND") (at 0 0 0) (unit 1)
+    (property "Reference" "#PWR?" (at 0 -3.81 0) (effects (font (size 1.27 1.27))))
+    (property "Value" "GND" (at 0 3.81 0) (effects (font (size 1.27 1.27))))
+  )
+
+  (symbol (lib_id "Interface:MCP23017") (at 120 80 0) (unit 1)
+    (property "Reference" "U1" (at 120 105 0) (effects (font (size 1.27 1.27))))
+    (property "Value" "MCP23017" (at 120 55 0) (effects (font (size 1.27 1.27))))
+    (property "Footprint" "Package_SO:SOIC-28_7.5x10.3mm_P1.27mm" (at 120 80 0))
+  )
+
+  (symbol (lib_id "Connector:Conn_01x05") (at 280 50 0) (unit 1)
+    (property "Reference" "J1" (at 280 70 0) (effects (font (size 1.27 1.27))))
+    (property "Value" "I2C" (at 280 30 0) (effects (font (size 1.27 1.27))))
+    (property "Footprint" "Connector_PinHeader_2.54mm:PinHeader_1x05_P2.54mm_Horizontal_SMD_RightAngle" (at 280 50 0))
+  )
+
+  (symbol (lib_id "Connector:Conn_02x08") (at 280 150 0) (unit 1)
+    (property "Reference" "J2" (at 280 170 0) (effects (font (size 1.27 1.27))))
+    (property "Value" "Debug" (at 280 130 0) (effects (font (size 1.27 1.27))))
+    (property "Footprint" "Connector_PinHeader_2.54mm:PinHeader_2x08_P2.54mm_Horizontal_SMD_RightAngle" (at 280 150 0))
+  )
+
+)
