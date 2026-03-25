@@ -202,7 +202,8 @@ Chess101/
     #                                   data cell toggle/untoggle/fading-ignored, ESC/T shortcuts,
     #                                   typing sub-mode (buffer fill, cap at 6, backspace,
     #                                   non-alpha ignored, C to buffer not camera, Enter advances),
-    #                                   decode round-trip to NAME_ENTRY, three-color sequence
+    #                                   decode round-trip to NAME_ENTRY, three-color sequence,
+    #                                   _render_panel_extra smoke (board-scan + typing mode)
 ```
 
 ## Architecture

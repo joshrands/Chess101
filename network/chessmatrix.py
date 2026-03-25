@@ -30,8 +30,11 @@ stored as 4 big-endian bytes, which become the ChessMatrix payload.
 """
 from __future__ import annotations
 
+import math as _math
 import struct
-from typing import TYPE_CHECKING
+from dataclasses import dataclass, field
+from enum import Enum
+from typing import TYPE_CHECKING, Optional
 
 if TYPE_CHECKING:
     import numpy as np
@@ -195,15 +198,17 @@ DATA_CELLS: list[tuple[int, int]] = [
     if (r, c) not in {(1, 1), (1, 6), (6, 1), (6, 6)}
 ]
 
+# Calibration anchor positions: K=black(0), R=red(1), G=green(2), B=blue(3).
+# Row/col indices are fixed by the ChessMatrix spec (L-finder at BL orientation).
+_CAL_ANCHORS: list[tuple[int, int]] = [(1, 1), (1, 6), (6, 1), (6, 6)]
+_ANCHOR_IDX: dict[tuple[int, int], int] = {pos: i for i, pos in enumerate(_CAL_ANCHORS)}
+
 
 def _set_cell(canvas: object, row: int, col: int, r: int, g: int, b: int) -> None:
     """Paint a single 4×4 LED block for board cell (row, col)."""
     for di in range(4):
         for dj in range(4):
             canvas.SetPixel(row * 4 + di, col * 4 + dj, r, g, b)  # type: ignore[attr-defined]
-
-
-import math as _math
 
 
 def render_border_only(canvas: object) -> None:
@@ -245,7 +250,7 @@ def render_border_only(canvas: object) -> None:
             _set_cell(canvas, row, col, *rgb)
 
 
-# Color palette for beam rendering — full saturation
+# Color palette for beam rendering — full saturation and ~80% dim base
 _BEAM_FULL: dict[int, tuple[int, int, int]] = {
     1: (255, 0,   0),    # RED
     2: (0,   255, 0),    # GREEN
@@ -257,15 +262,213 @@ _BEAM_DIM: dict[int, tuple[int, int, int]] = {
     3: (0,   0,   200),  # BLUE  ~80%
 }
 
-# Additive excite colors: locked_color → (beam_color → excite_rgb)
-_BEAM_EXCITE: dict[tuple[int, int], tuple[int, int, int]] = {
-    (1, 2): (255, 255, 0),    # red locked, green beam  → yellow
-    (1, 3): (255, 0,   255),  # red locked, blue beam   → magenta
-    (2, 3): (0,   255, 255),  # green locked, blue beam → cyan
-    (2, 1): (255, 255, 0),    # green locked, red beam  → yellow
-    (3, 1): (255, 0,   255),  # blue locked, red beam   → magenta
-    (3, 2): (0,   255, 255),  # blue locked, green beam → cyan
+
+class BarcodeColor(int, Enum):
+    """Color indices used by the ChessMatrix spec.
+
+    Inherits from ``int`` so members compare equal to their integer values
+    and can index ``_BEAM_FULL`` / ``_BEAM_DIM`` without conversion.
+    """
+    BLACK = 0
+    RED   = 1
+    GREEN = 2
+    BLUE  = 3
+
+
+def _add_colors(
+    a: tuple[int, int, int],
+    b: tuple[int, int, int],
+) -> tuple[int, int, int]:
+    """Channel-wise additive blend of two RGB tuples, clamped to [0, 255]."""
+    return (min(a[0] + b[0], 255), min(a[1] + b[1], 255), min(a[2] + b[2], 255))
+
+
+# ── Animation timing and brightness constants ──────────────────────────────────
+# Beam sweep: 32 data cells visited in one cycle
+_BEAM_SWEEP_S: float          = 0.8        # full cycle duration (seconds)
+_CELL_PERIOD_S: float         = 0.8 / 32   # seconds per cell
+_TRAIL_FADE_S: float          = 0.5        # beam trail decay (seconds)
+_EXCITE_FLASH_S: float        = 0.15       # toggle-on flash duration (seconds)
+_BEAM_HEAD_BRIGHTNESS: float  = 0.5        # peak brightness multiplier on unoccupied cells
+
+# Corner animation
+_CORNER_FADE_S: float         = 3.0        # corner piece fade-out duration (seconds)
+_BLINK_PERIOD_S: float        = 0.5        # wait-state corner blink period (seconds)
+_INACTIVITY_S: float          = 5.0        # idle time before inactivity pulse (seconds)
+_PULSE_BASE: float            = 0.7        # sine pulse floor
+_PULSE_AMP: float             = 0.3        # sine pulse amplitude
+
+
+# ── Scan phase state machine ────────────────────────────────────────────────────
+
+class ScanPhase(str, Enum):
+    """Sub-states for the CODE_SCAN_BOARD board-entry UX.
+
+    Inherits from ``str`` so members compare equal to their string values,
+    keeping existing string-comparison code compatible without changes.
+
+    The three color phases each have three modes — wait (corner not yet
+    placed), active (corner placed, user toggles data cells), and fading
+    (corner removed, 3-second commit countdown) — followed by decoding.
+    """
+    RED_WAIT     = "red_wait"
+    RED_ACTIVE   = "red_active"
+    RED_FADING   = "red_fading"
+    GREEN_WAIT   = "green_wait"
+    GREEN_ACTIVE = "green_active"
+    GREEN_FADING = "green_fading"
+    BLUE_WAIT    = "blue_wait"
+    BLUE_ACTIVE  = "blue_active"
+    BLUE_FADING  = "blue_fading"
+    DECODING     = "decoding"
+
+    @property
+    def color(self) -> BarcodeColor:
+        """The barcode color associated with this phase."""
+        _map = {"red": BarcodeColor.RED, "green": BarcodeColor.GREEN,
+                "blue": BarcodeColor.BLUE}
+        return _map.get(self.value.split("_")[0], BarcodeColor.BLACK)
+
+    @property
+    def corner(self) -> "tuple[int, int] | None":
+        """Board cell (row, col) of the phase's entry corner, or None."""
+        _map: dict[str, tuple[int, int]] = {
+            "red": (1, 6), "green": (6, 1), "blue": (6, 6),
+        }
+        return _map.get(self.value.split("_")[0])
+
+    @property
+    def is_wait(self) -> bool:
+        """True when waiting for the user to place the corner piece."""
+        return self.value.endswith("_wait")
+
+    @property
+    def is_active(self) -> bool:
+        """True when the corner is placed and data cells can be toggled."""
+        return self.value.endswith("_active")
+
+    @property
+    def is_fading(self) -> bool:
+        """True during the 3-second commit countdown after corner removal."""
+        return self.value.endswith("_fading")
+
+    @property
+    def next_phase(self) -> "ScanPhase":
+        """The phase that follows this fading state after commit."""
+        _next: dict[ScanPhase, ScanPhase] = {
+            ScanPhase.RED_FADING:   ScanPhase.GREEN_WAIT,
+            ScanPhase.GREEN_FADING: ScanPhase.BLUE_WAIT,
+            ScanPhase.BLUE_FADING:  ScanPhase.DECODING,
+        }
+        return _next[self]
+
+
+# Colors that have been fully committed (promoted) at each phase.
+# Promoted colors render their data cells at FULL brightness (vs. DIM).
+_PROMOTED_SET: dict[ScanPhase, "frozenset[int]"] = {
+    ScanPhase.GREEN_WAIT:    frozenset({BarcodeColor.RED}),
+    ScanPhase.GREEN_ACTIVE:  frozenset({BarcodeColor.RED}),
+    ScanPhase.GREEN_FADING:  frozenset({BarcodeColor.RED}),
+    ScanPhase.BLUE_WAIT:     frozenset({BarcodeColor.RED,   BarcodeColor.GREEN}),
+    ScanPhase.BLUE_ACTIVE:   frozenset({BarcodeColor.RED,   BarcodeColor.GREEN}),
+    ScanPhase.BLUE_FADING:   frozenset({BarcodeColor.RED,   BarcodeColor.GREEN}),
+    ScanPhase.DECODING:      frozenset({BarcodeColor.RED,   BarcodeColor.GREEN,
+                                        BarcodeColor.BLUE}),
 }
+
+
+# ── Board-entry state and render parameter types ────────────────────────────────
+
+@dataclass
+class CodeScanState:
+    """All mutable state for the CODE_SCAN_BOARD board-entry UX.
+
+    A single instance replaces the seven loose ``_cs_*`` instance variables
+    previously scattered across ``NetworkedGameRunner``.
+    """
+    phase: ScanPhase = ScanPhase.RED_WAIT
+    locked: "dict[tuple[int, int], int]" = field(default_factory=dict)
+    pending: "set[tuple[int, int]]"      = field(default_factory=set)
+    fade_start: "Optional[float]"        = None
+    last_activity: "Optional[float]"     = None
+    excite_times: "dict[tuple[int, int], float]" = field(default_factory=dict)
+    typing: bool = False
+
+    def reset(self) -> None:
+        """Restore to the initial red_wait state."""
+        self.phase         = ScanPhase.RED_WAIT
+        self.locked        = {}
+        self.pending       = set()
+        self.fade_start    = None
+        self.last_activity = None
+        self.excite_times  = {}
+        self.typing        = False
+
+
+@dataclass
+class BeamRenderParams:
+    """All parameters needed to draw one frame of the beam-entry animation.
+
+    Build with ``from_scan_state`` to derive all values from a ``CodeScanState``
+    at a given timestamp, then pass to ``render_beam_frame_from_params``.
+    """
+    locked: "dict[tuple[int, int], int]"
+    current_color: int
+    beam_phase: float
+    blink_on: bool
+    active_corner: "tuple[int, int] | None"     = None
+    fade_frac: float                             = 0.0
+    corner_color: int                            = 0
+    corner_pulsing: bool                         = False
+    pulse_t: float                               = 0.0
+    extra_excite: "frozenset[tuple[int, int]]"   = field(default_factory=frozenset)
+    fading_color: int                            = 0
+    promoted: "frozenset[int]"                   = field(default_factory=frozenset)
+
+    @classmethod
+    def from_scan_state(cls, cs: CodeScanState, now: float) -> "BeamRenderParams":
+        """Derive all render parameters from *cs* at timestamp *now*."""
+        phase = ScanPhase(cs.phase)
+
+        fade_frac, fading_color = 0.0, 0
+        if phase.is_fading and cs.fade_start is not None:
+            fade_frac    = min((now - cs.fade_start) / _CORNER_FADE_S, 1.0)
+            fading_color = int(phase.color)
+
+        active_color = int(phase.color) if (phase.is_active or phase.is_fading) else 0
+        display_locked: "dict[tuple[int, int], int]" = dict(cs.locked)
+        if active_color:
+            for cell in cs.pending:
+                display_locked[cell] = active_color
+
+        blink_on = (
+            (now % _BLINK_PERIOD_S) < _BLINK_PERIOD_S / 2
+            if phase.is_wait else True
+        )
+        corner_pulsing = (
+            phase.is_active
+            and cs.last_activity is not None
+            and (now - cs.last_activity) >= _INACTIVITY_S
+        )
+        extra_excite: frozenset[tuple[int, int]] = frozenset(
+            cell for cell, t in cs.excite_times.items()
+            if now - t < _EXCITE_FLASH_S
+        )
+
+        return cls(
+            locked        = display_locked,
+            current_color = active_color,
+            beam_phase    = (now % _BEAM_SWEEP_S) / _BEAM_SWEEP_S,
+            blink_on      = blink_on,
+            active_corner = phase.corner,
+            fade_frac     = fade_frac,
+            corner_color  = int(phase.color),
+            corner_pulsing= corner_pulsing,
+            pulse_t       = now,
+            extra_excite  = extra_excite,
+            fading_color  = fading_color,
+            promoted      = _PROMOTED_SET.get(phase, frozenset()),
+        )
 
 
 def render_beam_frame(
@@ -305,8 +508,8 @@ def render_beam_frame(
                 # Fading out: straight linear fade, no pulse or blink
                 brightness = 1.0 - fade_frac
             elif corner_pulsing:
-                # Inactivity hint: slow sine pulse 0.4 – 1.0
-                brightness = 0.7 + 0.3 * _math.sin(2.0 * _math.pi * pulse_t)
+                # Inactivity hint: slow sine pulse
+                brightness = _PULSE_BASE + _PULSE_AMP * _math.sin(2.0 * _math.pi * pulse_t)
             elif not blink_on:
                 # Wait state blink: off half
                 brightness = 0.0
@@ -328,16 +531,13 @@ def render_beam_frame(
             _set_cell(canvas, arow, acol, 0, 0, 0)
 
     # Data cells — time-based decaying trail
-    # The beam sweeps all 32 cells in 0.8 s → _CELL_PERIOD seconds per cell.
+    # The beam sweeps all 32 cells in _BEAM_SWEEP_S → _CELL_PERIOD_S per cell.
     # For each cell, compute how long ago the beam passed it; lerp from excite
     # color down to base (locked) or off (unlocked) over _TRAIL_FADE_S seconds.
     # All brightness is scaled by (1 - fade_frac) so the beam dims in sync with
     # the corner during the phase-transition fade.
     beam_idx_float = beam_phase * 32
-    _CELL_PERIOD       = 0.8 / 32    # seconds per cell
-    _TRAIL_FADE_S      = 0.5         # seconds to decay from excite to base/off
-    _beam_scale        = 1.0 - fade_frac   # applied to every data cell
-    _BEAM_HEAD_BRIGHTNESS = 0.5      # peak brightness of beam on unoccupied cells
+    _beam_scale    = 1.0 - fade_frac   # applied to every data cell
 
     for i, (row, col) in enumerate(DATA_CELLS):
         cell_lock = locked.get((row, col), 0)
@@ -346,8 +546,9 @@ def render_beam_frame(
         # intentionally — toggle feedback should punch through the fade)
         if (row, col) in extra_excite:
             if cell_lock:
-                excite_rgb = _BEAM_EXCITE.get(
-                    (cell_lock, current_color or cell_lock), _BEAM_FULL[cell_lock]
+                excite_rgb = (
+                    _add_colors(_BEAM_FULL[cell_lock], _BEAM_FULL[current_color])
+                    if current_color else _BEAM_FULL[cell_lock]
                 )
             else:
                 excite_rgb = _BEAM_FULL[current_color] if current_color else (200, 200, 200)
@@ -356,7 +557,7 @@ def render_beam_frame(
 
         # How many seconds ago did the beam pass this cell?
         trail_cells = (beam_idx_float - i) % 32
-        age_s = trail_cells * _CELL_PERIOD
+        age_s = trail_cells * _CELL_PERIOD_S
         frac = min(age_s / _TRAIL_FADE_S, 1.0)   # 0 = just hit, 1 = fully faded
 
         if cell_lock:
@@ -399,6 +600,30 @@ def render_beam_frame(
             _set_cell(canvas, row, col, 0, 0, 0)
 
 
+def render_beam_frame_from_params(canvas: object, params: BeamRenderParams) -> None:
+    """Render one animation frame from a :class:`BeamRenderParams` bundle.
+
+    Thin wrapper around :func:`render_beam_frame` for callers that build
+    parameters via ``BeamRenderParams.from_scan_state`` rather than passing
+    each argument individually.
+    """
+    render_beam_frame(
+        canvas,
+        params.locked,
+        params.current_color,
+        params.beam_phase,
+        params.blink_on,
+        active_corner  = params.active_corner,
+        fade_frac      = params.fade_frac,
+        corner_color   = params.corner_color,
+        corner_pulsing = params.corner_pulsing,
+        pulse_t        = params.pulse_t,
+        extra_excite   = params.extra_excite,
+        fading_color   = params.fading_color,
+        promoted       = params.promoted,
+    )
+
+
 def grid_from_cell_state(locked: dict) -> "list[list[int]]":
     """Build an 8×8 color-index grid from user-entered cell state.
 
@@ -415,9 +640,6 @@ def grid_from_cell_state(locked: dict) -> "list[list[int]]":
         An 8×8 ``list[list[int]]`` with values 0–3 suitable for
         ``chessmatrix.decode()``.
     """
-    # Calibration anchor positions in order K, R, G, B
-    _ANCHOR_IDX = {pos: i for i, pos in enumerate(_CAL_ANCHORS)}
-
     grid: list[list[int]] = [[0] * 8 for _ in range(8)]
     for row in range(1, 7):
         for col in range(1, 7):
@@ -655,10 +877,6 @@ def _detect_barcode_corners(frame: "np.ndarray") -> "np.ndarray | None":
 
 
 # ── Post-detection pipeline: warp → orient → calibrate → classify ────────────
-
-# Anchor cell positions in the canonical oriented image (L-finder at BL).
-# (row, col) for: K=black, R=red, G=green, B=blue
-_CAL_ANCHORS: "list[tuple[int, int]]" = [(1, 1), (1, 6), (6, 1), (6, 6)]
 
 
 def _warp_to_canonical(

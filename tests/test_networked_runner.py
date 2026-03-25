@@ -953,84 +953,84 @@ class TestCodeScanBoardStateMachine:
         )
         r._init_board()
         r.phase = Phase.CODE_SCAN_BOARD
-        r._cs_phase = "red_wait"
-        r._cs_locked = {}
-        r._cs_pending = set()
-        r._cs_fade_start = None
+        r._cs.phase = "red_wait"
+        r._cs.locked = {}
+        r._cs.pending = set()
+        r._cs.fade_start = None
         return r
 
     # ── Corner-click transitions ──────────────────────────────────────────────
 
     def test_wait_to_active_on_corner_click(self, runner: NetworkedGameRunner) -> None:
         runner._handle_code_scan_board(_mouse_click(1, 6))   # red corner
-        assert runner._cs_phase == "red_active"
-        assert runner._cs_pending == set()
+        assert runner._cs.phase == "red_active"
+        assert runner._cs.pending == set()
 
     def test_active_to_fading_on_corner_click(self, runner: NetworkedGameRunner) -> None:
-        runner._cs_phase = "red_active"
+        runner._cs.phase = "red_active"
         runner._handle_code_scan_board(_mouse_click(1, 6))
-        assert runner._cs_phase == "red_fading"
-        assert runner._cs_fade_start is not None
+        assert runner._cs.phase == "red_fading"
+        assert runner._cs.fade_start is not None
 
     def test_fading_cancel_on_corner_click(self, runner: NetworkedGameRunner) -> None:
-        runner._cs_phase = "red_fading"
-        runner._cs_fade_start = 0.0
+        runner._cs.phase = "red_fading"
+        runner._cs.fade_start = 0.0
         runner._handle_code_scan_board(_mouse_click(1, 6))
-        assert runner._cs_phase == "red_active"
-        assert runner._cs_fade_start is None
+        assert runner._cs.phase == "red_active"
+        assert runner._cs.fade_start is None
 
     def test_green_corner_activates_in_green_wait(self, runner: NetworkedGameRunner) -> None:
-        runner._cs_phase = "green_wait"
+        runner._cs.phase = "green_wait"
         runner._handle_code_scan_board(_mouse_click(6, 1))   # green corner
-        assert runner._cs_phase == "green_active"
+        assert runner._cs.phase == "green_active"
 
     def test_blue_corner_activates_in_blue_wait(self, runner: NetworkedGameRunner) -> None:
-        runner._cs_phase = "blue_wait"
+        runner._cs.phase = "blue_wait"
         runner._handle_code_scan_board(_mouse_click(6, 6))   # blue corner
-        assert runner._cs_phase == "blue_active"
+        assert runner._cs.phase == "blue_active"
 
     # ── Data cell toggles ─────────────────────────────────────────────────────
 
     def test_data_cell_click_adds_to_pending(self, runner: NetworkedGameRunner) -> None:
-        runner._cs_phase = "red_active"
+        runner._cs.phase = "red_active"
         cell = _chessmatrix.DATA_CELLS[0]
         runner._handle_code_scan_board(_mouse_click(*cell))
-        assert cell in runner._cs_pending
+        assert cell in runner._cs.pending
 
     def test_data_cell_click_twice_removes_from_pending(self, runner: NetworkedGameRunner) -> None:
-        runner._cs_phase = "red_active"
+        runner._cs.phase = "red_active"
         cell = _chessmatrix.DATA_CELLS[0]
         runner._handle_code_scan_board(_mouse_click(*cell))
         runner._handle_code_scan_board(_mouse_click(*cell))
-        assert cell not in runner._cs_pending
+        assert cell not in runner._cs.pending
 
     def test_data_cell_click_in_wait_does_nothing(self, runner: NetworkedGameRunner) -> None:
         """Wait state should ignore data cell clicks."""
         cell = _chessmatrix.DATA_CELLS[0]
         runner._handle_code_scan_board(_mouse_click(*cell))
-        assert runner._cs_phase == "red_wait"
-        assert len(runner._cs_pending) == 0
+        assert runner._cs.phase == "red_wait"
+        assert len(runner._cs.pending) == 0
 
     def test_data_cell_click_in_fading_is_ignored(self, runner: NetworkedGameRunner) -> None:
         """Fading state should not accept new cell toggles — the phase is committing."""
-        runner._cs_phase = "red_fading"
-        runner._cs_fade_start = 0.0
+        runner._cs.phase = "red_fading"
+        runner._cs.fade_start = 0.0
         cell = _chessmatrix.DATA_CELLS[0]
         runner._handle_code_scan_board(_mouse_click(*cell))
-        assert cell not in runner._cs_pending
-        assert runner._cs_phase == "red_fading"   # state unchanged
+        assert cell not in runner._cs.pending
+        assert runner._cs.phase == "red_fading"   # state unchanged
 
     def test_wrong_corner_in_wait_does_nothing(self, runner: NetworkedGameRunner) -> None:
         """Clicking the green corner during red_wait must not advance state."""
         runner._handle_code_scan_board(_mouse_click(6, 1))   # green corner, wrong phase
-        assert runner._cs_phase == "red_wait"
+        assert runner._cs.phase == "red_wait"
 
     def test_data_cell_click_updates_activity_timer(self, runner: NetworkedGameRunner) -> None:
-        runner._cs_phase = "red_active"
-        runner._cs_last_activity = None
+        runner._cs.phase = "red_active"
+        runner._cs.last_activity = None
         cell = _chessmatrix.DATA_CELLS[0]
         runner._handle_code_scan_board(_mouse_click(*cell))
-        assert runner._cs_last_activity is not None
+        assert runner._cs.last_activity is not None
 
     # ── Keyboard shortcuts ────────────────────────────────────────────────────
 
@@ -1040,58 +1040,58 @@ class TestCodeScanBoardStateMachine:
 
     def test_t_enters_typing_mode(self, runner: NetworkedGameRunner) -> None:
         runner._handle_code_scan_board(_key_event(pygame.K_t))
-        assert runner._cs_typing is True
+        assert runner._cs.typing is True
         assert runner._room_code_input == ""
 
     def test_typing_mode_esc_exits(self, runner: NetworkedGameRunner) -> None:
-        runner._cs_typing = True
+        runner._cs.typing = True
         runner._handle_code_scan_board(_key_event(pygame.K_ESCAPE))
-        assert runner._cs_typing is False
+        assert runner._cs.typing is False
         assert runner.phase == Phase.CODE_SCAN_BOARD   # not lobby
 
     def test_typing_mode_alpha_fills_buffer(self, runner: NetworkedGameRunner) -> None:
-        runner._cs_typing = True
+        runner._cs.typing = True
         for ch in "ABCDEF":
             runner._handle_code_scan_board(_key_event(0, unicode=ch))
         assert runner._room_code_input == "ABCDEF"
 
     def test_typing_mode_buffer_capped_at_six(self, runner: NetworkedGameRunner) -> None:
         """A seventh character must be silently ignored."""
-        runner._cs_typing = True
+        runner._cs.typing = True
         for ch in "ABCDEFG":
             runner._handle_code_scan_board(_key_event(0, unicode=ch))
         assert runner._room_code_input == "ABCDEF"
         assert len(runner._room_code_input) == 6
 
     def test_typing_mode_backspace_removes_last_char(self, runner: NetworkedGameRunner) -> None:
-        runner._cs_typing = True
+        runner._cs.typing = True
         runner._room_code_input = "ABC"
         runner._handle_code_scan_board(_key_event(pygame.K_BACKSPACE))
         assert runner._room_code_input == "AB"
 
     def test_typing_mode_non_alpha_ignored(self, runner: NetworkedGameRunner) -> None:
         """Digits and other non-alpha characters must not enter the buffer."""
-        runner._cs_typing = True
+        runner._cs.typing = True
         runner._handle_code_scan_board(_key_event(pygame.K_1, unicode="1"))
         runner._handle_code_scan_board(_key_event(pygame.K_SPACE, unicode=" "))
         assert runner._room_code_input == ""
 
     def test_typing_mode_c_goes_to_buffer_not_camera(self, runner: NetworkedGameRunner) -> None:
         """'C' while typing should append to the buffer, not switch to camera."""
-        runner._cs_typing = True
+        runner._cs.typing = True
         runner._handle_code_scan_board(_key_event(pygame.K_c, unicode="C"))
         assert "C" in runner._room_code_input
         assert runner.phase == Phase.CODE_SCAN_BOARD
 
     def test_typing_mode_enter_sets_name_entry(self, runner: NetworkedGameRunner) -> None:
-        runner._cs_typing = True
+        runner._cs.typing = True
         runner._room_code_input = "ABCDEF"
         runner._handle_code_scan_board(_key_event(pygame.K_RETURN))
         assert runner.phase == Phase.NAME_ENTRY
         assert runner._room_code == "ABCDEF"
 
     def test_typing_mode_enter_ignored_if_short(self, runner: NetworkedGameRunner) -> None:
-        runner._cs_typing = True
+        runner._cs.typing = True
         runner._room_code_input = "ABC"
         runner._handle_code_scan_board(_key_event(pygame.K_RETURN))
         assert runner.phase == Phase.CODE_SCAN_BOARD   # not advanced
@@ -1103,7 +1103,7 @@ class TestCodeScanBoardStateMachine:
         _cm = pytest.importorskip("chessmatrix")
         code = "ABCDEF"
         raw = _cm.encode(_chessmatrix.room_code_to_bytes(code))
-        runner._cs_locked = {
+        runner._cs.locked = {
             (r, c): raw[r][c]
             for r, c in _chessmatrix.DATA_CELLS
             if raw[r][c] != 0
@@ -1119,21 +1119,45 @@ class TestCodeScanBoardStateMachine:
         """Walk through all six corner clicks; verify each phase transition."""
         # Red
         runner._handle_code_scan_board(_mouse_click(1, 6))
-        assert runner._cs_phase == "red_active"
+        assert runner._cs.phase == "red_active"
         runner._handle_code_scan_board(_mouse_click(1, 6))
-        assert runner._cs_phase == "red_fading"
+        assert runner._cs.phase == "red_fading"
         # Skip the 3-second fade by directly advancing
-        runner._cs_phase = "green_wait"
-        runner._cs_pending = set()
+        runner._cs.phase = "green_wait"
+        runner._cs.pending = set()
         # Green
         runner._handle_code_scan_board(_mouse_click(6, 1))
-        assert runner._cs_phase == "green_active"
+        assert runner._cs.phase == "green_active"
         runner._handle_code_scan_board(_mouse_click(6, 1))
-        assert runner._cs_phase == "green_fading"
+        assert runner._cs.phase == "green_fading"
         # Blue
-        runner._cs_phase = "blue_wait"
-        runner._cs_pending = set()
+        runner._cs.phase = "blue_wait"
+        runner._cs.pending = set()
         runner._handle_code_scan_board(_mouse_click(6, 6))
-        assert runner._cs_phase == "blue_active"
+        assert runner._cs.phase == "blue_active"
         runner._handle_code_scan_board(_mouse_click(6, 6))
-        assert runner._cs_phase == "blue_fading"
+        assert runner._cs.phase == "blue_fading"
+
+    # ── Panel rendering smoke tests ──────────────────────────────────────────
+
+    def test_render_panel_extra_board_scan_mode(self, runner: NetworkedGameRunner) -> None:
+        """_render_panel_extra must not raise when CODE_SCAN_BOARD is active (board-scan mode)."""
+        calls: list = []
+        runner._render_panel_extra(
+            text=lambda *a, **kw: calls.append(a),
+            sep=lambda: calls.append("sep"),
+            pfont_sm=None,
+            pfont_md=None,
+        )
+
+    def test_render_panel_extra_typing_mode(self, runner: NetworkedGameRunner) -> None:
+        """_render_panel_extra must not raise in keyboard text-entry sub-mode."""
+        runner._cs.typing = True
+        runner._room_code_input = "ABC"
+        calls: list = []
+        runner._render_panel_extra(
+            text=lambda *a, **kw: calls.append(a),
+            sep=lambda: calls.append("sep"),
+            pfont_sm=None,
+            pfont_md=None,
+        )
