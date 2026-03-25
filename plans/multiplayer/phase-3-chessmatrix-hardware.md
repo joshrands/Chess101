@@ -126,28 +126,33 @@ decoding`.
 - Full round-trip: `encode(code)` → extract locked cells → `grid_from_cell_state`
   → `chessmatrix.decode()` → original code.
 
-**`TestRenderBeamFrameColors`** (5 tests)
+**`TestRenderBeamFrameColors`** (9 tests)
 - Promoted corner renders at `_BEAM_FULL`.
 - Locked cell is never darker than `_BEAM_DIM` for any beam position.
 - `fading_color` cell at `fade_frac=0` shows `_BEAM_DIM`.
 - `fading_color` cell at `fade_frac=1` shows `_BEAM_FULL`.
 - Green beam on red-locked cell adds green (additive blending).
+- Unoccupied cell directly under beam head is visibly lit.
+- Unoccupied cell is fully dark when beam is beyond the 0.5 s trail window.
+- All unoccupied cells are black at `fade_frac=1` (beam killed by corner fade).
+- Promoted data cell rests at `_BEAM_FULL` base (distinct code path from fading lerp).
 
 ### `tests/test_networked_runner.py`
 
-**`TestCodeScanBoardStateMachine`** (15 tests)
-- Corner click transitions for all three colors (wait→active, active→fading,
-  fading→active cancel).
-- Green and blue corner activations in their respective wait states.
-- Data cell click adds to pending; second click removes.
-- Data cell click in wait state is ignored.
-- Data cell click updates the inactivity timer.
-- ESC returns to lobby; T enters typing mode.
-- Typing mode: ESC exits without going to lobby; alpha fills buffer;
-  C goes to buffer (not camera); Enter with 6 chars advances to NAME_ENTRY;
-  Enter with short code is ignored.
+**`TestCodeScanBoardStateMachine`** (23 tests)
+- All six corner-click transitions (wait→active, active→fading, fading→active cancel)
+  for all three colors.
+- Wrong corner in wait state does nothing (no phase skip).
+- Data cell click adds to pending; second click removes; activity timer updated.
+- Data cell click in wait state ignored.
+- Data cell click in fading state ignored (cells locked while phase is committing).
+- ESC→lobby; T→typing mode.
+- Typing mode: ESC exits without going to lobby; alpha fills buffer; buffer capped
+  at 6 chars (7th dropped); backspace removes last char; digits/spaces ignored;
+  C goes to buffer not camera; Enter with 6 chars → NAME_ENTRY; Enter with short
+  code ignored.
 - Full decode round-trip: encode a known code → build locked dict →
-  `_cs_do_decode()` → `Phase.NAME_ENTRY` with correct `_room_code`.
+  `_cs_do_decode()` → `Phase.NAME_ENTRY` with correct `_room_code` and role.
 - Three-color corner sequence walks all six transitions end-to-end.
 
 ---

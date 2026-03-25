@@ -193,15 +193,16 @@ Chess101/
     # test_chessmatrix_scanning.py board-entry sections:
     #   TestGridFromCellState     — grid_from_cell_state: border/anchor/data cell correctness
     #   test_grid_from_cell_state_round_trip — encode→locked→grid_from_cell_state→decode round-trip
-    #   TestRenderBeamFrameColors — promoted corners at FULL, locked cells never below DIM,
-    #                               fading_color lerp DIM→FULL, additive cross-color blending
+    #   TestRenderBeamFrameColors — promoted corners/data cells at FULL, locked cells never below DIM,
+    #                               fading_color lerp DIM→FULL, additive cross-color blending,
+    #                               beam visible near head, dark when far, killed at fade_frac=1
 
     # test_networked_runner.py CODE_SCAN_BOARD section:
-    #   TestCodeScanBoardStateMachine — all six corner-click transitions, data cell toggle/untoggle,
-    #                                   wait-state click ignored, ESC/T keyboard shortcuts,
-    #                                   typing sub-mode (buffer fill, C goes to buffer not camera,
-    #                                   Enter advances), decode round-trip to NAME_ENTRY,
-    #                                   three-color corner sequence
+    #   TestCodeScanBoardStateMachine — all six corner-click transitions, wrong corner ignored,
+    #                                   data cell toggle/untoggle/fading-ignored, ESC/T shortcuts,
+    #                                   typing sub-mode (buffer fill, cap at 6, backspace,
+    #                                   non-alpha ignored, C to buffer not camera, Enter advances),
+    #                                   decode round-trip to NAME_ENTRY, three-color sequence
 ```
 
 ## Architecture

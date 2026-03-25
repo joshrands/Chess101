@@ -1011,6 +1011,20 @@ class TestCodeScanBoardStateMachine:
         assert runner._cs_phase == "red_wait"
         assert len(runner._cs_pending) == 0
 
+    def test_data_cell_click_in_fading_is_ignored(self, runner: NetworkedGameRunner) -> None:
+        """Fading state should not accept new cell toggles — the phase is committing."""
+        runner._cs_phase = "red_fading"
+        runner._cs_fade_start = 0.0
+        cell = _chessmatrix.DATA_CELLS[0]
+        runner._handle_code_scan_board(_mouse_click(*cell))
+        assert cell not in runner._cs_pending
+        assert runner._cs_phase == "red_fading"   # state unchanged
+
+    def test_wrong_corner_in_wait_does_nothing(self, runner: NetworkedGameRunner) -> None:
+        """Clicking the green corner during red_wait must not advance state."""
+        runner._handle_code_scan_board(_mouse_click(6, 1))   # green corner, wrong phase
+        assert runner._cs_phase == "red_wait"
+
     def test_data_cell_click_updates_activity_timer(self, runner: NetworkedGameRunner) -> None:
         runner._cs_phase = "red_active"
         runner._cs_last_activity = None
@@ -1040,6 +1054,27 @@ class TestCodeScanBoardStateMachine:
         for ch in "ABCDEF":
             runner._handle_code_scan_board(_key_event(0, unicode=ch))
         assert runner._room_code_input == "ABCDEF"
+
+    def test_typing_mode_buffer_capped_at_six(self, runner: NetworkedGameRunner) -> None:
+        """A seventh character must be silently ignored."""
+        runner._cs_typing = True
+        for ch in "ABCDEFG":
+            runner._handle_code_scan_board(_key_event(0, unicode=ch))
+        assert runner._room_code_input == "ABCDEF"
+        assert len(runner._room_code_input) == 6
+
+    def test_typing_mode_backspace_removes_last_char(self, runner: NetworkedGameRunner) -> None:
+        runner._cs_typing = True
+        runner._room_code_input = "ABC"
+        runner._handle_code_scan_board(_key_event(pygame.K_BACKSPACE))
+        assert runner._room_code_input == "AB"
+
+    def test_typing_mode_non_alpha_ignored(self, runner: NetworkedGameRunner) -> None:
+        """Digits and other non-alpha characters must not enter the buffer."""
+        runner._cs_typing = True
+        runner._handle_code_scan_board(_key_event(pygame.K_1, unicode="1"))
+        runner._handle_code_scan_board(_key_event(pygame.K_SPACE, unicode=" "))
+        assert runner._room_code_input == ""
 
     def test_typing_mode_c_goes_to_buffer_not_camera(self, runner: NetworkedGameRunner) -> None:
         """'C' while typing should append to the buffer, not switch to camera."""

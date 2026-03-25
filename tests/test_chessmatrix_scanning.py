@@ -1006,3 +1006,61 @@ class TestRenderBeamFrameColors:
         # Should be brighter than DIM in at least the green channel (additive)
         dr, dg, db = _BEAM_DIM[1]
         assert g > dg, f"green beam on red cell should add green: got g={g}, DIM g={dg}"
+
+    def test_unoccupied_cell_glows_near_beam_head(self) -> None:
+        """An unoccupied cell directly under the beam head must be visibly lit."""
+        # DATA_CELLS[0] = (1,2) is at index 0; beam_phase=0.0 puts the head there.
+        c = _RecordCanvas()
+        render_beam_frame(
+            c, locked={}, current_color=1,   # red beam
+            beam_phase=0.0, blink_on=True,
+            active_corner=(1, 6), corner_color=1,
+        )
+        r, g, b = c.cell_color(*DATA_CELLS[0])
+        assert r > 0, f"beam head on unoccupied cell should be lit; got r={r}"
+
+    def test_unoccupied_cell_dark_when_beam_far(self) -> None:
+        """An unoccupied cell well behind the beam trail should be fully dark."""
+        # DATA_CELLS[0] is at index 0; at beam_phase=0.5 the head is at index 16,
+        # so cell 0 is 16 positions behind — age_s = 16*(0.8/32) = 0.4 s < 0.5 s.
+        # Use beam_phase=0.99 to put the head at index ~31; cell 0 is ~31 behind
+        # → age_s ≈ 31*0.025 = 0.775 s > 0.5 s → fully faded → (0,0,0).
+        c = _RecordCanvas()
+        render_beam_frame(
+            c, locked={}, current_color=1,
+            beam_phase=0.99, blink_on=True,
+            active_corner=(1, 6), corner_color=1,
+        )
+        assert c.cell_color(*DATA_CELLS[0]) == (0, 0, 0), (
+            "unoccupied cell should be dark when beam is far away"
+        )
+
+    def test_unoccupied_cell_dark_when_fully_faded(self) -> None:
+        """At fade_frac=1, unoccupied cells must be fully black."""
+        c = _RecordCanvas()
+        render_beam_frame(
+            c, locked={}, current_color=1,
+            beam_phase=0.0, blink_on=True,   # beam head right on DATA_CELLS[0]
+            active_corner=(1, 6), corner_color=1,
+            fade_frac=1.0,
+        )
+        # _beam_scale = 0 at fade_frac=1 → all unoccupied cells are black
+        for cell in DATA_CELLS[:4]:
+            assert c.cell_color(*cell) == (0, 0, 0), (
+                f"cell {cell} should be black at fade_frac=1"
+            )
+
+    def test_promoted_data_cell_uses_full_base(self) -> None:
+        """A data cell whose color is in the promoted set should rest at FULL."""
+        # Red cell locked, in promoted set, beam far away so no excite contribution.
+        locked = {(2, 2): 1}
+        c = _RecordCanvas()
+        render_beam_frame(
+            c, locked=locked, current_color=2,
+            beam_phase=0.99, blink_on=True,   # beam far from (2,2)
+            active_corner=(6, 1), corner_color=2,
+            promoted=frozenset({1}),
+        )
+        assert c.cell_color(2, 2) == _BEAM_FULL[1], (
+            "promoted data cell should rest at FULL brightness"
+        )
