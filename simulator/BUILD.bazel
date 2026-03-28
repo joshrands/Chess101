@@ -1,0 +1,26 @@
+load("@rules_python//python:defs.bzl", "py_library")
+
+py_library(
+    name = "simulator",
+    srcs = [
+        "__init__.py",
+        "app.py",
+        "display.py",
+        "fake_rgbmatrix.py",
+        "networked_runner.py",
+        "sensor.py",
+    ],
+    visibility = ["//:__subpackages__"],
+    deps = [
+        "//ai",
+        "//core",
+        "//game",
+        "//hardware",
+        "//network",
+        "//pieces",
+        "@pip//chessmatrix",
+        "@pip//numpy",
+        "@pip//opencv_python",
+        "@pip//pygame",
+    ],
+)

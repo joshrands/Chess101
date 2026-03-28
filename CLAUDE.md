@@ -70,9 +70,28 @@ sudo python3 GameManager.py --join 192.168.1.42
 # JS scanner — runs under Node.js, no npm install needed:
 node tests/test_chessmatrix_js.js
 node tests/test_chessmatrix_js.js --verbose
+
+# JS sim logic — regression tests for web/sim.html game logic:
+node tests/test_sim_js.js
+node tests/test_sim_js.js --verbose
 ```
 
 `conftest.py` stubs out `rgbmatrix` and `smbus` so all test files run on Mac without Pi hardware.
+
+### Testing policy
+
+**Always add regression tests** for every bug fix and feature change — both Python and JS sides. If a fix touches `web/sim.html`, add tests in `tests/test_sim_js.js`. If a fix touches Python simulator or networking code, add tests in the appropriate `tests/test_*.py` file.
+
+**Always run both test suites** after making changes to verify nothing is broken:
+
+```bash
+# Preferred — runs everything (Python + JS) via Bazel:
+bazel test //tests/...
+
+# Or manually without Bazel:
+.venv/bin/python -m pytest tests/ -q
+node tests/test_chessmatrix_js.js && node tests/test_sim_js.js
+```
 
 The canonical test documentation lives in **`tests/README.md`**. Keep it up to date whenever tests change (see "Keeping test documentation current" below).
 
@@ -94,6 +113,41 @@ RELAY_URL=ws://127.0.0.1:8765 .venv/bin/python -m pytest tests/test_relay.py -v
 # Post-deploy smoke test against the live relay:
 RELAY_URL=wss://relay.chess101.net .venv/bin/python -m pytest tests/test_relay.py -v
 ```
+
+## Bazel Build System
+
+The project uses Bazel 9 with bzlmod (`MODULE.bazel`) and Gazelle for Python BUILD file generation.
+
+```bash
+# Run all tests (Python + JS):
+bazel test //tests/...
+
+# Run a specific test:
+bazel test //tests:test_board
+bazel test //tests:test_chessmatrix_js
+
+# Regenerate BUILD files after adding/removing Python files or imports:
+bazel run //:gazelle
+
+# Build everything:
+bazel build //...
+```
+
+**Key files:**
+- `MODULE.bazel` — Bazel module definition, Python toolchain (3.9), pip deps
+- `BUILD` (root) — Gazelle config, `# gazelle:resolve` directives, root `py_library`
+- `requirements_lock.txt` — Pinned pip dependencies (all transitive deps must be listed)
+- `.bazelrc` — Test output config, SDL dummy drivers for headless pygame
+
+**After changing Python imports or adding pip packages:**
+1. Update `requirements_lock.txt` if adding a new pip package (include transitive deps)
+2. Add `# gazelle:resolve py <module> @pip//<package>` to root `BUILD` if needed
+3. Run `bazel run //:gazelle` to regenerate BUILD files
+4. Run `bazel test //tests/...` to verify
+
+**Pre-seeded BUILD files** (Gazelle can't auto-generate these):
+- `hardware/BUILD` — Pi-only deps (`smbus`, `RPi.GPIO`) that aren't pip-installable
+- `tools/BUILD` — Debug tools with self-referential imports
 
 ## Keeping test documentation current
 
@@ -219,6 +273,7 @@ Chess101/
     ├── test_relay.py                # Relay server protocol, reconnect, and anti-cheat tests
     ├── test_chessmatrix_scanning.py # ChessMatrix scanning pipeline (Python) + board-entry helpers
     ├── test_chessmatrix_js.js       # ChessMatrix scanning pipeline (Node.js)
+    ├── test_sim_js.js              # Web sim logic regression tests (Node.js)
     └── fixtures/chessmatrix/        # PNG fixtures: real phone photos + synthetics
 
     # test_chessmatrix_scanning.py board-entry sections:

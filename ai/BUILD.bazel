@@ -1,0 +1,15 @@
+load("@rules_python//python:defs.bzl", "py_library")
+
+py_library(
+    name = "ai",
+    srcs = [
+        "__init__.py",
+        "ai.py",
+        "tree.py",
+    ],
+    visibility = ["//:__subpackages__"],
+    deps = [
+        "//core",
+        "//pieces",
+    ],
+)

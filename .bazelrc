@@ -1,0 +1,7 @@
+# ── Test output ──────────────────────────────────────────────────────────────
+test --test_output=errors
+
+# ── Python ───────────────────────────────────────────────────────────────────
+# Allow tests to find conftest.py and root-level shims
+build --action_env=SDL_VIDEODRIVER=dummy
+build --action_env=SDL_AUDIODRIVER=dummy

@@ -768,6 +768,10 @@ class NetworkedGameRunner(GameRunner):
 
     def _handle_color_pick(self, event: pygame.event.Event) -> None:
         """Networked COLOR_PICK: each side controls only their own row."""
+        if self._local_team_key == "both":
+            # LOCAL mode — use base GameRunner's unrestricted handler
+            super()._handle_color_pick(event)
+            return
         if event.type != pygame.MOUSEBUTTONDOWN:
             return
         if self._peer_name is None:     # peer hasn't joined yet — ignore clicks
@@ -816,6 +820,10 @@ class NetworkedGameRunner(GameRunner):
 
     def _handle_war_games(self, event: pygame.event.Event) -> None:
         """Networked WAR_GAMES: each side controls only their own row."""
+        if self._local_team_key == "both":
+            # LOCAL mode — use base GameRunner's unrestricted handler
+            super()._handle_war_games(event)
+            return
         if event.type != pygame.MOUSEBUTTONDOWN:
             return
         if self._local_war_sent:        # already chose — ignore re-picks

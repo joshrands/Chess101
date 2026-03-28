@@ -6,6 +6,8 @@ Covers:
   - _on_hello: sends game_setup during pre-game phases
   - _on_rejoin_sync: restores team colours, board grid, counters, net_seq
   - _remote_last_move: set by _apply_remote_move, cleared by _next_turn on local move
+  - LOCAL mode: color pick and war games delegate to base GameRunner
+  - Networked AI suppression: AI only runs for the local team's turn
 
 Run with:
     .venv/bin/python -m pytest tests/test_networked_runner.py -v
@@ -1160,4 +1162,134 @@ class TestCodeScanBoardStateMachine:
             sep=lambda: calls.append("sep"),
             pfont_sm=None,
             pfont_md=None,
+        )
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# LOCAL mode regression tests
+# ═════════════════════════════════════════════════════════════════════════════
+
+def _make_local_runner(_pygame_fixture) -> NetworkedGameRunner:
+    """Create a NetworkedGameRunner in LOCAL mode, ready for COLOR_PICK."""
+    runner = NetworkedGameRunner(role=NetworkRole.LOCAL)
+    runner._init_board()
+    # Simulate selecting "Play Locally" from the lobby
+    runner._lobby_select(0)
+    return runner
+
+
+class TestLocalColorPick:
+    """LOCAL mode must delegate to the base GameRunner color/war-games handlers
+    so that _local_team_key=="both" is handled correctly.
+
+    Regression: NetworkedGameRunner._handle_color_pick only checked for "r" and
+    "l" team keys, and also blocked on _peer_name being None — both conditions
+    prevented any color selection in LOCAL mode.
+    """
+
+    def test_local_color_pick_row2_works(self, _pygame):
+        """Clicking row 2 in LOCAL mode must set team_r color."""
+        runner = _make_local_runner(_pygame)
+        assert runner.phase == Phase.COLOR_PICK
+
+        runner._handle_color_pick(_click(2, 3))
+
+        assert runner._selected_r_idx == 3, (
+            "Row 2 click must select team_r color in LOCAL mode"
+        )
+
+    def test_local_color_pick_row5_works(self, _pygame):
+        """Clicking row 5 in LOCAL mode must set team_l color."""
+        runner = _make_local_runner(_pygame)
+
+        runner._handle_color_pick(_click(5, 1))
+
+        assert runner._selected_l_idx == 1, (
+            "Row 5 click must select team_l color in LOCAL mode"
+        )
+
+    def test_local_color_pick_advances_to_war_games(self, _pygame):
+        """Picking both colors in LOCAL mode must advance to WAR_GAMES."""
+        runner = _make_local_runner(_pygame)
+
+        runner._handle_color_pick(_click(2, 0))
+        runner._handle_color_pick(_click(5, 1))
+
+        assert runner.phase == Phase.WAR_GAMES, (
+            "LOCAL mode must advance to WAR_GAMES after both colors are picked"
+        )
+
+    def test_local_color_pick_no_peer_required(self, _pygame):
+        """LOCAL mode must NOT require _peer_name to be set."""
+        runner = _make_local_runner(_pygame)
+        assert runner._peer_name is None, "Precondition: no peer in LOCAL mode"
+
+        runner._handle_color_pick(_click(2, 4))
+
+        assert runner._selected_r_idx == 4, (
+            "Color pick must work even when _peer_name is None (LOCAL mode)"
+        )
+
+
+class TestLocalWarGames:
+    """LOCAL mode war-games must also delegate to the base handler."""
+
+    def test_local_war_games_both_rows(self, _pygame):
+        """Clicking rows 3 and 4 in LOCAL mode must set both AI flags and start."""
+        runner = _make_local_runner(_pygame)
+        # Advance past color pick
+        runner._handle_color_pick(_click(2, 0))
+        runner._handle_color_pick(_click(5, 1))
+        assert runner.phase == Phase.WAR_GAMES
+
+        runner._handle_war_games(_click(3, 0))   # team_r = Human
+        runner._handle_war_games(_click(4, 7))   # team_l = Human
+
+        assert runner.phase == Phase.PLAYING, (
+            "LOCAL mode must advance to PLAYING after both sides pick Human/AI"
+        )
+        assert runner._b.computer_player_r is False
+        assert runner._b.computer_player_l is False
+
+
+class TestNetworkedAISuppression:
+    """Networked runner must suppress AI for the remote team's turn.
+
+    Regression: the web sim's beginTurn() launched AI for any AI-marked team
+    regardless of whose turn it was.  The Python sim already had the fix in
+    _begin_turn(), but this test locks it in.
+    """
+
+    def test_ai_suppressed_on_remote_turn(self, _pygame):
+        """When it's the remote team's turn, _ai_thinking must be False."""
+        runner, relay = _make_online_runner(NetworkRole.ONLINE_HOST, _pygame)
+        runner.phase = Phase.PLAYING
+        b = runner._b
+        b.computer_player_r = False     # HOST is Human
+        b.computer_player_l = True      # GUEST is AI
+        b.initialize_game_board()
+
+        # Simulate it being team_l's turn (the remote team for HOST)
+        runner._current_team = b.team_l
+        runner._begin_turn(b.team_l)
+
+        assert runner._ai_thinking is False, (
+            "AI must not run locally for the remote team's turn — "
+            "the remote instance handles it"
+        )
+
+    def test_ai_runs_on_local_turn(self, _pygame):
+        """When it's our team's turn and we're AI, _ai_thinking must be True."""
+        runner, relay = _make_online_runner(NetworkRole.ONLINE_HOST, _pygame)
+        runner.phase = Phase.PLAYING
+        b = runner._b
+        b.computer_player_r = True      # HOST is AI
+        b.computer_player_l = False     # GUEST is Human
+        b.initialize_game_board()
+
+        runner._current_team = b.team_r
+        runner._begin_turn(b.team_r)
+
+        assert runner._ai_thinking is True, (
+            "AI must run for our own AI-controlled team"
         )

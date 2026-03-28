@@ -1,0 +1,17 @@
+filegroup(
+    name = "chessmatrix_scanner_js",
+    srcs = ["chessmatrix-scanner.js"],
+    visibility = ["//visibility:public"],
+)
+
+filegroup(
+    name = "sim_html",
+    srcs = ["sim.html"],
+    visibility = ["//visibility:public"],
+)
+
+filegroup(
+    name = "spectator_html",
+    srcs = ["spectator.html"],
+    visibility = ["//visibility:public"],
+)

@@ -1,0 +1,214 @@
+load("@rules_python//python:defs.bzl", "py_library", "py_test")
+load("@rules_shell//shell:sh_test.bzl", "sh_test")
+
+# ── Fixture data ─────────────────────────────────────────────────────────────
+
+filegroup(
+    name = "chessmatrix_fixtures",
+    srcs = glob(["fixtures/chessmatrix/**"]),
+)
+
+# ── JS tests (run under Node.js) ────────────────────────────────────────────
+
+sh_test(
+    name = "test_chessmatrix_js",
+    srcs = ["run_js_test.sh"],
+    args = ["tests/test_chessmatrix_js.js"],
+    data = [
+        "test_chessmatrix_js.js",
+        ":chessmatrix_fixtures",
+        "//web:chessmatrix_scanner_js",
+    ],
+)
+
+sh_test(
+    name = "test_sim_js",
+    srcs = ["run_js_test.sh"],
+    args = ["tests/test_sim_js.js"],
+    data = [
+        "test_sim_js.js",
+        "//web:sim_html",
+    ],
+)
+
+py_library(
+    name = "tests",
+    srcs = ["__init__.py"],
+    visibility = ["//:__subpackages__"],
+)
+
+py_library(
+    name = "conftest",
+    testonly = True,
+    srcs = ["conftest.py"],
+    visibility = ["//:__subpackages__"],
+    deps = [
+        "//:Chess101",
+        "//network",
+        "@pip//exceptiongroup",
+        "@pip//iniconfig",
+        "@pip//packaging",
+        "@pip//pluggy",
+        "@pip//pygments",
+        "@pip//pytest",
+        "@pip//tomli",
+        "@pip//typing_extensions",
+        "@pip//websockets",
+    ],
+)
+
+py_test(
+    name = "test_ai_tree",
+    srcs = ["test_ai_tree.py"],
+    deps = [
+        ":conftest",
+        "//:Chess101",
+        "@pip//pytest",
+    ],
+)
+
+py_test(
+    name = "test_board",
+    srcs = ["test_board.py"],
+    deps = [
+        ":conftest",
+        "//:Chess101",
+        "//core",
+        "@pip//pytest",
+    ],
+)
+
+py_test(
+    name = "test_chessmatrix_pipeline",
+    srcs = ["test_chessmatrix_pipeline.py"],
+    data = [":chessmatrix_fixtures"],
+    deps = [
+        ":conftest",
+        "//network",
+        "//tools",
+        "@pip//numpy",
+        "@pip//opencv_python",
+        "@pip//pytest",
+    ],
+)
+
+py_test(
+    name = "test_chessmatrix_scanning",
+    srcs = ["test_chessmatrix_scanning.py"],
+    data = [":chessmatrix_fixtures"],
+    deps = [
+        ":conftest",
+        "//network",
+        "@pip//chessmatrix",
+        "@pip//numpy",
+        "@pip//opencv_python",
+        "@pip//pytest",
+    ],
+)
+
+py_test(
+    name = "test_gameplay",
+    srcs = ["test_gameplay.py"],
+    deps = [
+        ":conftest",
+        "//:Chess101",
+        "//simulator",
+        "@pip//pygame",
+        "@pip//pytest",
+    ],
+)
+
+py_test(
+    name = "test_king",
+    srcs = ["test_king.py"],
+    deps = [
+        ":conftest",
+        "//:Chess101",
+        "@pip//pytest",
+    ],
+)
+
+py_test(
+    name = "test_network",
+    srcs = ["test_network.py"],
+    deps = [
+        ":conftest",
+        "//core",
+        "//game",
+        "//network",
+        "//pieces",
+        "@pip//pytest",
+    ],
+)
+
+py_test(
+    name = "test_networked_runner",
+    srcs = ["test_networked_runner.py"],
+    deps = [
+        ":conftest",
+        "//ai",
+        "//core",
+        "//network",
+        "//pieces",
+        "//simulator",
+        "@pip//pygame",
+        "@pip//pytest",
+    ],
+)
+
+py_test(
+    name = "test_online_flow",
+    srcs = ["test_online_flow.py"],
+    deps = [
+        ":conftest",
+        "//simulator",
+        "@pip//pygame",
+        "@pip//pytest",
+    ],
+)
+
+py_test(
+    name = "test_pieces",
+    srcs = ["test_pieces.py"],
+    deps = [
+        ":conftest",
+        "//:Chess101",
+        "@pip//pytest",
+    ],
+)
+
+py_test(
+    name = "test_primitives",
+    srcs = ["test_primitives.py"],
+    deps = [
+        ":conftest",
+        "//:Chess101",
+        "@pip//pytest",
+    ],
+)
+
+py_test(
+    name = "test_relay",
+    srcs = ["test_relay.py"],
+    deps = [
+        ":conftest",
+        "//network",
+        "//pieces",
+        "@pip//pytest",
+        "@pip//websockets",
+    ],
+)
+
+py_test(
+    name = "test_simulator",
+    srcs = ["test_simulator.py"],
+    deps = [
+        ":conftest",
+        "//ai",
+        "//core",
+        "//pieces",
+        "//simulator",
+        "@pip//pygame",
+        "@pip//pytest",
+    ],
+)

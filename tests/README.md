@@ -75,12 +75,13 @@ The `relay_url` fixture (in `conftest.py`) selects the mode automatically: `RELA
 | `test_primitives.py` | Cell, Team, Piece ABC | 192 |
 | `test_ai_tree.py` | Tree utility + alpha-beta minimax | 283 |
 | `test_network.py` | Protocol encode/decode, beacon discovery, transport | 761 |
-| `test_networked_runner.py` | NetworkedGameRunner: reconnect, CODE_SCAN_BOARD state machine | 1163 |
+| `test_networked_runner.py` | NetworkedGameRunner: reconnect, CODE_SCAN_BOARD, LOCAL mode, AI suppression | ~1280 |
 | `test_online_flow.py` | E2E: relay handshake → color-pick → war-games → playing | 459 |
 | `test_relay.py` | Relay protocol, forwarding, reconnect, anti-cheat | 1116 |
 | `test_chessmatrix_scanning.py` | ChessMatrix scanner: all pipeline stages + E2E (Python) | 1159 |
 | `test_chessmatrix_pipeline.py` | ChessMatrix pipeline via OpenCV debug tools | 190 |
 | `test_chessmatrix_js.js` | ChessMatrix scanner (JavaScript / Node.js) | 442 |
+| `test_sim_js.js` | Web sim logic: ping/pong, AI gating, color pick guards, render (JS) | ~360 |
 
 ---
 
@@ -256,6 +257,9 @@ Builds minimal board positions and verifies `calc_targets()`, `get_value()`, `mo
 | `TestOnRejoinSync` | Restores team colours, board grid, counters, and `net_seq` from sync payload |
 | `_remote_last_move` tracking | Set by `_apply_remote_move`, cleared by `_next_turn` on the local player's next move |
 | `TestCodeScanBoardStateMachine` | Corner-click transitions, data-cell toggle/untoggle, fading-cell ignored, ESC/T shortcuts, typing sub-mode (buffer fill, backspace, cap at 6, non-alpha ignored, C to buffer not camera, Enter advances), decode round-trip to NAME_ENTRY, three-color sequence, `_render_panel_extra` smoke test |
+| `TestLocalColorPick` | LOCAL mode (`_local_team_key=="both"`) delegates color pick to base GameRunner: row 2/5 clicks work, no peer required, advances to WAR_GAMES |
+| `TestLocalWarGames` | LOCAL mode delegates war-games to base handler: both rows 3/4 work, advances to PLAYING |
+| `TestNetworkedAISuppression` | AI suppressed on remote team's turn (`_ai_thinking=False`); AI runs on local team's turn |
 
 Factories: `_make_host()` and `_make_guest()` return ready-to-use `NetworkedGameRunner` instances with mocked WebSocket transport.
 
@@ -356,6 +360,22 @@ node tests/test_chessmatrix_js.js --verbose  # per-test output
 
 Covers the same pipeline stages as the Python scanner: synthetic clean frames, rotation, perspective, noise, and real-photo fixtures. Also includes a **timing-strip guard** section with the same adversarial unit tests as the Python suite (uniform gray/white rejected, both strips required independently, below/at threshold boundary cases, AAAAAA false-positive regression, real AAAAAA decodes correctly).
 
+### `test_sim_js.js` — Web sim logic regression tests (JavaScript)
+
+Node.js test runner for game logic extracted from `web/sim.html`. Uses `vm` module to evaluate the sim's script blocks in a sandboxed context with mocked DOM/browser APIs.
+
+```bash
+node tests/test_sim_js.js            # summary output
+node tests/test_sim_js.js --verbose  # per-test output
+```
+
+| Area | What it verifies |
+|---|---|
+| Ping/pong | `handleRelayMsg` responds to `{type:'ping'}` with `{type:'pong'}` including `seq` |
+| AI gating | `beginTurn` does not launch AI for the remote team's turn in networked play; does launch for local team; local mode runs AI for any team |
+| Color pick guards | HOST cannot pick row 5 (team_l); GUEST cannot pick row 2 (team_r); HOST can pick row 2 and sends `color_chosen` |
+| Color pick rendering | `renderColorPick` dims unselected cells on the correct row (not cross-referencing the other team's selection) |
+
 ---
 
 ## Adding new tests
@@ -374,6 +394,7 @@ Covers the same pipeline stages as the Python scanner: synthetic clean frames, r
 | `network/relay.py` | `test_relay.py` |
 | `network/chessmatrix.py` | `test_chessmatrix_scanning.py` |
 | `web/chessmatrix-scanner.js` | `test_chessmatrix_js.js` |
+| `web/sim.html` (game logic) | `test_sim_js.js` |
 | Full online flow | `test_online_flow.py` |
 
 **Minimal piece test pattern:**

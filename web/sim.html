@@ -750,7 +750,7 @@ function beginTurn(team){
   inCheck=check;
   if(inCheck)addLog(`${team.name} is in check!`);
   const isAI=(team.r===teamR.r&&computerR)||(team.r===teamL.r&&computerL);
-  if(isAI){aiThinking=true;launchAI();}
+  if(isAI&&isMyTurn()){aiThinking=true;launchAI();}
 }
 
 function nextTurn(){
@@ -866,6 +866,10 @@ function handleRelayMsg(msg){
     if(ev==='checkmate'||ev==='stalemate')phase=Phase.GAME_OVER;
   } else if(t==='new_game'){
     resetGame();phase=Phase.LOBBY;
+  } else if(t==='ping'){
+    netSend({type:'pong',seq:msg.seq||0});
+  } else if(t==='pong'){
+    // keepalive acknowledged — nothing to do
   }
 }
 
@@ -933,14 +937,12 @@ function renderColorPick(now){
   for(let col=0;col<8;col++){
     const[pr,pg,pb]=PALETTE[col];
     // Row 2 = team R, row 5 = team L
-    const dimR=selectedLIdx===col?0.25:1;
-    const dimL=selectedRIdx===col?0.25:1;
+    // Dim unselected cells once a pick is made on that row
+    const dimR=(selectedRIdx!==null&&col!==selectedRIdx)?0.25:1;
+    const dimL=(selectedLIdx!==null&&col!==selectedLIdx)?0.25:1;
     lightCell(2,col,Math.floor(pr*dimR),Math.floor(pg*dimR),Math.floor(pb*dimR));
     lightCell(5,col,Math.floor(pr*dimL),Math.floor(pg*dimL),Math.floor(pb*dimL));
   }
-  // Show selected
-  if(selectedRIdx!==null){const[r,g,b]=PALETTE[selectedRIdx];lightCell(2,selectedRIdx,r,g,b);}
-  if(selectedLIdx!==null){const[r,g,b]=PALETTE[selectedLIdx];lightCell(5,selectedLIdx,r,g,b);}
   flip();
 }
 

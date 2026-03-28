@@ -1,0 +1,17 @@
+load("@rules_python//python:defs.bzl", "py_library")
+
+py_library(
+    name = "pieces",
+    srcs = [
+        "__init__.py",
+        "bishop.py",
+        "king.py",
+        "knight.py",
+        "pawn.py",
+        "piece.py",
+        "queen.py",
+        "rook.py",
+    ],
+    visibility = ["//:__subpackages__"],
+    deps = ["//core"],
+)

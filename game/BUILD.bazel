@@ -1,0 +1,24 @@
+load("@rules_python//python:defs.bzl", "py_library")
+
+py_library(
+    name = "game",
+    srcs = [
+        "__init__.py",
+        "board.py",
+        "networked_board.py",
+        "rules.py",
+    ],
+    visibility = ["//:__subpackages__"],
+    deps = [
+        "//:Chess101",
+        "//ai",
+        "//core",
+        "//hardware",
+        "//network",
+        "//pieces",
+        "//rgbmatrix",
+        "//ui",
+        "@pip//chessmatrix",
+        "@pip//numpy",
+    ],
+)
