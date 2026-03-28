@@ -512,13 +512,11 @@ function calibrateAndDecode(oriented, N) {
   const lum = sampled.map(([r, g, b]) => 0.299 * r + 0.587 * g + 0.114 * b);
   if (Math.max(...lum) - Math.min(...lum) < 60) return null;
 
-  // For every cell center: find nearest calibration sample, map to cm value
+  // For every cell: sample a patch average, find nearest calibration color
   const grid = Array.from({length: 8}, () => new Array(8).fill(0));
   for (let row = 0; row < 8; row++) {
     for (let col = 0; col < 8; col++) {
-      const [cx, cy] = cellCenterPx(row, col);
-      const i = (Math.round(cy)*N + Math.round(cx)) * 4;
-      const pr = oriented[i], pg = oriented[i+1], pb = oriented[i+2];
+      const [pr, pg, pb] = sampleCell(oriented, N, row, col);
       let minD = Infinity, nearest = 0;
       for (let k = 0; k < sampled.length; k++) {
         const [sr, sg, sb] = sampled[k];
@@ -542,9 +540,8 @@ function timingStripOk(oriented, N) {
   const half   = Math.floor(cellPx / 2);
 
   function bright(r, c) {
-    const cy = r * cellPx + half, cx = c * cellPx + half;
-    const i  = (cy * N + cx) * 4;
-    return (oriented[i] + oriented[i + 1] + oriented[i + 2]) / 3 > 127;
+    const [sr, sg, sb] = sampleCell(oriented, N, r, c);
+    return (sr + sg + sb) / 3 > 127;
   }
 
   const row0 = Array.from({length: 8}, (_, c) => bright(0, c));

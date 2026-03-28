@@ -367,7 +367,7 @@ node tests/test_chessmatrix_js.js            # summary output
 node tests/test_chessmatrix_js.js --verbose  # per-test output
 ```
 
-Covers the same pipeline stages as the Python scanner: synthetic clean frames, rotation, perspective, noise, and real-photo fixtures. Also includes a **timing-strip guard** section with the same adversarial unit tests as the Python suite (uniform gray/white rejected, both strips required independently, below/at threshold boundary cases, AAAAAA false-positive regression, real AAAAAA decodes correctly).
+Covers the same pipeline stages as the Python scanner: synthetic clean frames, rotation, perspective, noise, and real-photo fixtures. Also includes a **timing-strip guard** section with adversarial unit tests (uniform gray/white rejected, both strips required independently, below/at threshold boundary cases, AAAAAA false-positive regression, real AAAAAA decodes correctly, center-pixel corruption survived via patch averaging) and a **cell sampling robustness** section that verifies `calibrateAndDecode` survives corrupted and inverted center pixels (regression tests for the single-pixel sampling bug).
 
 ### `test_lockstep_chessmatrix.py` — Python↔JS ChessMatrix lockstep
 
@@ -391,6 +391,11 @@ bazel test //tests:test_lockstep_chessmatrix
 
 # Run the fuzzer (1000 iterations by default):
 bazel run //harness:fuzz_chessmatrix -- --iterations 1000
+
+# Replay a crash image through both decoders with debug output:
+bazel run //harness:replay_crash -- "$PWD/harness/crashes/chessmatrix/disagree_000042_ABCDEF.png" --stages
+# --stages dumps all 15 Python pipeline stage PNGs alongside the input image
+# --js prints a hint for opening the JS browser-based pipeline debugger
 ```
 
 ---

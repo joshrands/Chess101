@@ -68,6 +68,22 @@ py_binary(
     ],
 )
 
+py_binary(
+    name = "replay_crash",
+    srcs = ["replay_crash.py"],
+    data = [
+        "js_bridge.js",
+        "//web:chessmatrix_scanner_js",
+    ],
+    deps = [
+        ":python_bridge",
+        "//network",
+        "//tools",
+        "@pip//numpy",
+        "@pip//opencv_python",
+    ],
+)
+
 filegroup(
     name = "js_bridge",
     srcs = ["js_bridge.js"],

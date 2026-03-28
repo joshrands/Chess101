@@ -769,8 +769,55 @@ def _inflate_rect(
     return left, top, right, bottom
 
 
+def _sobel_axes(norm: "np.ndarray") -> "tuple[float, float] | None":
+    """Return (angle1_deg, angle2_deg) via Sobel gradients on normalized grayscale.
+
+    Runs on the contrast-normalized grayscale (uint8) *before* binarization.
+    Binary images have staircase artifacts that alias small rotations to 0°/90°,
+    so grayscale preserves the true edge orientation.
+
+    Builds a magnitude-weighted angle histogram in [0, 180).  After finding a1
+    (the global peak), its ±15° neighbourhood is suppressed and a2 is the next
+    largest peak.
+    """
+    import cv2
+    import numpy as np
+
+    gx = cv2.Sobel(norm, cv2.CV_32F, 1, 0, ksize=3)
+    gy = cv2.Sobel(norm, cv2.CV_32F, 0, 1, ksize=3)
+    mag = np.sqrt(gx * gx + gy * gy)
+
+    mask = mag >= 100
+    gx_sel = gx[mask]
+    gy_sel = gy[mask]
+    mag_sel = mag[mask]
+
+    if len(mag_sel) == 0:
+        return None
+
+    # Gradient direction via arctan2(gy, gx), then +90° to get line direction
+    # (line is perpendicular to its gradient).
+    angles = (np.degrees(np.arctan2(gy_sel, gx_sel)) + 90) % 180
+    bins = np.clip(angles.astype(np.int32), 0, 179)
+
+    hist = np.zeros(180, dtype=np.float32)
+    np.add.at(hist, bins, mag_sel)
+
+    a1 = int(np.argmax(hist))
+    if hist[a1] == 0:
+        return None
+
+    suppressed = hist.copy()
+    for d in range(-15, 16):
+        suppressed[(a1 + d) % 180] = 0
+    a2 = int(np.argmax(suppressed))
+    return float(a1), float(a2)
+
+
 def _hough_axes(binary: "np.ndarray") -> "tuple[float, float] | None":
-    """Return (angle1_deg, angle2_deg) — the two dominant line directions, or None.
+    """Return (angle1_deg, angle2_deg) via probabilistic Hough line segments.
+
+    Kept as a fallback — see ``_sobel_axes`` for the preferred approach.
 
     Angles are in [0, 180).  The two peaks are found independently in the
     full unfolded histogram so that genuinely non-perpendicular axes (shear)
@@ -838,7 +885,7 @@ def _detect_barcode_corners(frame: "np.ndarray") -> "np.ndarray | None":
     cy_c, cx_c = white.mean(axis=0)
     cx_c, cy_c = float(cx_c), float(cy_c)
 
-    axes = _hough_axes(binary)
+    axes = _sobel_axes(norm)
     if axes is None:
         return None
 
@@ -948,12 +995,9 @@ def _timing_strip_ok(warped: "np.ndarray", cell_px: int) -> bool:
     rejects non-barcode images that accidentally produce a valid perspective
     warp.  Requires ≥5 of 7 adjacent cell pairs to differ (tolerates noise).
     """
-    import numpy as np
-    gray = np.mean(warped, axis=2)
-    half = cell_px // 2
-
     def bright(r: int, c: int) -> bool:
-        return float(gray[r * cell_px + half, c * cell_px + half]) > 127.0
+        sr, sg, sb = _sample_cell_rgb(warped, r, c, cell_px)
+        return (sr + sg + sb) / 3 > 127.0
 
     row0 = [bright(0, c) for c in range(8)]
     col7 = [bright(r, 7) for r in range(8)]

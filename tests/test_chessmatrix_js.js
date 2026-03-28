@@ -333,8 +333,8 @@ for (const shear of [0.1, 0.2]) {
   });
 }
 
-// ── Helper: build a 128×128 RGBA image with specific grid cells painted ────
-function makeWarpedCells(entries, N = 128, defaultVal = 0) {
+// ── Helper: build a WARP_SIZE×WARP_SIZE RGBA image with specific grid cells painted
+function makeWarpedCells(entries, N = scanner._WARP_SIZE, defaultVal = 0) {
   // entries: array of [[row, col], brightness]  (brightness 0–255, painted as gray)
   const cellPx = N / 8;
   const half   = Math.floor(cellPx / 2);
@@ -362,14 +362,14 @@ function makeWarpedCells(entries, N = 128, defaultVal = 0) {
 console.log('\nTiming-strip guard — adversarial');
 
 test('timing_strip_ok_rejects_uniform_gray', () => {
-  const flat = new Uint8Array(128 * 128 * 4);
+  const flat = new Uint8Array(scanner._WARP_SIZE * scanner._WARP_SIZE * 4);
   for (let i = 0; i < 128*128*4; i += 4) { flat[i]=128; flat[i+1]=128; flat[i+2]=128; flat[i+3]=255; }
-  assert(!scanner._timingStripOk(flat, 128), 'uniform gray should be rejected');
+  assert(!scanner._timingStripOk(flat, scanner._WARP_SIZE), 'uniform gray should be rejected');
 });
 
 test('timing_strip_ok_rejects_solid_white', () => {
-  const white = new Uint8Array(128 * 128 * 4).fill(255);
-  assert(!scanner._timingStripOk(white, 128), 'solid white should be rejected');
+  const white = new Uint8Array(scanner._WARP_SIZE * scanner._WARP_SIZE * 4).fill(255);
+  assert(!scanner._timingStripOk(white, scanner._WARP_SIZE), 'solid white should be rejected');
 });
 
 test('timing_strip_ok_accepts_real_barcode', () => {
@@ -388,7 +388,7 @@ test('timing_strip_ok_col7_solid_rejects', () => {
   const entries = [];
   for (let c = 0; c < 8; c++) entries.push([[0, c], c % 2 === 0 ? 255 : 0]);
   for (let r = 0; r < 8; r++) entries.push([[r, 7], 128]);
-  assert(!scanner._timingStripOk(makeWarpedCells(entries), 128), 'solid col 7 should reject');
+  assert(!scanner._timingStripOk(makeWarpedCells(entries), scanner._WARP_SIZE), 'solid col 7 should reject');
 });
 
 test('timing_strip_ok_row0_solid_rejects', () => {
@@ -396,7 +396,7 @@ test('timing_strip_ok_row0_solid_rejects', () => {
   const entries = [];
   for (let r = 0; r < 8; r++) entries.push([[r, 7], r % 2 === 0 ? 255 : 0]);
   for (let c = 0; c < 8; c++) entries.push([[0, c], 128]);
-  assert(!scanner._timingStripOk(makeWarpedCells(entries), 128), 'solid row 0 should reject');
+  assert(!scanner._timingStripOk(makeWarpedCells(entries), scanner._WARP_SIZE), 'solid row 0 should reject');
 });
 
 test('timing_strip_ok_below_threshold', () => {
@@ -406,7 +406,7 @@ test('timing_strip_ok_below_threshold', () => {
   const entries = [];
   for (let c = 0; c < 8; c++) entries.push([[0, c], c % 2 === 0 ? 255 : 0]);
   for (let r = 0; r < 8; r++) entries.push([[r, 7], col7vals[r]]);
-  assert(!scanner._timingStripOk(makeWarpedCells(entries), 128), 'below-threshold strip should reject');
+  assert(!scanner._timingStripOk(makeWarpedCells(entries), scanner._WARP_SIZE), 'below-threshold strip should reject');
 });
 
 test('timing_strip_ok_at_threshold', () => {
@@ -415,14 +415,45 @@ test('timing_strip_ok_at_threshold', () => {
   const entries = [];
   for (let c = 0; c < 8; c++) entries.push([[0, c], strip[c]]);
   for (let r = 0; r < 8; r++) entries.push([[r, 7], strip[r]]);
-  assert(scanner._timingStripOk(makeWarpedCells(entries), 128), 'at-threshold strip should be accepted');
+  assert(scanner._timingStripOk(makeWarpedCells(entries), scanner._WARP_SIZE), 'at-threshold strip should be accepted');
 });
 
 test('timing_strip_blocks_all_zero_decode', () => {
   // All-black warped → timing strip fails (AAAAAA false-positive regression).
   // Without the guard, all cells classify as K(0) → 32 zero dibits → false "AAAAAA".
-  const allBlack = new Uint8Array(128 * 128 * 4); // all zeros → alpha=0 too, but RGB=0
-  assert(!scanner._timingStripOk(allBlack, 128), 'all-black warped should be rejected');
+  const allBlack = new Uint8Array(scanner._WARP_SIZE * scanner._WARP_SIZE * 4); // all zeros → alpha=0 too, but RGB=0
+  assert(!scanner._timingStripOk(allBlack, scanner._WARP_SIZE), 'all-black warped should be rejected');
+});
+
+test('timing_strip_ok_survives_corrupted_center_pixels', () => {
+  // A valid barcode's timing strips must still pass even when the center pixel
+  // of several strip cells is corrupted.  Regression test: timingStripOk used
+  // to sample a single center pixel — noise there would flip bright/dark and
+  // break the alternation check, rejecting a valid barcode.
+  const N = scanner._WARP_SIZE;
+  const cell = N / 8;
+  const oriented = makeCanonicalOriented('ABCDEF');
+
+  // Corrupt center pixel of every timing strip cell in row 0 and col 7
+  for (let c = 0; c < 8; c++) {
+    const cx = Math.round(c * cell + cell / 2);
+    const cy = Math.round(0 * cell + cell / 2);
+    const i = (cy * N + cx) * 4;
+    oriented[i] = 255 - oriented[i];
+    oriented[i+1] = 255 - oriented[i+1];
+    oriented[i+2] = 255 - oriented[i+2];
+  }
+  for (let r = 0; r < 8; r++) {
+    const cx = Math.round(7 * cell + cell / 2);
+    const cy = Math.round(r * cell + cell / 2);
+    const i = (cy * N + cx) * 4;
+    oriented[i] = 255 - oriented[i];
+    oriented[i+1] = 255 - oriented[i+1];
+    oriented[i+2] = 255 - oriented[i+2];
+  }
+
+  assert(scanner._timingStripOk(oriented, N),
+    'timing strip should survive corrupted center pixels via patch averaging');
 });
 
 test('decode_aaaaaa_real_barcode', () => {
@@ -430,6 +461,74 @@ test('decode_aaaaaa_real_barcode', () => {
   const frame = syntheticFrame('AAAAAA');
   const got = decodeFrame(frame.data, frame.width, frame.height);
   assertEqual(got, 'AAAAAA');
+});
+
+// ── Tests: cell sampling robustness (patch average vs single pixel) ───────
+console.log('\nCell sampling robustness');
+
+// Build a canonical oriented RGBA image (WARP_SIZE × WARP_SIZE) directly,
+// then corrupt the center pixel of several data cells.  calibrateAndDecode
+// must still decode correctly because it samples a 5×5 patch average, not
+// a single pixel.  This is a regression test for the single-pixel bug where
+// noisy center pixels caused misclassification (showed as -1 in debug).
+function makeCanonicalOriented(code) {
+  const N = scanner._WARP_SIZE;
+  const cell = N / 8;
+  const colorGrid = encodeChessMatrix(code);
+  const rgba = new Uint8Array(N * N * 4);
+  for (let r = 0; r < 8; r++) {
+    for (let c = 0; c < 8; c++) {
+      const [rv, gv, bv] = colorGrid[r][c];
+      for (let dy = 0; dy < cell; dy++) {
+        for (let dx = 0; dx < cell; dx++) {
+          const py = r * cell + dy;
+          const px = c * cell + dx;
+          const i = (py * N + px) * 4;
+          rgba[i] = rv; rgba[i+1] = gv; rgba[i+2] = bv; rgba[i+3] = 255;
+        }
+      }
+    }
+  }
+  return rgba;
+}
+
+test('calibrateAndDecode_survives_corrupted_center_pixels', () => {
+  const N = scanner._WARP_SIZE;
+  const cell = N / 8;
+  const oriented = makeCanonicalOriented('ABCDEF');
+
+  // Corrupt the exact center pixel of the first 8 data cells to white (255)
+  // — single-pixel sampling would classify these as WHITE → clamped to BLACK → wrong dibit
+  for (let di = 0; di < 8 && di < DATA_CELLS.length; di++) {
+    const [r, c] = DATA_CELLS[di];
+    const cx = Math.round(c * cell + cell / 2);
+    const cy = Math.round(r * cell + cell / 2);
+    const i = (cy * N + cx) * 4;
+    oriented[i] = 255; oriented[i+1] = 255; oriented[i+2] = 255;
+  }
+
+  const result = scanner._calibrateAndDecode(oriented, N);
+  assertEqual(result, 'ABCDEF');
+});
+
+test('calibrateAndDecode_survives_salt_pepper_at_centers', () => {
+  const N = scanner._WARP_SIZE;
+  const cell = N / 8;
+  const oriented = makeCanonicalOriented('XKCDQR');
+
+  // Salt-and-pepper: flip center pixel of every data cell to its opposite
+  for (const [r, c] of DATA_CELLS) {
+    const cx = Math.round(c * cell + cell / 2);
+    const cy = Math.round(r * cell + cell / 2);
+    const i = (cy * N + cx) * 4;
+    // Invert the center pixel
+    oriented[i] = 255 - oriented[i];
+    oriented[i+1] = 255 - oriented[i+1];
+    oriented[i+2] = 255 - oriented[i+2];
+  }
+
+  const result = scanner._calibrateAndDecode(oriented, N);
+  assertEqual(result, 'XKCDQR');
 });
 
 // ── Summary ────────────────────────────────────────────────────────────────

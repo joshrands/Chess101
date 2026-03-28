@@ -96,6 +96,9 @@ node tests/test_sim_js.js --verbose
 # Lockstep fuzzers — standalone, save disagreements to harness/crashes/:
 .venv/bin/python harness/fuzz_chessmatrix.py --iterations 1000
 .venv/bin/python harness/fuzz_networked.py --iterations 100
+
+# Replay a fuzzer crash through both decoders with debug output:
+.venv/bin/python harness/replay_crash.py harness/crashes/chessmatrix/disagree_000042_ABCDEF.png --stages
 ```
 
 `conftest.py` stubs out `rgbmatrix` and `smbus` so all test files run on Mac without Pi hardware.
@@ -155,6 +158,9 @@ bazel test //tests:test_lockstep_networked
 bazel run //harness:fuzz_chessmatrix -- --iterations 1000
 bazel run //harness:fuzz_chess -- --iterations 100
 bazel run //harness:fuzz_networked -- --iterations 100
+
+# Replay a fuzzer crash image through both decoders:
+bazel run //harness:replay_crash -- "$PWD/path/to/crash.png" --stages
 
 # Regenerate BUILD files after adding/removing Python files or imports:
 bazel run //:gazelle
@@ -292,6 +298,7 @@ Chess101/
 │   ├── fuzz_chessmatrix.py     # ChessMatrix lockstep fuzzer (standalone)
 │   ├── fuzz_chess.py           # Chess engine lockstep fuzzer (standalone)
 │   ├── fuzz_networked.py      # Three-way networked lockstep fuzzer (standalone)
+│   ├── replay_crash.py         # Replay a crash PNG through both decoders with debug stages
 │   └── BUGS.md                # Fuzz testing bug report
 │
 ├── plans/multiplayer/      # Design docs for all multiplayer phases

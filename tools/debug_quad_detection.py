@@ -65,37 +65,7 @@ def _render_centroid(frame, pipeline):
     return out
 
 
-def _hough_axes(binary):
-    """Find the two dominant line directions via Hough lines.
-
-    Angles are in [0, 180).  Peaks are found in the full unfolded histogram so
-    that sheared axes (not 90° apart) are detected correctly.  After finding
-    a1 (the global peak) its ±15° neighbourhood is suppressed and a2 is the
-    next largest peak.
-
-    Returns (angle1_deg, angle2_deg) or None if no lines found.
-    """
-    h, w = binary.shape
-    k = max(3, min(int(min(h, w) * 0.015), 15)) | 1
-    smoothed = cv2.boxFilter(binary, -1, (k, k))
-    edges = cv2.Canny(smoothed, 30, 100)
-    lines = cv2.HoughLinesP(edges, rho=1, theta=np.pi/180,
-                             threshold=20, minLineLength=10, maxLineGap=5)
-    if lines is None:
-        return None
-
-    hist = np.zeros(180, dtype=np.float32)
-    for x1, y1, x2, y2 in lines[:, 0]:
-        angle = np.degrees(np.arctan2(y2 - y1, x2 - x1)) % 180
-        hist[int(angle)] += np.hypot(x2 - x1, y2 - y1)   # weight by length
-
-    # Find two dominant peaks in [0,180) without folding
-    a1 = int(np.argmax(hist))
-    suppressed = hist.copy()
-    for d in range(-15, 16):
-        suppressed[(a1 + d) % 180] = 0
-    a2 = int(np.argmax(suppressed))
-    return float(a1), float(a2)
+from network.chessmatrix import _sobel_axes
 
 
 def _render_hough(frame, pipeline):
@@ -111,7 +81,7 @@ def _render_hough(frame, pipeline):
                     cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 220), 1)
         return out
 
-    axes = _hough_axes(pipeline["binary"])
+    axes = _sobel_axes(pipeline["norm"])
     if axes is None:
         cv2.putText(out, "no lines found", (6, h_img - 8),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 220), 1)
@@ -172,7 +142,7 @@ def _render_oriented_inflate(frame, pipeline):
                     cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 220), 1)
         return out
 
-    axes = _hough_axes(pipeline["binary"])
+    axes = _sobel_axes(pipeline["norm"])
     if axes is None:
         cv2.putText(out, "no hough lines", (6, h_img - 8),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 220), 1)
@@ -218,7 +188,7 @@ def _get_oriented_corners(pipeline):
     c = pipeline["centroid"]
     if c is None:
         return None
-    axes = _hough_axes(pipeline["binary"])
+    axes = _sobel_axes(pipeline["norm"])
     if axes is None:
         return None
 
