@@ -81,6 +81,7 @@ The `relay_url` fixture (in `conftest.py`) selects the mode automatically: `RELA
 | `test_chessmatrix_scanning.py` | ChessMatrix scanner: all pipeline stages + E2E (Python) | 1159 |
 | `test_chessmatrix_pipeline.py` | ChessMatrix pipeline via OpenCV debug tools | 190 |
 | `test_chessmatrix_js.js` | ChessMatrix scanner (JavaScript / Node.js) | 442 |
+| `test_lockstep_chessmatrix.py` | Python↔JS ChessMatrix lockstep: both decoders must agree on every frame | 193 |
 | `test_sim_js.js` | Web sim logic: ping/pong, AI gating, color pick guards, render (JS) | ~360 |
 
 ---
@@ -360,6 +361,32 @@ node tests/test_chessmatrix_js.js --verbose  # per-test output
 
 Covers the same pipeline stages as the Python scanner: synthetic clean frames, rotation, perspective, noise, and real-photo fixtures. Also includes a **timing-strip guard** section with the same adversarial unit tests as the Python suite (uniform gray/white rejected, both strips required independently, below/at threshold boundary cases, AAAAAA false-positive regression, real AAAAAA decodes correctly).
 
+### `test_lockstep_chessmatrix.py` — Python↔JS ChessMatrix lockstep
+
+Feeds identical synthetic and real-photo frames to both the Python (`network.chessmatrix.decode_frame`) and JavaScript (`web/chessmatrix-scanner.js::decodeFrame`) decoders and asserts they always agree — including both returning None/null.
+
+Uses a persistent `JsBridge` subprocess (`harness/python_bridge.py` → `harness/js_bridge.js`) for cross-language calls. Converts between BGR numpy (Python) and RGBA bytes (JS) automatically.
+
+| Class | What it verifies |
+|---|---|
+| `TestCleanPadded` | 5 room codes × 3 cell sizes — clean synthetic images |
+| `TestRotated` | 2 codes × 7 rotation angles (15° – 270°) |
+| `TestNoise` | 2 codes × 3 noise levels (sigma 10–30) |
+| `TestPhotometric` | Brightness (1.4×) and darkness (0.5×) variations |
+| `TestFixtures` | All `.png` files in `tests/fixtures/chessmatrix/` (auto-discovered) |
+
+Related: `harness/fuzz_chessmatrix.py` is a standalone fuzzer that generates random mutated frames (rotation, noise, perspective, brightness, salt-pepper) and saves disagreements to `harness/crashes/chessmatrix/`.
+
+```bash
+# Run lockstep tests:
+bazel test //tests:test_lockstep_chessmatrix
+
+# Run the fuzzer (1000 iterations by default):
+bazel run //harness:fuzz_chessmatrix -- --iterations 1000
+```
+
+---
+
 ### `test_sim_js.js` — Web sim logic regression tests (JavaScript)
 
 Node.js test runner for game logic extracted from `web/sim.html`. Uses `vm` module to evaluate the sim's script blocks in a sandboxed context with mocked DOM/browser APIs.
@@ -396,6 +423,7 @@ node tests/test_sim_js.js --verbose  # per-test output
 | `web/chessmatrix-scanner.js` | `test_chessmatrix_js.js` |
 | `web/sim.html` (game logic) | `test_sim_js.js` |
 | Full online flow | `test_online_flow.py` |
+| Python↔JS parity (ChessMatrix) | `test_lockstep_chessmatrix.py` |
 
 **Minimal piece test pattern:**
 

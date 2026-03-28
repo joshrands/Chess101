@@ -1,0 +1,38 @@
+load("@rules_python//python:defs.bzl", "py_binary", "py_library")
+
+py_library(
+    name = "harness",
+    srcs = ["__init__.py"],
+    visibility = ["//:__subpackages__"],
+)
+
+py_library(
+    name = "python_bridge",
+    srcs = ["python_bridge.py"],
+    data = [
+        "js_bridge.js",
+        "//web:chessmatrix_scanner_js",
+    ],
+    visibility = ["//:__subpackages__"],
+)
+
+py_binary(
+    name = "fuzz_chessmatrix",
+    srcs = ["fuzz_chessmatrix.py"],
+    data = [
+        "js_bridge.js",
+        "//web:chessmatrix_scanner_js",
+    ],
+    deps = [
+        ":python_bridge",
+        "//network",
+        "@pip//numpy",
+        "@pip//opencv_python",
+    ],
+)
+
+filegroup(
+    name = "js_bridge",
+    srcs = ["js_bridge.js"],
+    visibility = ["//:__subpackages__"],
+)

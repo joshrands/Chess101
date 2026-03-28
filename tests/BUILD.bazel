@@ -93,6 +93,24 @@ py_test(
 )
 
 py_test(
+    name = "test_lockstep_chessmatrix",
+    srcs = ["test_lockstep_chessmatrix.py"],
+    data = [
+        ":chessmatrix_fixtures",
+        "//harness:js_bridge",
+        "//web:chessmatrix_scanner_js",
+    ],
+    deps = [
+        ":conftest",
+        "//harness:python_bridge",
+        "//network",
+        "@pip//numpy",
+        "@pip//opencv_python",
+        "@pip//pytest",
+    ],
+)
+
+py_test(
     name = "test_chessmatrix_scanning",
     srcs = ["test_chessmatrix_scanning.py"],
     data = [":chessmatrix_fixtures"],

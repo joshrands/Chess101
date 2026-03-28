@@ -66,6 +66,7 @@ sudo python3 GameManager.py --join 192.168.1.42
 .venv/bin/python -m pytest tests/test_online_flow.py -v         # E2E online flow: handshake → color-pick → war-games → playing
 .venv/bin/python -m pytest tests/test_relay.py -v               # relay server tests (see below)
 .venv/bin/python -m pytest tests/test_chessmatrix_scanning.py -v  # ChessMatrix barcode scanner + board-entry helpers (grid_from_cell_state, render_beam_frame)
+.venv/bin/python -m pytest tests/test_lockstep_chessmatrix.py -v # Python↔JS ChessMatrix lockstep parity
 
 # JS scanner — runs under Node.js, no npm install needed:
 node tests/test_chessmatrix_js.js
@@ -74,6 +75,9 @@ node tests/test_chessmatrix_js.js --verbose
 # JS sim logic — regression tests for web/sim.html game logic:
 node tests/test_sim_js.js
 node tests/test_sim_js.js --verbose
+
+# Lockstep fuzzer — standalone, saves disagreements to harness/crashes/:
+.venv/bin/python harness/fuzz_chessmatrix.py --iterations 1000
 ```
 
 `conftest.py` stubs out `rgbmatrix` and `smbus` so all test files run on Mac without Pi hardware.
@@ -125,6 +129,10 @@ bazel test //tests/...
 # Run a specific test:
 bazel test //tests:test_board
 bazel test //tests:test_chessmatrix_js
+bazel test //tests:test_lockstep_chessmatrix
+
+# Run the lockstep fuzzer:
+bazel run //harness:fuzz_chessmatrix -- --iterations 1000
 
 # Regenerate BUILD files after adding/removing Python files or imports:
 bazel run //:gazelle
@@ -148,6 +156,7 @@ bazel build //...
 **Pre-seeded BUILD files** (Gazelle can't auto-generate these):
 - `hardware/BUILD` — Pi-only deps (`smbus`, `RPi.GPIO`) that aren't pip-installable
 - `tools/BUILD` — Debug tools with self-referential imports
+- `harness/BUILD.bazel` — Lockstep testing harness (JS bridge data deps, fuzzer binary)
 
 ## Keeping test documentation current
 
@@ -253,6 +262,11 @@ Chess101/
 │   ├── debug_quad_detection.py  # Python: renders pipeline stages to PNG for every fixture
 │   └── pipeline_debug.html      # Browser: interactive step-by-step JS pipeline debugger
 │
+├── harness/
+│   ├── js_bridge.js            # Node.js stdio bridge for lockstep testing
+│   ├── python_bridge.py        # JsBridge Python wrapper class
+���   └── fuzz_chessmatrix.py     # ChessMatrix lockstep fuzzer (standalone)
+│
 ├── plans/multiplayer/      # Design docs for all multiplayer phases
 │   ├── README.md           # Overview, 7 modes, 3-phase roadmap
 │   ├── protocol.md         # Full wire protocol spec (all message types + board hash)
@@ -272,6 +286,7 @@ Chess101/
     ├── test_online_flow.py          # E2E online flow over in-process relay (handshake → playing)
     ├── test_relay.py                # Relay server protocol, reconnect, and anti-cheat tests
     ├── test_chessmatrix_scanning.py # ChessMatrix scanning pipeline (Python) + board-entry helpers
+    ├── test_lockstep_chessmatrix.py # Python↔JS ChessMatrix lockstep parity
     ├── test_chessmatrix_js.js       # ChessMatrix scanning pipeline (Node.js)
     ├── test_sim_js.js              # Web sim logic regression tests (Node.js)
     └── fixtures/chessmatrix/        # PNG fixtures: real phone photos + synthetics
