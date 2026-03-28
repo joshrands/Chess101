@@ -2,6 +2,21 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Shell Commands
+
+**Never `cd` into the project root** — the working directory is already set to the project root. Use paths relative to the root (or absolute paths) directly.
+
+**Always use Bazel for testing.** Run `bazel test //tests/...` for the full suite. For a single test with verbose pytest output:
+```bash
+bazel test //tests:test_board --test_output=streamed --test_arg=-v
+```
+
+**Always run Gazelle** after adding/removing Python files or changing imports:
+```bash
+bazel run //:gazelle
+```
+Review the diff before committing — Gazelle may incorrectly expand pre-seeded BUILD files (e.g., `Chess101` library, `hardware/BUILD`). Revert those changes and only keep valid additions.
+
 ## Overview
 
 Chess101 is a physical chess board running on a Raspberry Pi. An 8×8 RGB LED matrix displays the board, eight Arduinos connected via I2C detect piece positions using reed switches (one Arduino per row), and Python implements chess logic with an optional alpha-beta AI opponent.
@@ -67,6 +82,7 @@ sudo python3 GameManager.py --join 192.168.1.42
 .venv/bin/python -m pytest tests/test_relay.py -v               # relay server tests (see below)
 .venv/bin/python -m pytest tests/test_chessmatrix_scanning.py -v  # ChessMatrix barcode scanner + board-entry helpers (grid_from_cell_state, render_beam_frame)
 .venv/bin/python -m pytest tests/test_lockstep_chessmatrix.py -v # Python↔JS ChessMatrix lockstep parity
+.venv/bin/python -m pytest tests/test_lockstep_chess.py -v       # Python↔JS chess engine lockstep parity
 
 # JS scanner — runs under Node.js, no npm install needed:
 node tests/test_chessmatrix_js.js
@@ -130,9 +146,11 @@ bazel test //tests/...
 bazel test //tests:test_board
 bazel test //tests:test_chessmatrix_js
 bazel test //tests:test_lockstep_chessmatrix
+bazel test //tests:test_lockstep_chess
 
-# Run the lockstep fuzzer:
+# Run the lockstep fuzzers:
 bazel run //harness:fuzz_chessmatrix -- --iterations 1000
+bazel run //harness:fuzz_chess -- --iterations 100
 
 # Regenerate BUILD files after adding/removing Python files or imports:
 bazel run //:gazelle
@@ -254,6 +272,7 @@ Chess101/
 │   └── sensor.py           # SimSensor(BoardSensor) — click-driven, no I2C
 │
 ├── web/
+│   ├── chess-engine.js         # Extracted JS chess engine (Node.js-importable)
 │   ├── sim.html            # Simulator web UI
 │   ├── spectator.html      # Spectator web UI
 │   └── chessmatrix-scanner.js  # Browser/Node.js ChessMatrix decoder (no dependencies)
@@ -265,7 +284,8 @@ Chess101/
 ├── harness/
 │   ├── js_bridge.js            # Node.js stdio bridge for lockstep testing
 │   ├── python_bridge.py        # JsBridge Python wrapper class
-���   └── fuzz_chessmatrix.py     # ChessMatrix lockstep fuzzer (standalone)
+│   ├── fuzz_chessmatrix.py     # ChessMatrix lockstep fuzzer (standalone)
+│   └── fuzz_chess.py           # Chess engine lockstep fuzzer (standalone)
 │
 ├── plans/multiplayer/      # Design docs for all multiplayer phases
 │   ├── README.md           # Overview, 7 modes, 3-phase roadmap
@@ -287,6 +307,7 @@ Chess101/
     ├── test_relay.py                # Relay server protocol, reconnect, and anti-cheat tests
     ├── test_chessmatrix_scanning.py # ChessMatrix scanning pipeline (Python) + board-entry helpers
     ├── test_lockstep_chessmatrix.py # Python↔JS ChessMatrix lockstep parity
+    ├── test_lockstep_chess.py       # Python↔JS chess engine lockstep parity
     ├── test_chessmatrix_js.js       # ChessMatrix scanning pipeline (Node.js)
     ├── test_sim_js.js              # Web sim logic regression tests (Node.js)
     └── fixtures/chessmatrix/        # PNG fixtures: real phone photos + synthetics

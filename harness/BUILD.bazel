@@ -1,5 +1,7 @@
 load("@rules_python//python:defs.bzl", "py_binary", "py_library")
 
+# gazelle:ignore
+
 py_library(
     name = "harness",
     srcs = ["__init__.py"],
@@ -11,6 +13,7 @@ py_library(
     srcs = ["python_bridge.py"],
     data = [
         "js_bridge.js",
+        "//web:chess_engine_js",
         "//web:chessmatrix_scanner_js",
     ],
     visibility = ["//:__subpackages__"],
@@ -28,6 +31,22 @@ py_binary(
         "//network",
         "@pip//numpy",
         "@pip//opencv_python",
+    ],
+)
+
+py_binary(
+    name = "fuzz_chess",
+    srcs = ["fuzz_chess.py"],
+    data = [
+        "js_bridge.js",
+        "//web:chess_engine_js",
+        "//web:chessmatrix_scanner_js",
+    ],
+    deps = [
+        ":python_bridge",
+        "//core",
+        "//network",
+        "//pieces",
     ],
 )
 

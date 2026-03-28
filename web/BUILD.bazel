@@ -5,6 +5,12 @@ filegroup(
 )
 
 filegroup(
+    name = "chess_engine_js",
+    srcs = ["chess-engine.js"],
+    visibility = ["//visibility:public"],
+)
+
+filegroup(
     name = "sim_html",
     srcs = ["sim.html"],
     visibility = ["//visibility:public"],

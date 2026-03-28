@@ -85,6 +85,7 @@ The `relay_url` fixture (in `conftest.py`) selects the mode automatically: `RELA
 | `test_chessmatrix_pipeline.py` | ChessMatrix pipeline via OpenCV debug tools | 190 |
 | `test_chessmatrix_js.js` | ChessMatrix scanner (JavaScript / Node.js) | 442 |
 | `test_lockstep_chessmatrix.py` | Python↔JS ChessMatrix lockstep: both decoders must agree on every frame | 193 |
+| `test_lockstep_chess.py` | Python↔JS chess engine lockstep: legal moves + board hash parity | ~340 |
 | `test_sim_js.js` | Web sim logic: ping/pong, AI gating, color pick guards, render (JS) | ~360 |
 | `test_simulator_extras.py` | SimSensor, FakeRGBMatrix, FakeFrameCanvas unit tests | ~110 |
 | `test_python_bridge.py` | JsBridge subprocess error paths (mocked) | ~90 |
@@ -393,6 +394,27 @@ bazel run //harness:fuzz_chessmatrix -- --iterations 1000
 
 ---
 
+### `test_lockstep_chess.py` — Python↔JS chess engine lockstep
+
+Plays random games from the starting position, comparing legal move sets and board hashes at each step between the Python engine (`pieces/*.py`) and the JS engine (`web/chess-engine.js`).
+
+Uses the same `JsBridge` subprocess as the ChessMatrix lockstep tests. Grid state is serialized to JSON for cross-language comparison.
+
+| Class | What it verifies |
+|---|---|
+| `TestBoardHashParity` | board_hash identical on both sides for starting position and after e4 |
+| `TestLegalMovesParity` | Legal move sets agree at starting position for both teams |
+| `TestRandomGames` | 10 seeded random games (80 plies each): legal moves + board hashes agree at every step |
+
+Related: `harness/fuzz_chess.py` is a standalone fuzzer that plays random games and saves disagreements with full move history to `harness/crashes/chess/`.
+
+```bash
+bazel test //tests:test_lockstep_chess
+bazel run //harness:fuzz_chess -- --iterations 100
+```
+
+---
+
 ### `test_sim_js.js` — Web sim logic regression tests (JavaScript)
 
 Node.js test runner for game logic extracted from `web/sim.html`. Uses `vm` module to evaluate the sim's script blocks in a sandboxed context with mocked DOM/browser APIs.
@@ -474,6 +496,7 @@ Unit tests for `network/validator.py` that target guard conditions and special m
 | `web/sim.html` (game logic) | `test_sim_js.js` |
 | Full online flow | `test_online_flow.py` |
 | Python↔JS parity (ChessMatrix) | `test_lockstep_chessmatrix.py` |
+| Python↔JS parity (chess engine) | `test_lockstep_chess.py` |
 
 **Minimal piece test pattern:**
 

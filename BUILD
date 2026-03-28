@@ -56,6 +56,10 @@ load("@rules_python//python:defs.bzl", "py_binary", "py_library")
 # gazelle:resolve py debug_quad_detection._color_calibrate_image //tools
 # gazelle:resolve py debug_quad_detection.decode_oriented //tools
 
+# ── Harness resolves (sys.path-based imports in fuzzer scripts) ──────────────
+# gazelle:resolve py python_bridge //harness:python_bridge
+# gazelle:resolve py python_bridge.JsBridge //harness:python_bridge
+
 # ── Internal cross-package resolves ──────────────────────────────────────────
 # gazelle:resolve py hardware //hardware
 # gazelle:resolve py hardware.master //hardware
