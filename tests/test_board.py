@@ -291,6 +291,27 @@ class TestCheckThreefoldRepetition:
         assert len(double) == 0
         assert len(days) == 2  # new distinct state added
 
+    def test_double_jeopardy_mismatch_does_not_trigger(self, board_instance):
+        # double_jeopardy has one state that does NOT match the current board.
+        # This covers lines 99-100 (second_match=False; break inner col loop)
+        # and line 102 (break outer row loop) in game/rules.py.
+        b = board_instance
+        b.peace_time = 1
+
+        # double_jeopardy state has a rook at (3,3)
+        mismatch_state = [[None] * 8 for _ in range(8)]
+        mismatch_state[3][3] = Rook(3, 3, b.team_r)
+
+        # current board is entirely empty — no match
+        current = [[None] * 8 for _ in range(8)]
+
+        days = []
+        double = [mismatch_state]
+        result = self._call(b, b.team_r, current, days, double)
+        assert result is False
+        # mismatch in double → falls through to first_match check → added to days
+        assert len(days) == 1
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # light_cell()

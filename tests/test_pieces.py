@@ -392,6 +392,41 @@ class TestPawn:
         value = pawn.get_value(board)
         assert value > 5
 
+    def test_print_piece(self, capsys):
+        tr, _ = self._teams()
+        pawn = Pawn(2, 5, tr)
+        pawn.print_piece()
+        out = capsys.readouterr().out
+        assert "2" in out and "5" in out
+
+    def test_skyfall_allows_en_passant_capturing_checker(self):
+        # When the en passant capture resolves check (the captured pawn IS the
+        # checking piece), sky_fall must include the en passant destination.
+        # Covers line 151 in pieces/pawn.py.
+        tr, tl = self._teams()
+        pawn = Pawn(1, 4, tr)
+        pawn.row = 4
+        enemy_pawn = Pawn(6, 3, tl)
+        enemy_pawn.row = 4
+        enemy_pawn.en_passantable = True
+        board = empty_board()
+        board[4][4] = pawn
+        board[4][3] = enemy_pawn
+        pawn.calc_targets(board)
+
+        # en passant destination is (5, 3); captured pawn sits at (4, 3)
+        assert any(t.row == 5 and t.col == 3 for t in pawn.targets), \
+            "en passant target should be computed"
+
+        king = King(0, 4, tr)
+        # god_save_the_king includes (4, 3) — the enemy pawn's square.
+        # This means capturing via en passant resolves the check.
+        king.god_save_the_king = [Cell(4, 3)]
+
+        pawn.sky_fall(king)
+        targets = [(c.row, c.col) for c in pawn.targets]
+        assert (5, 3) in targets  # en passant is allowed — it captures the checker
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Bishop
@@ -465,6 +500,13 @@ class TestBishop:
         board[2][2] = bishop
         val = bishop.get_value(board)
         assert val > 15
+
+    def test_print_piece(self, capsys):
+        tr, _ = self._team()
+        bishop = Bishop(1, 6, tr)
+        bishop.print_piece()
+        out = capsys.readouterr().out
+        assert "1" in out and "6" in out
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -557,6 +599,13 @@ class TestRook:
         val = rook.get_value(board)
         assert val > 27
 
+    def test_print_piece(self, capsys):
+        tr, _ = self._teams()
+        rook = Rook(0, 7, tr)
+        rook.print_piece()
+        out = capsys.readouterr().out
+        assert "0" in out and "7" in out
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Knight
@@ -642,6 +691,13 @@ class TestKnight:
         board[3][3] = knight
         assert knight.get_value(board) >= 13
 
+    def test_print_piece(self, capsys):
+        tr, _ = self._teams()
+        knight = Knight(0, 1, tr)
+        knight.print_piece()
+        out = capsys.readouterr().out
+        assert "0" in out and "1" in out
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Queen
@@ -696,3 +752,10 @@ class TestQueen:
         board = empty_board()
         board[3][3] = queen
         assert queen.get_value(board) >= 49
+
+    def test_print_piece(self, capsys):
+        tr, _ = self._teams()
+        queen = Queen(7, 3, tr)
+        queen.print_piece()
+        out = capsys.readouterr().out
+        assert "7" in out and "3" in out

@@ -335,6 +335,24 @@ class TestFindAttacker:
         assert ally_rook.critical is True, \
             "Pinned rook must be critical even when king is simultaneously in check"
 
+    def test_diagonal_pin_by_bishop_marks_friendly_critical(self):
+        # Covers am_i_gonna_die lines 271-274: diagonal branch where a friendly
+        # piece is between the king and an enemy Bishop/Queen.
+        #
+        # Setup: king at (4,4), ally rook at (3,3), enemy bishop at (2,2).
+        # Direction (-1,-1): _i_spy encounters friendly rook first (scout),
+        # then continues and finds enemy bishop → PIN → rook.critical = True.
+        tr, tl, king, board = self._setup()
+        ally_rook = Rook(3, 3, tr)
+        enemy_bishop = Bishop(2, 2, tl)
+        board[3][3] = ally_rook
+        board[2][2] = enemy_bishop
+        king.am_i_gonna_die(board)
+        assert ally_rook.critical is True, \
+            "Rook pinned diagonally by bishop must be marked critical"
+        assert len(ally_rook.critical_targets) > 0, \
+            "Pinned rook must have critical_targets set"
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # determine_direction_from_enemy_towards_king (float-return bug)
@@ -528,6 +546,21 @@ class TestCastling:
         king.move(5, 4, board)
         assert king.touched is True
 
+    def test_queenside_castle_destination_in_check_removes_castle(self):
+        # Covers king.py line 135: castle_left is set True, then the simulated
+        # position at the castled square is in check → castle_left = False.
+        #
+        # Enemy rook at (7,2) threatens col 2 only — the king's current square
+        # (0,4) and step square (0,3) are safe, but the destination (0,2) is not.
+        tr, king, rook_q, rook_k, board = self._setup_clean_castling()
+        tl = Team(255, 140, 0)
+        enemy = Rook(7, 2, tl)
+        board[7][2] = enemy
+        king.calc_targets(board)
+        targets = [(c.row, c.col) for c in king.targets]
+        assert (0, 2) not in targets, \
+            "Queen-side castling must be removed when the destination square is under attack"
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # get_value (tuple-truthy bug)
@@ -556,3 +589,16 @@ class TestKingGetValue:
         board[4][4] = king
         board[4][7] = enemy
         assert king.get_value(board) == 0
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# print_piece
+# ─────────────────────────────────────────────────────────────────────────────
+
+class TestKingPrintPiece:
+    def test_print_piece(self, capsys):
+        tr = Team(64, 180, 232)
+        king = King(3, 6, tr)
+        king.print_piece()
+        out = capsys.readouterr().out
+        assert "3" in out and "6" in out

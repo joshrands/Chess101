@@ -281,3 +281,56 @@ class TestAI:
         best = ai.alpha_beta_search()
         # child_1 leads to higher utility (50 in best subtree leaf)
         assert best is child_1
+
+    def test_max_value_with_non_terminal_node(self):
+        # max_value on a non-terminal node should recurse into min_value on each child.
+        # Covers the non-terminal body of max_value (lines 76-83).
+        tr, tl = self._teams()
+        board = empty_board()
+        board[0][0] = Rook(0, 0, tr)
+        leaf = Tree(board, Cell(0, 0), Cell(1, 0), tr, tl)
+
+        root_board = empty_board()
+        non_terminal = Tree(root_board, None, None, tr, tl)
+        non_terminal.add_child(leaf)
+
+        ai = AI(non_terminal, tr)
+        val = ai.max_value(non_terminal, float('-inf'), float('inf'))
+        # leaf has a rook for team_r → utility > 0
+        assert val > 0
+
+    def test_max_value_beta_pruning(self):
+        # If the first child already beats beta, max_value should return early
+        # (pruning subsequent children).  Covers lines 80-81.
+        tr, tl = self._teams()
+        board_high = empty_board()
+        board_high[0][0] = Queen(0, 0, tr)  # high utility
+        leaf_high = Tree(board_high, Cell(0, 0), Cell(1, 0), tr, tl)
+
+        board_low = empty_board()
+        board_low[0][0] = Pawn(1, 0, tr)
+        board_low[0][0].row = 0
+        leaf_low = Tree(board_low, Cell(0, 1), Cell(1, 1), tr, tl)
+
+        root_board = empty_board()
+        node = Tree(root_board, None, None, tr, tl)
+        node.add_child(leaf_high)
+        node.add_child(leaf_low)
+
+        ai = AI(node, tr)
+        # beta = 0: first child returns value > 0 → triggers beta pruning
+        val = ai.max_value(node, float('-inf'), 0)
+        # Pruned early; value exceeds beta
+        assert val > 0
+
+    def test_get_successors_raises_for_none(self):
+        tr, tl = self._teams()
+        ai = AI(Tree(empty_board(), None, None, tr, tl), tr)
+        with pytest.raises(ValueError):
+            ai.get_successors(None)
+
+    def test_is_terminal_raises_for_none(self):
+        tr, tl = self._teams()
+        ai = AI(Tree(empty_board(), None, None, tr, tl), tr)
+        with pytest.raises(ValueError):
+            ai.is_terminal(None)

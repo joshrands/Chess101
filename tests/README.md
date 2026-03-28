@@ -36,6 +36,9 @@ node tests/test_chessmatrix_js.js --verbose
 | Piece logic | `.venv/bin/python -m pytest tests/test_pieces.py tests/test_king.py -v` |
 | Primitives (Cell, Team, Piece ABC) | `.venv/bin/python -m pytest tests/test_primitives.py -v` |
 | AI / alpha-beta | `.venv/bin/python -m pytest tests/test_ai_tree.py -v` |
+| SimSensor + FakeRGBMatrix | `.venv/bin/python -m pytest tests/test_simulator_extras.py -v` |
+| JsBridge (subprocess mock) | `.venv/bin/python -m pytest tests/test_python_bridge.py -v` |
+| RoomValidator unit tests | `.venv/bin/python -m pytest tests/test_validator_unit.py -v` |
 
 ---
 
@@ -83,6 +86,9 @@ The `relay_url` fixture (in `conftest.py`) selects the mode automatically: `RELA
 | `test_chessmatrix_js.js` | ChessMatrix scanner (JavaScript / Node.js) | 442 |
 | `test_lockstep_chessmatrix.py` | Python↔JS ChessMatrix lockstep: both decoders must agree on every frame | 193 |
 | `test_sim_js.js` | Web sim logic: ping/pong, AI gating, color pick guards, render (JS) | ~360 |
+| `test_simulator_extras.py` | SimSensor, FakeRGBMatrix, FakeFrameCanvas unit tests | ~110 |
+| `test_python_bridge.py` | JsBridge subprocess error paths (mocked) | ~90 |
+| `test_validator_unit.py` | RoomValidator: guards, sky_fall, promotion, castling, en-passant | ~170 |
 
 ---
 
@@ -405,6 +411,47 @@ node tests/test_sim_js.js --verbose  # per-test output
 
 ---
 
+### `test_simulator_extras.py` — SimSensor + FakeRGBMatrix unit tests
+
+Targets the uncovered lines in `simulator/sensor.py` and `simulator/fake_rgbmatrix.py`.
+
+| Class | What it verifies |
+|---|---|
+| `TestSimSensor` | All 64 cells initialised to `EMPTY`; `read_data` is a no-op; `get_cell_state` and `set_state` round-trip correctly |
+| `TestFakeFrameCanvas` | `SetPixel` in-bounds writes without error; out-of-bounds calls are silently ignored; `Clear` fills surface with black |
+| `TestFakeRGBMatrix` | `SwapOnVSync` returns the same canvas; `blit_to_screen` returns early when `_screen` is `None`; `blit_to_screen` calls `screen.blit` when screen is set; `flip` calls both `blit_to_screen` and `pygame.display.flip` |
+
+Uses headless SDL (`SDL_VIDEODRIVER=dummy`) and a module-scoped `pygame.init()` fixture.
+
+---
+
+### `test_python_bridge.py` — JsBridge subprocess mock tests
+
+Covers error paths in `harness/python_bridge.py` using `unittest.mock.patch` on `subprocess.Popen`. No real Node.js process is required.
+
+| Class | What it verifies |
+|---|---|
+| `TestJsBridgeClose` | `close()` calls `stdin.close()`; `__exit__` (context manager) also calls `close()` |
+| `TestJsBridgeCall` | `_call()` raises `RuntimeError("JS bridge died")` when stdout returns an empty line; error message includes stderr content |
+| `TestJsBridgePing` | `ping()` raises `RuntimeError` on an `{"error": ...}` response; returns `result` on success |
+| `TestJsBridgeDecodeFrame` | `decode_frame()` raises `RuntimeError` on an `{"error": ...}` response; returns `None` when result is null |
+
+---
+
+### `test_validator_unit.py` — RoomValidator edge cases
+
+Unit tests for `network/validator.py` that target guard conditions and special move handling not exercised by the integration-level relay tests.
+
+| Class | What it verifies |
+|---|---|
+| `TestValidateAndApplyGuards` | Not-yet-initialized validator allows any move; missing coordinate fields rejected; `_current_team=None` rejected; empty from-square rejected; wrong team's piece rejected; missing king rejected |
+| `TestSkyFallOnCheck` | `sky_fall()` is called for a non-King piece when the king is in check; a move that doesn't resolve check is correctly rejected |
+| `TestApplyPawnPromotion` | A team_r pawn reaching row 7 is replaced with a `Queen` in `_apply()` |
+| `TestApplyCastling` | After queenside castling, king moves to (0,2) and rook moves to (0,3); old rook square is cleared |
+| `TestApplyEnPassant` | After an en-passant capture, the captured pawn is removed from its row (not the capture destination) |
+
+---
+
 ## Adding new tests
 
 **Where to put them:**
@@ -417,8 +464,11 @@ node tests/test_sim_js.js --verbose  # per-test output
 | `game/board.py` | `test_board.py` |
 | `simulator/app.py` (GameRunner) | `test_simulator.py` or `test_gameplay.py` |
 | `simulator/networked_runner.py` | `test_networked_runner.py` |
+| `simulator/sensor.py`, `simulator/fake_rgbmatrix.py` | `test_simulator_extras.py` |
+| `harness/python_bridge.py` | `test_python_bridge.py` |
 | `network/protocol.py`, `server.py`, `client.py`, `discovery.py` | `test_network.py` |
 | `network/relay.py` | `test_relay.py` |
+| `network/validator.py` | `test_validator_unit.py` or `test_relay.py` |
 | `network/chessmatrix.py` | `test_chessmatrix_scanning.py` |
 | `web/chessmatrix-scanner.js` | `test_chessmatrix_js.js` |
 | `web/sim.html` (game logic) | `test_sim_js.js` |

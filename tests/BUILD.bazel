@@ -230,3 +230,37 @@ py_test(
         "@pip//pytest",
     ],
 )
+
+py_test(
+    name = "test_simulator_extras",
+    srcs = ["test_simulator_extras.py"],
+    deps = [
+        ":conftest",
+        "//core",
+        "//simulator",
+        "@pip//pygame",
+        "@pip//pytest",
+    ],
+)
+
+py_test(
+    name = "test_python_bridge",
+    srcs = ["test_python_bridge.py"],
+    deps = [
+        ":conftest",
+        "//harness:python_bridge",
+        "@pip//pytest",
+    ],
+)
+
+py_test(
+    name = "test_validator_unit",
+    srcs = ["test_validator_unit.py"],
+    deps = [
+        ":conftest",
+        "//core",
+        "//network",
+        "//pieces",
+        "@pip//pytest",
+    ],
+)

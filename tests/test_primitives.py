@@ -190,3 +190,42 @@ class TestPieceBase:
         row, col = rook._kingsman(board, 3, 4, 0, 1)
         assert row == -1
         assert col == -1
+
+    # ── print_piece (base class) ──
+
+    def test_print_piece_base_class(self, capsys):
+        # Piece.print_piece is a non-abstract method on the base class.
+        # Rook overrides it, so we call Piece.print_piece directly.
+        from Piece import Piece
+        r = self._rook(2, 5)
+        Piece.print_piece(r)
+        out = capsys.readouterr().out
+        assert "2" in out and "5" in out
+
+    # ── Abstract method bodies ──
+
+    def test_calc_targets_abstract_raises(self):
+        # @abstractmethod methods can have bodies callable via unbound call.
+        from Piece import Piece
+        r = self._rook(0, 0)
+        with pytest.raises(NotImplementedError):
+            Piece.calc_targets(r, self._board())
+
+    def test_get_value_abstract_raises(self):
+        from Piece import Piece
+        r = self._rook(0, 0)
+        with pytest.raises(NotImplementedError):
+            Piece.get_value(r, self._board())
+
+
+# ── Team.set_color ────────────────────────────────────────────────────────────
+
+class TestTeamSetColor:
+    def test_set_color_updates_rgb(self, monkeypatch):
+        t = Team(0, 0, 0)
+        responses = iter(["100", "150", "200"])
+        monkeypatch.setattr("builtins.input", lambda _: next(responses))
+        t.set_color()
+        assert t.r == 100
+        assert t.g == 150
+        assert t.b == 200

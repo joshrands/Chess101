@@ -5,3 +5,8 @@ test --test_output=errors
 # Allow tests to find conftest.py and root-level shims
 build --action_env=SDL_VIDEODRIVER=dummy
 build --action_env=SDL_AUDIODRIVER=dummy
+
+# ── Node.js ──────────────────────────────────────────────────────────────────
+# Pass the host PATH into the sandbox so that `node` (e.g. from Homebrew) is
+# found by sh_test wrappers that exec node directly.
+build --action_env=PATH
