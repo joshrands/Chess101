@@ -44,6 +44,9 @@ function gridFromJson(data, teamR, teamL) {
       p.enPassantLoc = cell.en_passant_loc
         ? new Cell(cell.en_passant_loc[0], cell.en_passant_loc[1]) : null;
     }
+    if (p instanceof King && cell.direction !== undefined) {
+      p.direction = cell.direction;
+    }
     return p;
   }));
 }
@@ -155,6 +158,9 @@ function gridToJson(grid, teamR) {
       obj.direction = p.direction;
       obj.en_passantable = p.enPassantable;
       obj.en_passant_loc = p.enPassantLoc ? [p.enPassantLoc.row, p.enPassantLoc.col] : null;
+    }
+    if (p instanceof King) {
+      obj.direction = p.direction;
     }
     return obj;
   }));

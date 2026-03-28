@@ -114,6 +114,7 @@ def encode_grid(grid: "BoardGrid", team_r: "Team") -> list[list[Optional[dict]]]
         8×8 nested list of dicts or None values.
     """
     from pieces.pawn import Pawn as _Pawn
+    from pieces.king import King as _King
 
     encoded: list[list[Optional[dict]]] = []
     for row in grid:
@@ -131,6 +132,8 @@ def encode_grid(grid: "BoardGrid", team_r: "Team") -> list[list[Optional[dict]]]
                 }
                 if isinstance(piece, _Pawn):
                     d["en_passantable"] = piece.en_passantable
+                    d["direction"] = piece.direction
+                if isinstance(piece, _King):
                     d["direction"] = piece.direction
                 enc_row.append(d)
         encoded.append(enc_row)
@@ -153,6 +156,7 @@ def decode_grid(
         8×8 list of Piece | None.
     """
     from pieces.pawn import Pawn as _Pawn
+    from pieces.king import King as _King
 
     registry = _piece_registry()
     grid: "BoardGrid" = []
@@ -169,6 +173,8 @@ def decode_grid(
                 if isinstance(piece, _Pawn):
                     piece.en_passantable = cell.get("en_passantable", False)
                     piece.direction = cell.get("direction", 1)
+                if isinstance(piece, _King) and "direction" in cell:
+                    piece.direction = cell["direction"]
                 row.append(piece)
         grid.append(row)
     return grid

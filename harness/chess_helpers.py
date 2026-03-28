@@ -72,6 +72,8 @@ def py_grid_to_json(grid: list, team_r: Team) -> list:
                         [p.en_passant_loc.row, p.en_passant_loc.col]
                         if p.en_passant_loc else None
                     )
+                if isinstance(p, King):
+                    obj["direction"] = p.direction
                 json_row.append(obj)
         result.append(json_row)
     return result
@@ -101,6 +103,8 @@ def json_to_py_grid(data: list, team_r: Team, team_l: Team) -> list:
                             cell["en_passant_loc"][0],
                             cell["en_passant_loc"][1],
                         )
+                if isinstance(p, King) and "direction" in cell:
+                    p.direction = cell["direction"]
                 py_row.append(p)
         grid.append(py_row)
     return grid

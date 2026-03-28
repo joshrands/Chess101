@@ -339,6 +339,7 @@ function serializeGrid(grid){
     if(!p)return null;
     const t={type:p.constructor.name,row:p.row,col:p.col,tr:p.team.r,tg:p.team.g,tb:p.team.b,touched:p.touched};
     if(p instanceof Pawn){t.startingRow=p.startingRow;t.direction=p.direction;t.enPassantable=p.enPassantable;t.enPassantLoc=p.enPassantLoc?{row:p.enPassantLoc.row,col:p.enPassantLoc.col}:null;}
+    if(p instanceof King){t.direction=p.direction;}
     return t;
   }));
 }
@@ -348,7 +349,7 @@ function deserializeGrid(data,teamR,teamL){
     const team=p.tr===teamR.r?teamR:teamL;
     let c;
     if(p.type==='Pawn'){c=new Pawn(p.row,p.col,team);c.startingRow=p.startingRow;c.direction=p.direction;c.enPassantable=p.enPassantable;c.enPassantLoc=p.enPassantLoc?new Cell(p.enPassantLoc.row,p.enPassantLoc.col):null;}
-    else if(p.type==='King'){c=new King(p.row,p.col,team);}
+    else if(p.type==='King'){c=new King(p.row,p.col,team);if(p.direction!==undefined)c.direction=p.direction;}
     else if(p.type==='Queen')c=new Queen(p.row,p.col,team);
     else if(p.type==='Rook')c=new Rook(p.row,p.col,team);
     else if(p.type==='Bishop')c=new Bishop(p.row,p.col,team);

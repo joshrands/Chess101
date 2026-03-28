@@ -305,6 +305,25 @@ py_test(
 )
 
 py_test(
+    name = "test_serialization_parity",
+    srcs = ["test_serialization_parity.py"],
+    data = [
+        "//harness:js_bridge",
+        "//web:chess_engine_js",
+        "//web:chessmatrix_scanner_js",
+    ],
+    deps = [
+        ":conftest",
+        "//core",
+        "//harness:chess_helpers",
+        "//harness:python_bridge",
+        "//network",
+        "//pieces",
+        "@pip//pytest",
+    ],
+)
+
+py_test(
     name = "test_corpus_replay",
     srcs = ["test_corpus_replay.py"],
     data = [
