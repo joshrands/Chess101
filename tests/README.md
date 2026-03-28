@@ -86,6 +86,7 @@ The `relay_url` fixture (in `conftest.py`) selects the mode automatically: `RELA
 | `test_chessmatrix_js.js` | ChessMatrix scanner (JavaScript / Node.js) | 442 |
 | `test_lockstep_chessmatrix.py` | Python↔JS ChessMatrix lockstep: both decoders must agree on every frame | 193 |
 | `test_lockstep_chess.py` | Python↔JS chess engine lockstep: legal moves + board hash parity | ~340 |
+| `test_lockstep_networked.py` | Python↔JS↔Spectator three-way lockstep: move application + board sync | ~310 |
 | `test_sim_js.js` | Web sim logic: ping/pong, AI gating, color pick guards, render (JS) | ~360 |
 | `test_simulator_extras.py` | SimSensor, FakeRGBMatrix, FakeFrameCanvas unit tests | ~110 |
 | `test_python_bridge.py` | JsBridge subprocess error paths (mocked) | ~90 |
@@ -415,6 +416,31 @@ bazel run //harness:fuzz_chess -- --iterations 100
 
 ---
 
+### `test_lockstep_networked.py` — Python↔JS↔Spectator three-way lockstep
+
+Plays random games from the starting position, applying each move on all three implementations: the Python chess engine, the JS chess engine (`web/chess-engine.js`), and the JS spectator engine (`web/spectator-engine.js`). After every move, all three grids must agree on piece types and team ownership.
+
+Also tests the `board_sync` path: `encode_grid` on the Python side → `applyGrid` on the JS spectator side → verify the resulting grid matches.
+
+Uses the same `JsBridge` subprocess as the other lockstep tests.
+
+| Class | What it verifies |
+|---|---|
+| `TestSpectatorInit` | Spectator starting position matches Python standard board |
+| `TestSpectatorApplyGrid` | `encode_grid` → spectator `applyGrid` round-trip (starting + mid-game) |
+| `TestSpectatorApplyMove` | Simple pawn move, castling (rook_from/rook_to flags), promotion (is_promotion flag) |
+| `TestSpectatorRandomGames` | 10 seeded games (80 plies): spectator stays in sync; 5 board_sync recovery tests |
+| `TestThreeWayParity` | 5 seeded games: Python engine, JS engine, and JS spectator all agree at every ply |
+
+Related: `harness/fuzz_networked.py` is a standalone three-way fuzzer. `harness/BUGS.md` documents all bugs found by the fuzz testing harness.
+
+```bash
+bazel test //tests:test_lockstep_networked
+bazel run //harness:fuzz_networked -- --iterations 100
+```
+
+---
+
 ### `test_sim_js.js` — Web sim logic regression tests (JavaScript)
 
 Node.js test runner for game logic extracted from `web/sim.html`. Uses `vm` module to evaluate the sim's script blocks in a sandboxed context with mocked DOM/browser APIs.
@@ -497,6 +523,8 @@ Unit tests for `network/validator.py` that target guard conditions and special m
 | Full online flow | `test_online_flow.py` |
 | Python↔JS parity (ChessMatrix) | `test_lockstep_chessmatrix.py` |
 | Python↔JS parity (chess engine) | `test_lockstep_chess.py` |
+| Python↔JS↔Spectator parity | `test_lockstep_networked.py` |
+| `web/spectator-engine.js` | `test_lockstep_networked.py` |
 
 **Minimal piece test pattern:**
 

@@ -83,6 +83,7 @@ sudo python3 GameManager.py --join 192.168.1.42
 .venv/bin/python -m pytest tests/test_chessmatrix_scanning.py -v  # ChessMatrix barcode scanner + board-entry helpers (grid_from_cell_state, render_beam_frame)
 .venv/bin/python -m pytest tests/test_lockstep_chessmatrix.py -v # Python↔JS ChessMatrix lockstep parity
 .venv/bin/python -m pytest tests/test_lockstep_chess.py -v       # Python↔JS chess engine lockstep parity
+.venv/bin/python -m pytest tests/test_lockstep_networked.py -v  # Python↔JS↔Spectator three-way lockstep parity
 
 # JS scanner — runs under Node.js, no npm install needed:
 node tests/test_chessmatrix_js.js
@@ -92,8 +93,9 @@ node tests/test_chessmatrix_js.js --verbose
 node tests/test_sim_js.js
 node tests/test_sim_js.js --verbose
 
-# Lockstep fuzzer — standalone, saves disagreements to harness/crashes/:
+# Lockstep fuzzers — standalone, save disagreements to harness/crashes/:
 .venv/bin/python harness/fuzz_chessmatrix.py --iterations 1000
+.venv/bin/python harness/fuzz_networked.py --iterations 100
 ```
 
 `conftest.py` stubs out `rgbmatrix` and `smbus` so all test files run on Mac without Pi hardware.
@@ -147,10 +149,12 @@ bazel test //tests:test_board
 bazel test //tests:test_chessmatrix_js
 bazel test //tests:test_lockstep_chessmatrix
 bazel test //tests:test_lockstep_chess
+bazel test //tests:test_lockstep_networked
 
 # Run the lockstep fuzzers:
 bazel run //harness:fuzz_chessmatrix -- --iterations 1000
 bazel run //harness:fuzz_chess -- --iterations 100
+bazel run //harness:fuzz_networked -- --iterations 100
 
 # Regenerate BUILD files after adding/removing Python files or imports:
 bazel run //:gazelle
@@ -273,6 +277,7 @@ Chess101/
 │
 ├── web/
 │   ├── chess-engine.js         # Extracted JS chess engine (Node.js-importable)
+│   ├── spectator-engine.js    # Extracted spectator move logic (Node.js-importable)
 │   ├── sim.html            # Simulator web UI
 │   ├── spectator.html      # Spectator web UI
 │   └── chessmatrix-scanner.js  # Browser/Node.js ChessMatrix decoder (no dependencies)
@@ -285,7 +290,9 @@ Chess101/
 │   ├── js_bridge.js            # Node.js stdio bridge for lockstep testing
 │   ├── python_bridge.py        # JsBridge Python wrapper class
 │   ├── fuzz_chessmatrix.py     # ChessMatrix lockstep fuzzer (standalone)
-│   └── fuzz_chess.py           # Chess engine lockstep fuzzer (standalone)
+│   ├── fuzz_chess.py           # Chess engine lockstep fuzzer (standalone)
+│   ├── fuzz_networked.py      # Three-way networked lockstep fuzzer (standalone)
+│   └── BUGS.md                # Fuzz testing bug report
 │
 ├── plans/multiplayer/      # Design docs for all multiplayer phases
 │   ├── README.md           # Overview, 7 modes, 3-phase roadmap
@@ -308,6 +315,7 @@ Chess101/
     ├── test_chessmatrix_scanning.py # ChessMatrix scanning pipeline (Python) + board-entry helpers
     ├── test_lockstep_chessmatrix.py # Python↔JS ChessMatrix lockstep parity
     ├── test_lockstep_chess.py       # Python↔JS chess engine lockstep parity
+    ├── test_lockstep_networked.py   # Python↔JS↔Spectator three-way lockstep parity
     ├── test_chessmatrix_js.js       # ChessMatrix scanning pipeline (Node.js)
     ├── test_sim_js.js              # Web sim logic regression tests (Node.js)
     └── fixtures/chessmatrix/        # PNG fixtures: real phone photos + synthetics

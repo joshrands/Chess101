@@ -150,3 +150,38 @@ class JsBridge:
         if "error" in resp:
             raise RuntimeError(resp["error"])
         return resp["result"]
+
+    # ── spectator ops ──────────────────────────────────────────────────
+
+    def spectator_init(self) -> list:
+        """Initialize the JS spectator starting position. Returns grid snapshot."""
+        resp = self._call({"op": "spectator_init"})
+        if "error" in resp:
+            raise RuntimeError(resp["error"])
+        return resp["result"]
+
+    def spectator_apply_move(
+        self, grid: list,
+        fr: int, fc: int, tr: int, tc: int,
+        flags: dict | None = None,
+    ) -> list:
+        """Apply a move on the JS spectator side. Returns updated grid snapshot."""
+        resp = self._call({
+            "op": "spectator_apply_move",
+            "grid": grid,
+            "fr": fr, "fc": fc, "tr": tr, "tc": tc,
+            "flags": flags or {},
+        })
+        if "error" in resp:
+            raise RuntimeError(resp["error"])
+        return resp["result"]
+
+    def spectator_apply_grid(self, encoded_grid: list) -> list:
+        """Apply a full board sync on the JS spectator side. Returns grid snapshot."""
+        resp = self._call({
+            "op": "spectator_apply_grid",
+            "encoded_grid": encoded_grid,
+        })
+        if "error" in resp:
+            raise RuntimeError(resp["error"])
+        return resp["result"]

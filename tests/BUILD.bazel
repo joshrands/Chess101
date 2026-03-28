@@ -111,6 +111,25 @@ py_test(
 )
 
 py_test(
+    name = "test_lockstep_networked",
+    srcs = ["test_lockstep_networked.py"],
+    data = [
+        "//harness:js_bridge",
+        "//web:chess_engine_js",
+        "//web:chessmatrix_scanner_js",
+        "//web:spectator_engine_js",
+    ],
+    deps = [
+        ":conftest",
+        "//core",
+        "//harness:python_bridge",
+        "//network",
+        "//pieces",
+        "@pip//pytest",
+    ],
+)
+
+py_test(
     name = "test_lockstep_chessmatrix",
     srcs = ["test_lockstep_chessmatrix.py"],
     data = [

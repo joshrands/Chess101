@@ -15,6 +15,7 @@ py_library(
         "js_bridge.js",
         "//web:chess_engine_js",
         "//web:chessmatrix_scanner_js",
+        "//web:spectator_engine_js",
     ],
     visibility = ["//:__subpackages__"],
 )
@@ -41,6 +42,23 @@ py_binary(
         "js_bridge.js",
         "//web:chess_engine_js",
         "//web:chessmatrix_scanner_js",
+    ],
+    deps = [
+        ":python_bridge",
+        "//core",
+        "//network",
+        "//pieces",
+    ],
+)
+
+py_binary(
+    name = "fuzz_networked",
+    srcs = ["fuzz_networked.py"],
+    data = [
+        "js_bridge.js",
+        "//web:chess_engine_js",
+        "//web:chessmatrix_scanner_js",
+        "//web:spectator_engine_js",
     ],
     deps = [
         ":python_bridge",

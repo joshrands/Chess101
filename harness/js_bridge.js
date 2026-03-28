@@ -17,6 +17,7 @@ const scanner = require(path.join(__dirname, "..", "web", "chessmatrix-scanner.j
 const { decodeFrame } = scanner;
 const engine = require(path.join(__dirname, "..", "web", "chess-engine.js"));
 const { Cell, Team, Pawn, Rook, Bishop, Knight, Queen, King, deepCopyGrid } = engine;
+const spectator = require(path.join(__dirname, "..", "web", "spectator-engine.js"));
 
 // ── helpers ────────────────────────────────────────────────────────────────
 
@@ -228,6 +229,27 @@ const OPS = {
     const grid = gridFromJson(msg.grid, teamR, teamL);
     const hash = boardHash(grid, msg.peace_time, msg.current_team_key, teamR);
     respond({ result: hash });
+  },
+
+  // ── spectator ops ──────────────────────────────────────────────────────
+
+  spectator_init() {
+    const grid = spectator.createGrid();
+    spectator.initStartingPosition(grid);
+    respond({ result: spectator.gridSnapshot(grid) });
+  },
+
+  spectator_apply_move(msg) {
+    // Reconstruct grid from snapshot
+    const grid = msg.grid.map(row => row.map(c => c ? { type: c.type, team_r: c.team_r } : null));
+    spectator.applyMove(grid, msg.fr, msg.fc, msg.tr, msg.tc, msg.flags || {});
+    respond({ result: spectator.gridSnapshot(grid) });
+  },
+
+  spectator_apply_grid(msg) {
+    const grid = spectator.createGrid();
+    spectator.applyGrid(grid, msg.encoded_grid);
+    respond({ result: spectator.gridSnapshot(grid) });
   },
 
   ping() {

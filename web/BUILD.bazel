@@ -21,3 +21,9 @@ filegroup(
     srcs = ["spectator.html"],
     visibility = ["//visibility:public"],
 )
+
+filegroup(
+    name = "spectator_engine_js",
+    srcs = ["spectator-engine.js"],
+    visibility = ["//visibility:public"],
+)
