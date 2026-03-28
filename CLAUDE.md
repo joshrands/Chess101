@@ -52,6 +52,9 @@ python3 -m venv .venv
 
 # Custom port (default 65101)
 .venv/bin/python run_simulator.py --host --port 65200
+
+# Replay a fuzzer corpus file interactively
+.venv/bin/python run_simulator.py --replay harness/crashes/chess/chess_*.corpus.json
 ```
 
 **Raspberry Pi (requires sudo for LED matrix access):**
@@ -84,6 +87,7 @@ sudo python3 GameManager.py --join 192.168.1.42
 .venv/bin/python -m pytest tests/test_lockstep_chessmatrix.py -v # Python↔JS ChessMatrix lockstep parity
 .venv/bin/python -m pytest tests/test_lockstep_chess.py -v       # Python↔JS chess engine lockstep parity
 .venv/bin/python -m pytest tests/test_lockstep_networked.py -v  # Python↔JS↔Spectator three-way lockstep parity
+.venv/bin/python -m pytest tests/test_corpus_replay.py -v       # auto-discovered corpus regression tests
 
 # JS scanner — runs under Node.js, no npm install needed:
 node tests/test_chessmatrix_js.js
@@ -278,6 +282,7 @@ Chess101/
 ├── simulator/
 │   ├── app.py              # GameRunner: Pygame event loop, phase state machine + Lobby
 │   ├── networked_runner.py # NetworkedGameRunner: multiplayer + SPECTATOR + physical_host
+│   ├── replay_runner.py    # ReplayRunner: corpus file interactive replay + human takeover
 │   ├── fake_rgbmatrix.py   # FakeFrameCanvas / FakeRGBMatrix backed by pygame.Surface
 │   └── sensor.py           # SimSensor(BoardSensor) — click-driven, no I2C
 │
@@ -295,9 +300,12 @@ Chess101/
 ├── harness/
 │   ├── js_bridge.js            # Node.js stdio bridge for lockstep testing
 │   ├── python_bridge.py        # JsBridge Python wrapper class
+│   ├── chess_helpers.py        # Shared Python-side chess helpers (grid, moves, init)
+│   ├── corpus.py               # Corpus file save/load/discover for fuzzer disagreements
+│   ├── replay.py               # ReplayEngine: step-by-step corpus replay through engines
 │   ├── fuzz_chessmatrix.py     # ChessMatrix lockstep fuzzer (standalone)
-│   ├── fuzz_chess.py           # Chess engine lockstep fuzzer (standalone)
-│   ├── fuzz_networked.py      # Three-way networked lockstep fuzzer (standalone)
+│   ├── fuzz_chess.py           # Chess engine lockstep fuzzer (standalone, emits .corpus.json)
+│   ├── fuzz_networked.py      # Three-way networked lockstep fuzzer (emits .corpus.json)
 │   ├── replay_crash.py         # Replay a crash PNG through both decoders with debug stages
 │   └── BUGS.md                # Fuzz testing bug report
 │
@@ -323,6 +331,7 @@ Chess101/
     ├── test_lockstep_chessmatrix.py # Python↔JS ChessMatrix lockstep parity
     ├── test_lockstep_chess.py       # Python↔JS chess engine lockstep parity
     ├── test_lockstep_networked.py   # Python↔JS↔Spectator three-way lockstep parity
+    ├── test_corpus_replay.py        # Auto-discovered corpus regression tests
     ├── test_chessmatrix_js.js       # ChessMatrix scanning pipeline (Node.js)
     ├── test_sim_js.js              # Web sim logic regression tests (Node.js)
     └── fixtures/chessmatrix/        # PNG fixtures: real phone photos + synthetics

@@ -11,7 +11,6 @@ Running
 
 from __future__ import annotations
 
-import hashlib
 import random
 import sys
 from pathlib import Path
@@ -22,27 +21,19 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "harness"))
 
 from python_bridge import JsBridge  # noqa: E402
 
-# ── Python chess imports ────────────────────────────────────────────────────
-
 from core.team import Team  # noqa: E402
 from pieces.pawn import Pawn  # noqa: E402
-from pieces.rook import Rook  # noqa: E402
-from pieces.bishop import Bishop  # noqa: E402
-from pieces.knight import Knight  # noqa: E402
-from pieces.queen import Queen  # noqa: E402
-from pieces.king import King  # noqa: E402
 from network.protocol import board_hash  # noqa: E402
-
-
-# ── constants ───────────────────────────────────────────────────────────────
-
-TEAM_R_RGB = (64, 180, 232)
-TEAM_L_RGB = (255, 140, 0)
-
-PIECE_MAP = {
-    "Pawn": Pawn, "Rook": Rook, "Bishop": Bishop,
-    "Knight": Knight, "Queen": Queen, "King": King,
-}
+from chess_helpers import (  # noqa: E402
+    TEAM_R_RGB,
+    TEAM_L_RGB,
+    py_grid_to_json,
+    json_to_py_grid,
+    py_init_board,
+    py_legal_moves,
+    py_apply_move,
+    clear_en_passant,
+)
 
 
 # ── fixtures ────────────────────────────────────────────────────────────────
@@ -53,154 +44,6 @@ def bridge():
     assert b.ping() == "pong"
     yield b
     b.close()
-
-
-# ── grid serialization (Python ↔ JSON) ─────────────────────────────────────
-
-def py_grid_to_json(grid: list, team_r: Team) -> list:
-    """Serialize Python grid to the JSON format expected by the JS bridge."""
-    result = []
-    for row in grid:
-        json_row = []
-        for p in row:
-            if p is None:
-                json_row.append(None)
-            else:
-                obj = {
-                    "type": type(p).__name__,
-                    "row": p.row,
-                    "col": p.col,
-                    "team_key": "r" if p.team.r == team_r.r else "l",
-                    "touched": getattr(p, "touched", False),
-                }
-                if isinstance(p, Pawn):
-                    obj["starting_row"] = p.starting_row
-                    obj["direction"] = p.direction
-                    obj["en_passantable"] = p.en_passantable
-                    obj["en_passant_loc"] = (
-                        [p.en_passant_loc.row, p.en_passant_loc.col]
-                        if p.en_passant_loc else None
-                    )
-                json_row.append(obj)
-        result.append(json_row)
-    return result
-
-
-def json_to_py_grid(data: list, team_r: Team, team_l: Team) -> list:
-    """Deserialize JSON grid back to Python piece objects."""
-    grid = []
-    for row in data:
-        py_row = []
-        for cell in row:
-            if cell is None:
-                py_row.append(None)
-            else:
-                team = team_r if cell["team_key"] == "r" else team_l
-                Cls = PIECE_MAP[cell["type"]]
-                p = Cls(cell["row"], cell["col"], team)
-                p.touched = cell["touched"]
-                if isinstance(p, Pawn):
-                    p.starting_row = cell["starting_row"]
-                    p.direction = cell["direction"]
-                    p.en_passantable = cell["en_passantable"]
-                    if cell["en_passant_loc"]:
-                        from core.cell import Cell
-                        p.en_passant_loc = Cell(
-                            cell["en_passant_loc"][0],
-                            cell["en_passant_loc"][1],
-                        )
-                py_row.append(p)
-        grid.append(py_row)
-    return grid
-
-
-# ── Python-side legal move computation ──────────────────────────────────────
-
-def py_legal_moves(grid: list, team: Team) -> set[tuple[int, int, int, int]]:
-    """Compute all legal moves for *team* on the Python side."""
-    pieces = []
-    king = None
-    for row in grid:
-        for p in row:
-            if p is not None and p.team.r == team.r:
-                pieces.append(p)
-                if isinstance(p, King):
-                    king = p
-
-    check = king.calc_targets(grid)
-    moves = set()
-    for t in king.targets:
-        moves.add((king.row, king.col, t.row, t.col))
-
-    for p in pieces:
-        if isinstance(p, King):
-            continue
-        p.calc_targets(grid)
-        if check:
-            p.sky_fall(king)
-        for t in p.targets:
-            moves.add((p.row, p.col, t.row, t.col))
-
-    return moves
-
-
-def py_apply_move(grid: list, fr: int, fc: int, tr: int, tc: int) -> dict:
-    """Apply a move on the Python side. Returns flags dict."""
-    piece = grid[fr][fc]
-    captured = grid[tr][tc]
-    grid[tr][tc] = piece
-    grid[fr][fc] = None
-    flags = {"captured": captured is not None}
-
-    if isinstance(piece, Pawn):
-        enemy = piece.move(tr, tc, grid)
-        if enemy:
-            grid[enemy.row][enemy.col] = None
-            flags["captured"] = True
-        # auto-promote
-        if (piece.starting_row + 6) % 12 == tr:
-            grid[tr][tc] = Queen(tr, tc, piece.team)
-            grid[tr][tc].touched = True
-            flags["promoted"] = True
-    elif isinstance(piece, King):
-        result = piece.move(tr, tc, grid)
-        if result is not None and result[0] is not None:
-            rook_from, rook_to = result
-            grid[rook_to.row][rook_to.col] = grid[rook_from.row][rook_from.col]
-            grid[rook_from.row][rook_from.col] = None
-            rook = grid[rook_to.row][rook_to.col]
-            if rook:
-                rook.move(rook_to.row, rook_to.col, grid)
-    else:
-        piece.move(tr, tc, grid)
-
-    return flags
-
-
-def py_init_board(team_r: Team, team_l: Team) -> list:
-    """Set up the standard starting position on the Python side."""
-    grid = [[None] * 8 for _ in range(8)]
-    grid[0][0] = Rook(0, 0, team_r); grid[0][1] = Knight(0, 1, team_r)
-    grid[0][2] = Bishop(0, 2, team_r); grid[0][3] = Queen(0, 3, team_r)
-    grid[0][4] = King(0, 4, team_r); grid[0][5] = Bishop(0, 5, team_r)
-    grid[0][6] = Knight(0, 6, team_r); grid[0][7] = Rook(0, 7, team_r)
-    for c in range(8):
-        grid[1][c] = Pawn(1, c, team_r)
-    for c in range(8):
-        grid[6][c] = Pawn(6, c, team_l)
-    grid[7][0] = Rook(7, 0, team_l); grid[7][1] = Knight(7, 1, team_l)
-    grid[7][2] = Bishop(7, 2, team_l); grid[7][3] = Queen(7, 3, team_l)
-    grid[7][4] = King(7, 4, team_l); grid[7][5] = Bishop(7, 5, team_l)
-    grid[7][6] = Knight(7, 6, team_l); grid[7][7] = Rook(7, 7, team_l)
-    return grid
-
-
-def clear_en_passant(grid: list, team: Team) -> None:
-    """Clear en_passantable on all pawns of *team* except the one that just moved."""
-    for row in grid:
-        for p in row:
-            if isinstance(p, Pawn) and p.team.r == team.r:
-                p.en_passantable = False
 
 
 # ── tests ───────────────────────────────────────────────────────────────────
@@ -278,10 +121,7 @@ class TestRandomGames:
             team = team_r if current_key == "r" else team_l
 
             # Clear en_passantable on the current team's pawns (window expired)
-            for row in py_grid:
-                for p in row:
-                    if isinstance(p, Pawn) and p.team.r == team.r:
-                        p.en_passantable = False
+            clear_en_passant(py_grid, team)
 
             grid_json = py_grid_to_json(py_grid, team_r)
 
@@ -310,7 +150,7 @@ class TestRandomGames:
             is_pawn = isinstance(py_grid[fr][fc], Pawn)
 
             # Apply on Python side
-            py_flags = py_apply_move(py_grid, fr, fc, tr, tc)
+            py_apply_move(py_grid, fr, fc, tr, tc)
 
             if is_capture or is_pawn:
                 peace_time = 0

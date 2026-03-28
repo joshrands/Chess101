@@ -1138,6 +1138,7 @@ function renderPanel(){
   }
   if(roomCode&&wsRole!=='local')html+=`<div class="p-alert room">ROOM: ${roomCode}</div>`;
   if(netPhase==='waiting_peer')html+=`<div class="p-alert ai">Waiting for opponent…</div>`;
+  if(replayCorpus)html+=replayPanelHtml();
   top.innerHTML=html;
 
   const logDiv=document.getElementById('panel-log');
@@ -1163,6 +1164,7 @@ canvas.addEventListener('click',function(e){
 });
 
 function handleClick(px,py){
+  if(replayMode)return; // block clicks during corpus replay
   const cell=pxToCell(px,py);
   if(phase===Phase.LOBBY){handleLobbyClick(cell);return;}
   if(phase===Phase.COLOR_PICK){handleColorPickClick(cell);return;}
@@ -1262,9 +1264,19 @@ function handlePlayingClick(cell){
 
 // ── Keyboard ──────────────────────────────────────────────────────────────────
 document.addEventListener('keydown',function(e){
+  // Replay controls take priority
+  if(replayMode&&replayCorpus&&phase===Phase.PLAYING){
+    if(e.key===' '){replayPaused=!replayPaused;e.preventDefault();return;}
+    if(e.key==='ArrowRight'){if(replayPly<replayCorpus.moves.length)replayStepForward();return;}
+    if(e.key==='ArrowLeft'){if(replayPly>0)replayToTarget(replayPly-1);return;}
+    if(e.key==='ArrowUp'){if(replaySpeedIdx>0)replaySpeedIdx--;return;}
+    if(e.key==='ArrowDown'){if(replaySpeedIdx<REPLAY_SPEEDS.length-1)replaySpeedIdx++;return;}
+    if(e.key==='t'||e.key==='T'){replayTakeover();return;}
+  }
   if(e.key==='n'||e.key==='N'){
     if(phase===Phase.GAME_OVER||phase===Phase.PLAYING){
       if(ws&&wsRole!=='local')netSend({type:'new_game'});
+      replayCorpus=null;replayMode=false;replayTakeoverPly=null;
       resetGame();phase=Phase.LOBBY;
     }
   }
@@ -1341,9 +1353,163 @@ function stopSimScan() {
 document.getElementById('scan-btn2').addEventListener('click',startSimScan);
 document.getElementById('stop-scan2').addEventListener('click',stopSimScan);
 
+// ── Corpus replay mode ───────────────────────────────────────────────────────
+let replayCorpus=null, replayPly=0, replayMode=false, replayPaused=true;
+let replayDelayMs=500, replayLastMs=0, replayTakeoverPly=null;
+const REPLAY_SPEEDS=[100,200,350,500,750,1000,1500,2000];
+let replaySpeedIdx=3;
+
+function initReplay(corpus){
+  resetGame();
+  replayCorpus=corpus;
+  replayPly=0;
+  replayMode=true;
+  replayPaused=true;
+  replayTakeoverPly=null;
+  replaySpeedIdx=3;
+  const c=corpus.team_r_rgb;
+  teamR=new Team(c[0],c[1],c[2],'Right');
+  const d=corpus.team_l_rgb;
+  teamL=new Team(d[0],d[1],d[2],'Left');
+  computerR=false;computerL=false;
+  initBoard();
+  currentTeam=teamR;
+  phase=Phase.PLAYING;
+  beginTurn(currentTeam);
+  addLog(`Corpus loaded: ${corpus.moves.length} moves`);
+  addLog(`Failure at ply ${corpus.failure.ply} (${corpus.failure.kind||'?'})`);
+  addLog('Space=play/pause  ←→=step  T=takeover');
+}
+
+function replayStepForward(){
+  if(!replayCorpus||replayPly>=replayCorpus.moves.length){replayPaused=true;return;}
+  const m=replayCorpus.moves[replayPly];
+  // Clear en passant on current team
+  for(let r=0;r<8;r++)for(let c=0;c<8;c++){
+    const p=grid[r][c];
+    if(p instanceof Pawn&&p.team.r===currentTeam.r)p.enPassantable=false;
+  }
+  const capture=grid[m.tr][m.tc];
+  grid[m.tr][m.tc]=grid[m.fr][m.fc];
+  applyMove(m.fr,m.fc,m.tr,m.tc);
+  moveCount++;
+  replayPly++;
+  // Update peace time
+  const flags=m.flags||{};
+  if(flags.is_capture||grid[m.tr][m.tc] instanceof Pawn)peaceTime=0;
+  else peaceTime++;
+  nextTurn();
+}
+
+function replayToTarget(target){
+  // Re-init and replay to target ply
+  initBoard();
+  currentTeam=teamR;moveCount=0;peaceTime=0;replayPly=0;
+  inCheck=false;selectedPiece=null;
+  for(let i=0;i<target&&replayPly<replayCorpus.moves.length;i++){
+    const m=replayCorpus.moves[replayPly];
+    for(let r=0;r<8;r++)for(let c=0;c<8;c++){
+      const p=grid[r][c];
+      if(p instanceof Pawn&&p.team.r===currentTeam.r)p.enPassantable=false;
+    }
+    grid[m.tr][m.tc]=grid[m.fr][m.fc];
+    applyMove(m.fr,m.fc,m.tr,m.tc);
+    moveCount++;
+    replayPly++;
+    const flags=m.flags||{};
+    if(flags.is_capture||grid[m.tr][m.tc] instanceof Pawn)peaceTime=0;
+    else peaceTime++;
+    currentTeam=currentTeam===teamR?teamL:teamR;
+  }
+  beginTurn(currentTeam);
+}
+
+function replayTakeover(){
+  replayMode=false;
+  replayTakeoverPly=replayPly;
+  selectedPiece=null;
+  addLog(`Takeover at ply ${replayPly} — human play begins`);
+}
+
+// Replay panel info (injected into renderPanel)
+function replayPanelHtml(){
+  if(!replayCorpus)return '';
+  let html='';
+  const total=replayCorpus.moves.length;
+  const fp=replayCorpus.failure.ply;
+  if(replayMode){
+    const st=replayPaused?'PAUSED':'PLAYING';
+    html+=`<div class="p-label">Replay</div><div class="p-val accent">${st}</div>`;
+    html+=`<div class="p-val">Ply ${replayPly}/${total}  ·  ${REPLAY_SPEEDS[replaySpeedIdx]}ms</div>`;
+    if(replayPly>0&&replayPly<=total){
+      const m=replayCorpus.moves[replayPly-1];
+      const f=m.flags||{};
+      let fl=[];
+      if(f.is_capture)fl.push('capture');
+      if(f.is_en_passant)fl.push('e.p.');
+      if(f.is_castling)fl.push('castle');
+      if(f.is_promotion)fl.push('promo');
+      html+=`<div class="p-val" style="font-size:11px">(${m.fr},${m.fc})→(${m.tr},${m.tc}) ${fl.join(' ')}</div>`;
+    }
+    if(replayPly===fp)html+=`<div class="p-alert check">▶▶ FAILURE PLY (${replayCorpus.failure.kind||'?'})</div>`;
+    else if(replayPly>fp)html+=`<div class="p-val" style="color:#c06060;font-size:11px">(past failure ply)</div>`;
+    html+=`<div style="margin-top:8px;font-size:10px;color:#3a5060">Space=play/pause ←→=step ↑↓=speed T=takeover</div>`;
+  } else if(replayTakeoverPly!=null){
+    html+=`<div class="p-label">Replay</div><div class="p-val" style="color:#60ff80">TAKEOVER from ply ${replayTakeoverPly}</div>`;
+    html+=`<div class="p-val" style="font-size:11px">Failure was at ply ${fp}</div>`;
+  }
+  return html;
+}
+
+// File-drop and file-input for loading corpus
+function handleCorpusFile(file){
+  const reader=new FileReader();
+  reader.onload=function(e){
+    try{
+      const corpus=JSON.parse(e.target.result);
+      if(corpus.version!==1||!corpus.moves||!corpus.failure){
+        addLog('Invalid corpus file');return;
+      }
+      initReplay(corpus);
+    }catch(err){addLog('Failed to parse corpus: '+err.message);}
+  };
+  reader.readAsText(file);
+}
+
+// Drag and drop
+document.addEventListener('dragover',function(e){e.preventDefault();});
+document.addEventListener('drop',function(e){
+  e.preventDefault();
+  if(e.dataTransfer.files.length>0){
+    const f=e.dataTransfer.files[0];
+    if(f.name.endsWith('.corpus.json'))handleCorpusFile(f);
+  }
+});
+
+// URL-based replay: sim.html?replay=path
+if(typeof URLSearchParams!=='undefined'&&typeof window!=='undefined'){
+  (function(){
+    const params=new URLSearchParams(window.location.search);
+    const replayUrl=params.get('replay');
+    if(replayUrl){
+      fetch(replayUrl).then(r=>r.json()).then(corpus=>{
+        if(corpus.version===1&&corpus.moves&&corpus.failure)initReplay(corpus);
+        else addLog('Invalid corpus file from URL');
+      }).catch(err=>addLog('Failed to load corpus: '+err.message));
+    }
+  })();
+}
+
 // ── Animation loop ────────────────────────────────────────────────────────────
 let lastPanelMs=0;
 function frame(now){
+  // Auto-advance replay
+  if(replayMode&&!replayPaused&&replayCorpus){
+    if(now-replayLastMs>=REPLAY_SPEEDS[replaySpeedIdx]){
+      if(replayPly<replayCorpus.moves.length){replayStepForward();replayLastMs=now;}
+      else replayPaused=true;
+    }
+  }
   render(now);
   if(now-lastPanelMs>100){renderPanel();lastPanelMs=now;}
   requestAnimationFrame(frame);

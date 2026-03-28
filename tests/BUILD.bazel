@@ -103,6 +103,7 @@ py_test(
     deps = [
         ":conftest",
         "//core",
+        "//harness:chess_helpers",
         "//harness:python_bridge",
         "//network",
         "//pieces",
@@ -122,6 +123,7 @@ py_test(
     deps = [
         ":conftest",
         "//core",
+        "//harness:chess_helpers",
         "//harness:python_bridge",
         "//network",
         "//pieces",
@@ -296,6 +298,28 @@ py_test(
     deps = [
         ":conftest",
         "//core",
+        "//network",
+        "//pieces",
+        "@pip//pytest",
+    ],
+)
+
+py_test(
+    name = "test_corpus_replay",
+    srcs = ["test_corpus_replay.py"],
+    data = [
+        "//harness:js_bridge",
+        "//web:chess_engine_js",
+        "//web:chessmatrix_scanner_js",
+        "//web:spectator_engine_js",
+    ],
+    deps = [
+        ":conftest",
+        "//core",
+        "//harness:chess_helpers",
+        "//harness:corpus",
+        "//harness:python_bridge",
+        "//harness:replay",
         "//network",
         "//pieces",
         "@pip//pytest",

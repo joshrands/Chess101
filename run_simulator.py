@@ -91,9 +91,15 @@ if __name__ == "__main__":
     parser.add_argument("--relay",         default="wss://relay.chess101.net",
                         metavar="URL",
                         help="Relay server URL (default wss://relay.chess101.net)")
+    parser.add_argument("--replay",        metavar="PATH",
+                        help="Replay a .corpus.json file in the simulator")
     args = parser.parse_args()
 
-    if args.local:
+    if args.replay:
+        from pathlib import Path
+        from simulator.replay_runner import ReplayRunner
+        ReplayRunner(corpus_path=Path(args.replay)).run()
+    elif args.local:
         GameRunner(skip_lobby=True).run()
     elif args.host:
         from simulator.networked_runner import NetworkedGameRunner, NetworkRole

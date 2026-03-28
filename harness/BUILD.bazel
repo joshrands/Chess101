@@ -20,6 +20,34 @@ py_library(
     visibility = ["//:__subpackages__"],
 )
 
+py_library(
+    name = "chess_helpers",
+    srcs = ["chess_helpers.py"],
+    visibility = ["//:__subpackages__"],
+    deps = [
+        "//core",
+        "//pieces",
+    ],
+)
+
+py_library(
+    name = "corpus",
+    srcs = ["corpus.py"],
+    visibility = ["//:__subpackages__"],
+)
+
+py_library(
+    name = "replay",
+    srcs = ["replay.py"],
+    visibility = ["//:__subpackages__"],
+    deps = [
+        ":chess_helpers",
+        "//core",
+        "//network",
+        "//pieces",
+    ],
+)
+
 py_binary(
     name = "fuzz_chessmatrix",
     srcs = ["fuzz_chessmatrix.py"],
@@ -44,6 +72,8 @@ py_binary(
         "//web:chessmatrix_scanner_js",
     ],
     deps = [
+        ":chess_helpers",
+        ":corpus",
         ":python_bridge",
         "//core",
         "//network",
@@ -61,6 +91,8 @@ py_binary(
         "//web:spectator_engine_js",
     ],
     deps = [
+        ":chess_helpers",
+        ":corpus",
         ":python_bridge",
         "//core",
         "//network",

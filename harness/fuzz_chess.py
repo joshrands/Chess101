@@ -3,7 +3,8 @@
 
 Plays random games from the starting position, comparing legal move sets
 and board hashes at each step between Python and JS. Disagreements are
-saved with full move history for replay.
+saved with full move history for replay, plus a ``.corpus.json`` file
+that can be replayed as a regression test or in the interactive simulator.
 
 Usage::
 
@@ -29,115 +30,17 @@ from python_bridge import JsBridge  # noqa: E402
 
 from core.team import Team  # noqa: E402
 from pieces.pawn import Pawn  # noqa: E402
-from pieces.rook import Rook  # noqa: E402
-from pieces.bishop import Bishop  # noqa: E402
-from pieces.knight import Knight  # noqa: E402
-from pieces.queen import Queen  # noqa: E402
-from pieces.king import King  # noqa: E402
 from network.protocol import board_hash  # noqa: E402
-
-TEAM_R_RGB = (64, 180, 232)
-TEAM_L_RGB = (255, 140, 0)
-
-PIECE_MAP = {
-    "Pawn": Pawn, "Rook": Rook, "Bishop": Bishop,
-    "Knight": Knight, "Queen": Queen, "King": King,
-}
-
-
-def py_grid_to_json(grid, team_r):
-    result = []
-    for row in grid:
-        json_row = []
-        for p in row:
-            if p is None:
-                json_row.append(None)
-            else:
-                obj = {
-                    "type": type(p).__name__,
-                    "row": p.row, "col": p.col,
-                    "team_key": "r" if p.team.r == team_r.r else "l",
-                    "touched": getattr(p, "touched", False),
-                }
-                if isinstance(p, Pawn):
-                    obj["starting_row"] = p.starting_row
-                    obj["direction"] = p.direction
-                    obj["en_passantable"] = p.en_passantable
-                    obj["en_passant_loc"] = (
-                        [p.en_passant_loc.row, p.en_passant_loc.col]
-                        if p.en_passant_loc else None
-                    )
-                json_row.append(obj)
-        result.append(json_row)
-    return result
-
-
-def py_init_board(team_r, team_l):
-    grid = [[None] * 8 for _ in range(8)]
-    grid[0][0] = Rook(0, 0, team_r); grid[0][1] = Knight(0, 1, team_r)
-    grid[0][2] = Bishop(0, 2, team_r); grid[0][3] = Queen(0, 3, team_r)
-    grid[0][4] = King(0, 4, team_r); grid[0][5] = Bishop(0, 5, team_r)
-    grid[0][6] = Knight(0, 6, team_r); grid[0][7] = Rook(0, 7, team_r)
-    for c in range(8):
-        grid[1][c] = Pawn(1, c, team_r)
-    for c in range(8):
-        grid[6][c] = Pawn(6, c, team_l)
-    grid[7][0] = Rook(7, 0, team_l); grid[7][1] = Knight(7, 1, team_l)
-    grid[7][2] = Bishop(7, 2, team_l); grid[7][3] = Queen(7, 3, team_l)
-    grid[7][4] = King(7, 4, team_l); grid[7][5] = Bishop(7, 5, team_l)
-    grid[7][6] = Knight(7, 6, team_l); grid[7][7] = Rook(7, 7, team_l)
-    return grid
-
-
-def py_legal_moves(grid, team):
-    pieces = []
-    king = None
-    for row in grid:
-        for p in row:
-            if p is not None and p.team.r == team.r:
-                pieces.append(p)
-                if isinstance(p, King):
-                    king = p
-    check = king.calc_targets(grid)
-    moves = set()
-    for t in king.targets:
-        moves.add((king.row, king.col, t.row, t.col))
-    for p in pieces:
-        if isinstance(p, King):
-            continue
-        p.calc_targets(grid)
-        if check:
-            p.sky_fall(king)
-        for t in p.targets:
-            moves.add((p.row, p.col, t.row, t.col))
-    return moves
-
-
-def py_apply_move(grid, fr, fc, tr, tc):
-    piece = grid[fr][fc]
-    captured = grid[tr][tc] is not None
-    grid[tr][tc] = piece
-    grid[fr][fc] = None
-    if isinstance(piece, Pawn):
-        enemy = piece.move(tr, tc, grid)
-        if enemy:
-            grid[enemy.row][enemy.col] = None
-            captured = True
-        if (piece.starting_row + 6) % 12 == tr:
-            grid[tr][tc] = Queen(tr, tc, piece.team)
-            grid[tr][tc].touched = True
-    elif isinstance(piece, King):
-        result = piece.move(tr, tc, grid)
-        if result is not None and result[0] is not None:
-            rook_from, rook_to = result
-            grid[rook_to.row][rook_to.col] = grid[rook_from.row][rook_from.col]
-            grid[rook_from.row][rook_from.col] = None
-            rook = grid[rook_to.row][rook_to.col]
-            if rook:
-                rook.move(rook_to.row, rook_to.col, grid)
-    else:
-        piece.move(tr, tc, grid)
-    return captured
+from chess_helpers import (  # noqa: E402
+    TEAM_R_RGB,
+    TEAM_L_RGB,
+    py_init_board,
+    py_grid_to_json,
+    py_legal_moves,
+    py_apply_move,
+    clear_en_passant,
+)
+from corpus import save_corpus  # noqa: E402
 
 
 def run_fuzzer(iterations: int, seed: int, max_ply: int) -> None:
@@ -166,16 +69,14 @@ def run_fuzzer(iterations: int, seed: int, max_ply: int) -> None:
             peace_time = 0
             current_key = "r"
             move_history = []
+            corpus_moves = []
             game_ok = True
 
             for ply in range(max_ply):
                 team = team_r if current_key == "r" else team_l
 
                 # Clear en_passantable on current team (window expired)
-                for row in py_grid:
-                    for p in row:
-                        if isinstance(p, Pawn) and p.team.r == team.r:
-                            p.en_passantable = False
+                clear_en_passant(py_grid, team)
 
                 grid_json = py_grid_to_json(py_grid, team_r)
 
@@ -201,6 +102,14 @@ def run_fuzzer(iterations: int, seed: int, max_ply: int) -> None:
                         "only_js": sorted(js_moves - py_moves),
                     }
                     (crashes_dir / fname).write_text(json.dumps(crash, indent=2))
+                    save_corpus(
+                        crashes_dir, "chess", "fuzz_chess",
+                        TEAM_R_RGB, TEAM_L_RGB, corpus_moves,
+                        {"ply": ply, "kind": "legal_moves",
+                         "detail": f"only_python={sorted(py_moves - js_moves)} "
+                                   f"only_js={sorted(js_moves - py_moves)}"},
+                        game_seed,
+                    )
                     print(f"[DISAGREE] game={total} ply={ply} "
                           f"py_extra={len(py_moves - js_moves)} "
                           f"js_extra={len(js_moves - py_moves)} → {fname}")
@@ -215,7 +124,7 @@ def run_fuzzer(iterations: int, seed: int, max_ply: int) -> None:
                 is_capture = py_grid[tr][tc] is not None
                 is_pawn = isinstance(py_grid[fr][fc], Pawn)
 
-                captured = py_apply_move(py_grid, fr, fc, tr, tc)
+                flags = py_apply_move(py_grid, fr, fc, tr, tc)
 
                 peace_time = 0 if (is_capture or is_pawn) else peace_time + 1
                 next_key = "l" if current_key == "r" else "r"
@@ -233,6 +142,14 @@ def run_fuzzer(iterations: int, seed: int, max_ply: int) -> None:
 
                 py_hash = board_hash(py_grid, peace_time, next_key, team_r)
                 js_hash = js_result["board_hash"]
+
+                # Record move for corpus before checking hash
+                corpus_moves.append({
+                    "fr": fr, "fc": fc, "tr": tr, "tc": tc,
+                    "team_key": current_key,
+                    "flags": flags,
+                })
+
                 if py_hash != js_hash:
                     disagree += 1
                     fname = f"hash_game{total:06d}_ply{ply}.json"
@@ -242,6 +159,14 @@ def run_fuzzer(iterations: int, seed: int, max_ply: int) -> None:
                         "py_hash": py_hash, "js_hash": js_hash,
                     }
                     (crashes_dir / fname).write_text(json.dumps(crash, indent=2))
+                    save_corpus(
+                        crashes_dir, "chess", "fuzz_chess",
+                        TEAM_R_RGB, TEAM_L_RGB, corpus_moves,
+                        {"ply": ply, "kind": "board_hash",
+                         "detail": f"py={py_hash[:16]} js={js_hash[:16]}",
+                         "py_hash": py_hash[:16], "js_hash": js_hash[:16]},
+                        game_seed,
+                    )
                     print(f"[DISAGREE] game={total} ply={ply} hash mismatch "
                           f"after {move} → {fname}")
                     game_ok = False
