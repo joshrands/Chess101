@@ -13,3 +13,4 @@ tests/fixtures/chessmatrix_debug/*
 **/.DS_Store
 bazel-*
 MODULE.bazel.lock
+harness/crashes/
