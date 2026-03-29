@@ -91,6 +91,14 @@ class ReplayEngine:
         # Clear en passant on current team (window expired)
         clear_en_passant(self.py_grid, team)
 
+        # Compute en_passant_loc on the moving pawn (if it is a pawn) so
+        # the serialized grid carries the correct value for the JS engine.
+        # Without this, JS Pawn.move() can't detect en passant captures
+        # because enPassantLoc would always be null.
+        piece = self.py_grid[fr][fc]
+        if isinstance(piece, Pawn):
+            piece.calc_targets(self.py_grid)
+
         # Snapshot grid for JS before mutation
         grid_json = py_grid_to_json(self.py_grid, self.team_r) if self.bridge else None
 

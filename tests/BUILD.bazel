@@ -8,6 +8,11 @@ filegroup(
     srcs = glob(["fixtures/chessmatrix/**"]),
 )
 
+filegroup(
+    name = "corpus_fixtures",
+    srcs = glob(["fixtures/corpus/**"]),
+)
+
 # ── JS tests (run under Node.js) ────────────────────────────────────────────
 
 sh_test(
@@ -305,6 +310,21 @@ py_test(
 )
 
 py_test(
+    name = "test_replay_runner",
+    srcs = ["test_replay_runner.py"],
+    deps = [
+        ":conftest",
+        "//core",
+        "//harness:chess_helpers",
+        "//harness:corpus",
+        "//network",
+        "//simulator",
+        "@pip//pygame",
+        "@pip//pytest",
+    ],
+)
+
+py_test(
     name = "test_serialization_parity",
     srcs = ["test_serialization_parity.py"],
     data = [
@@ -327,6 +347,7 @@ py_test(
     name = "test_corpus_replay",
     srcs = ["test_corpus_replay.py"],
     data = [
+        ":corpus_fixtures",
         "//harness:js_bridge",
         "//web:chess_engine_js",
         "//web:chessmatrix_scanner_js",

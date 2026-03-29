@@ -123,6 +123,7 @@ class ReplayRunner(GameRunner):
     def _replay_to_ply(self, target_ply: int) -> None:
         """Re-initialize and replay to a specific ply. Fast (no rendering)."""
         b = self._b
+        b.grid = [[None] * 8 for _ in range(8)]
         b.initialize_game_board()
         self._current_team = b.team_r
         self._move_count = 0

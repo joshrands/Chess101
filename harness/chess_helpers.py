@@ -152,6 +152,8 @@ def clear_en_passant(grid: list, team: Team) -> None:
 
 def py_apply_move(grid: list, fr: int, fc: int, tr: int, tc: int) -> dict:
     """Apply a move on the Python side. Returns wire-protocol-style flags dict."""
+    from core.cell import Cell
+
     piece = grid[fr][fc]
     pre_capture = grid[tr][tc]
     is_capture = pre_capture is not None
@@ -173,6 +175,17 @@ def py_apply_move(grid: list, fr: int, fc: int, tr: int, tc: int) -> dict:
         # Detect en passant before calling move
         if abs(tc - fc) == 1 and pre_capture is None:
             flags["is_en_passant"] = True
+            # Ensure en_passant_loc is set so Pawn.move() can return the
+            # captured cell.  Without this, callers that skip calc_targets
+            # (e.g. the replay engine) would silently leave the captured
+            # pawn on the board.
+            piece.en_passant_loc = Cell(tr, tc)
+        else:
+            # Clear any stale en_passant_loc (set by a prior calc_targets)
+            # that coincidentally matches the target.  Without this,
+            # move() would treat a regular capture as en passant and
+            # remove an extra piece from the board.
+            piece.en_passant_loc = None
 
         enemy = piece.move(tr, tc, grid)
         if enemy:

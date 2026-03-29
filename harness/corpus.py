@@ -77,9 +77,14 @@ def load_corpus(path: Path) -> dict:
 
     if not isinstance(data, dict):
         raise ValueError(f"{path}: root is not an object")
-    if data.get("version") != CORPUS_VERSION:
+    if "version" not in data:
         raise ValueError(
-            f"{path}: unsupported version {data.get('version')} "
+            f"{path}: not a corpus file (no 'version' field). "
+            f"Use a .corpus.json file, not a plain crash .json file."
+        )
+    if data["version"] != CORPUS_VERSION:
+        raise ValueError(
+            f"{path}: unsupported version {data['version']} "
             f"(expected {CORPUS_VERSION})"
         )
     if data.get("type") not in ("chess", "networked"):

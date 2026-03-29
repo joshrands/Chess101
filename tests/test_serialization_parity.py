@@ -358,3 +358,168 @@ class TestJsBridgeParity:
         assert only_py == set(), (
             f"Python allows moves JS forbids: {only_py}"
         )
+
+
+# ── En passant parity ──────────────────────────────────────────────────────
+
+class TestEnPassantParity:
+    """Verify en passant state survives serialization and that both Python
+    and JS engines agree on en passant captures.
+
+    FUZZ-04 was caused by en_passant_loc being None in serialized grids
+    because the replay engine never called calc_targets.  These tests
+    verify the fix end-to-end."""
+
+    @pytest.fixture(scope="class")
+    def bridge(self):
+        from harness.python_bridge import JsBridge
+        b = JsBridge()
+        yield b
+        b.close()
+
+    def test_en_passant_loc_round_trips_through_bridge(self, teams):
+        """en_passant_loc survives py_grid_to_json → json_to_py_grid."""
+        team_r, team_l = teams
+        grid = _empty_grid()
+
+        # R-Pawn at (4,3) just advanced two squares, is en-passantable
+        r_pawn = Pawn(4, 3, team_r)
+        r_pawn.en_passantable = True
+        r_pawn.touched = True
+        grid[4][3] = r_pawn
+
+        # L-Pawn at (4,4) can capture en passant
+        l_pawn = Pawn(4, 4, team_l)
+        l_pawn.en_passant_loc = Cell(5, 3)
+        l_pawn.touched = True
+        grid[4][4] = l_pawn
+
+        json_grid = py_grid_to_json(grid, team_r)
+        restored = json_to_py_grid(json_grid, team_r, team_l)
+
+        assert restored[4][3].en_passantable is True
+        rp = restored[4][4]
+        assert rp.en_passant_loc is not None, (
+            "en_passant_loc must survive bridge round-trip"
+        )
+        assert rp.en_passant_loc.row == 5
+        assert rp.en_passant_loc.col == 3
+
+    def test_calc_targets_sets_en_passant_loc(self, teams):
+        """calc_targets on a pawn adjacent to an en-passantable enemy sets
+        en_passant_loc correctly."""
+        team_r, team_l = teams
+        grid = _empty_grid()
+
+        # R-Pawn that just advanced two squares
+        r_pawn = Pawn(4, 3, team_r)
+        r_pawn.en_passantable = True
+        r_pawn.touched = True
+        grid[4][3] = r_pawn
+
+        # L-Pawn adjacent, hasn't had calc_targets called yet
+        l_pawn = Pawn(4, 4, team_l)
+        l_pawn.touched = True
+        grid[4][4] = l_pawn
+
+        assert l_pawn.en_passant_loc is None
+        l_pawn.calc_targets(grid)
+        assert l_pawn.en_passant_loc is not None, (
+            "calc_targets must set en_passant_loc when adjacent pawn is "
+            "en-passantable"
+        )
+        assert l_pawn.en_passant_loc.row == 5
+        assert l_pawn.en_passant_loc.col == 3
+
+    def test_py_apply_move_en_passant_without_calc_targets(self, teams):
+        """py_apply_move must handle en passant even if calc_targets was
+        never called (the replay engine scenario)."""
+        from harness.chess_helpers import py_apply_move, clear_en_passant
+        team_r, team_l = teams
+        grid = _empty_grid()
+
+        # R-Pawn that just advanced two squares to (4,3)
+        r_pawn = Pawn(4, 3, team_r)
+        r_pawn.en_passantable = True
+        r_pawn.touched = True
+        grid[4][3] = r_pawn
+
+        # L-Pawn at (4,4) — en_passant_loc NOT set (no calc_targets)
+        l_pawn = Pawn(4, 4, team_l)
+        l_pawn.touched = True
+        grid[4][4] = l_pawn
+
+        # Kings (needed for valid board state)
+        grid[0][4] = King(0, 4, team_r)
+        grid[7][4] = King(7, 4, team_l)
+
+        assert l_pawn.en_passant_loc is None, "precondition: no calc_targets"
+
+        # Apply the en passant capture: L-Pawn (4,4) -> (5,3)
+        flags = py_apply_move(grid, 4, 4, 5, 3)
+
+        assert flags["is_en_passant"] is True
+        assert flags["is_capture"] is True
+        # The captured pawn at (4,3) must be removed
+        assert grid[4][3] is None, (
+            "En passant must remove the captured pawn even without "
+            "prior calc_targets"
+        )
+        # The capturing pawn must be at (5,3)
+        assert isinstance(grid[5][3], Pawn)
+
+    def test_js_en_passant_capture_matches_python(self, bridge, teams):
+        """JS engine must produce the same result as Python for an en
+        passant capture when en_passant_loc is properly serialized."""
+        from harness.chess_helpers import (
+            py_apply_move, clear_en_passant,
+            TEAM_R_RGB, TEAM_L_RGB,
+        )
+        from network.protocol import board_hash
+        team_r, team_l = teams
+        grid = _empty_grid()
+
+        # R-Pawn that just advanced two squares to (4,3)
+        r_pawn = Pawn(4, 3, team_r)
+        r_pawn.en_passantable = True
+        r_pawn.touched = True
+        grid[4][3] = r_pawn
+
+        # L-Pawn at (4,4) — will capture en passant
+        l_pawn = Pawn(4, 4, team_l)
+        l_pawn.touched = True
+        grid[4][4] = l_pawn
+
+        # Kings
+        grid[0][4] = King(0, 4, team_r)
+        grid[7][4] = King(7, 4, team_l)
+
+        # Compute en_passant_loc via calc_targets (as the replay engine
+        # now does before serialization)
+        l_pawn.calc_targets(grid)
+        assert l_pawn.en_passant_loc is not None
+
+        # Serialize for JS (with en_passant_loc set)
+        grid_json = py_grid_to_json(grid, team_r)
+
+        # Verify en_passant_loc is in the serialized data
+        ep_cell = grid_json[4][4]
+        assert ep_cell["en_passant_loc"] is not None, (
+            "en_passant_loc must be present in serialized grid"
+        )
+
+        # Apply en passant on Python side
+        py_flags = py_apply_move(grid, 4, 4, 5, 3)
+        py_hash = board_hash(grid, 0, "r", team_r)
+
+        # Apply en passant on JS side
+        js_result = bridge.chess_apply_move(
+            grid_json, TEAM_R_RGB, TEAM_L_RGB,
+            4, 4, 5, 3, "l", "r", 0,
+        )
+        js_hash = js_result["board_hash"]
+
+        assert py_hash == js_hash, (
+            f"En passant board hash mismatch: py={py_hash[:16]} "
+            f"js={js_hash[:16]}"
+        )

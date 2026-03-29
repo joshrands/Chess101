@@ -1,0 +1,387 @@
+{
+  "version": 1,
+  "type": "networked",
+  "created": "2026-03-29T04:58:42.400126+00:00",
+  "source": "fuzz_networked",
+  "team_r_rgb": [
+    64,
+    180,
+    232
+  ],
+  "team_l_rgb": [
+    255,
+    140,
+    0
+  ],
+  "moves": [
+    {
+      "fr": 1,
+      "fc": 7,
+      "tr": 3,
+      "tc": 7,
+      "team_key": "r",
+      "flags": {
+        "is_capture": false,
+        "is_en_passant": false,
+        "is_castling": false,
+        "is_promotion": false,
+        "promoted_to": null,
+        "captured_at": null,
+        "rook_from": null,
+        "rook_to": null
+      }
+    },
+    {
+      "fr": 7,
+      "fc": 1,
+      "tr": 5,
+      "tc": 0,
+      "team_key": "l",
+      "flags": {
+        "is_capture": false,
+        "is_en_passant": false,
+        "is_castling": false,
+        "is_promotion": false,
+        "promoted_to": null,
+        "captured_at": null,
+        "rook_from": null,
+        "rook_to": null
+      }
+    },
+    {
+      "fr": 1,
+      "fc": 4,
+      "tr": 3,
+      "tc": 4,
+      "team_key": "r",
+      "flags": {
+        "is_capture": false,
+        "is_en_passant": false,
+        "is_castling": false,
+        "is_promotion": false,
+        "promoted_to": null,
+        "captured_at": null,
+        "rook_from": null,
+        "rook_to": null
+      }
+    },
+    {
+      "fr": 7,
+      "fc": 6,
+      "tr": 5,
+      "tc": 7,
+      "team_key": "l",
+      "flags": {
+        "is_capture": false,
+        "is_en_passant": false,
+        "is_castling": false,
+        "is_promotion": false,
+        "promoted_to": null,
+        "captured_at": null,
+        "rook_from": null,
+        "rook_to": null
+      }
+    },
+    {
+      "fr": 0,
+      "fc": 7,
+      "tr": 1,
+      "tc": 7,
+      "team_key": "r",
+      "flags": {
+        "is_capture": false,
+        "is_en_passant": false,
+        "is_castling": false,
+        "is_promotion": false,
+        "promoted_to": null,
+        "captured_at": null,
+        "rook_from": null,
+        "rook_to": null
+      }
+    },
+    {
+      "fr": 6,
+      "fc": 2,
+      "tr": 4,
+      "tc": 2,
+      "team_key": "l",
+      "flags": {
+        "is_capture": false,
+        "is_en_passant": false,
+        "is_castling": false,
+        "is_promotion": false,
+        "promoted_to": null,
+        "captured_at": null,
+        "rook_from": null,
+        "rook_to": null
+      }
+    },
+    {
+      "fr": 0,
+      "fc": 1,
+      "tr": 2,
+      "tc": 0,
+      "team_key": "r",
+      "flags": {
+        "is_capture": false,
+        "is_en_passant": false,
+        "is_castling": false,
+        "is_promotion": false,
+        "promoted_to": null,
+        "captured_at": null,
+        "rook_from": null,
+        "rook_to": null
+      }
+    },
+    {
+      "fr": 6,
+      "fc": 4,
+      "tr": 5,
+      "tc": 4,
+      "team_key": "l",
+      "flags": {
+        "is_capture": false,
+        "is_en_passant": false,
+        "is_castling": false,
+        "is_promotion": false,
+        "promoted_to": null,
+        "captured_at": null,
+        "rook_from": null,
+        "rook_to": null
+      }
+    },
+    {
+      "fr": 3,
+      "fc": 4,
+      "tr": 4,
+      "tc": 4,
+      "team_key": "r",
+      "flags": {
+        "is_capture": false,
+        "is_en_passant": false,
+        "is_castling": false,
+        "is_promotion": false,
+        "promoted_to": null,
+        "captured_at": null,
+        "rook_from": null,
+        "rook_to": null
+      }
+    },
+    {
+      "fr": 6,
+      "fc": 6,
+      "tr": 5,
+      "tc": 6,
+      "team_key": "l",
+      "flags": {
+        "is_capture": false,
+        "is_en_passant": false,
+        "is_castling": false,
+        "is_promotion": false,
+        "promoted_to": null,
+        "captured_at": null,
+        "rook_from": null,
+        "rook_to": null
+      }
+    },
+    {
+      "fr": 1,
+      "fc": 6,
+      "tr": 3,
+      "tc": 6,
+      "team_key": "r",
+      "flags": {
+        "is_capture": false,
+        "is_en_passant": false,
+        "is_castling": false,
+        "is_promotion": false,
+        "promoted_to": null,
+        "captured_at": null,
+        "rook_from": null,
+        "rook_to": null
+      }
+    },
+    {
+      "fr": 7,
+      "fc": 7,
+      "tr": 7,
+      "tc": 6,
+      "team_key": "l",
+      "flags": {
+        "is_capture": false,
+        "is_en_passant": false,
+        "is_castling": false,
+        "is_promotion": false,
+        "promoted_to": null,
+        "captured_at": null,
+        "rook_from": null,
+        "rook_to": null
+      }
+    },
+    {
+      "fr": 0,
+      "fc": 5,
+      "tr": 5,
+      "tc": 0,
+      "team_key": "r",
+      "flags": {
+        "is_capture": true,
+        "is_en_passant": false,
+        "is_castling": false,
+        "is_promotion": false,
+        "promoted_to": null,
+        "captured_at": null,
+        "rook_from": null,
+        "rook_to": null
+      }
+    },
+    {
+      "fr": 7,
+      "fc": 6,
+      "tr": 7,
+      "tc": 7,
+      "team_key": "l",
+      "flags": {
+        "is_capture": false,
+        "is_en_passant": false,
+        "is_castling": false,
+        "is_promotion": false,
+        "promoted_to": null,
+        "captured_at": null,
+        "rook_from": null,
+        "rook_to": null
+      }
+    },
+    {
+      "fr": 5,
+      "fc": 0,
+      "tr": 3,
+      "tc": 2,
+      "team_key": "r",
+      "flags": {
+        "is_capture": false,
+        "is_en_passant": false,
+        "is_castling": false,
+        "is_promotion": false,
+        "promoted_to": null,
+        "captured_at": null,
+        "rook_from": null,
+        "rook_to": null
+      }
+    },
+    {
+      "fr": 6,
+      "fc": 0,
+      "tr": 5,
+      "tc": 0,
+      "team_key": "l",
+      "flags": {
+        "is_capture": false,
+        "is_en_passant": false,
+        "is_castling": false,
+        "is_promotion": false,
+        "promoted_to": null,
+        "captured_at": null,
+        "rook_from": null,
+        "rook_to": null
+      }
+    },
+    {
+      "fr": 3,
+      "fc": 2,
+      "tr": 2,
+      "tc": 1,
+      "team_key": "r",
+      "flags": {
+        "is_capture": false,
+        "is_en_passant": false,
+        "is_castling": false,
+        "is_promotion": false,
+        "promoted_to": null,
+        "captured_at": null,
+        "rook_from": null,
+        "rook_to": null
+      }
+    },
+    {
+      "fr": 4,
+      "fc": 2,
+      "tr": 3,
+      "tc": 2,
+      "team_key": "l",
+      "flags": {
+        "is_capture": false,
+        "is_en_passant": false,
+        "is_castling": false,
+        "is_promotion": false,
+        "promoted_to": null,
+        "captured_at": null,
+        "rook_from": null,
+        "rook_to": null
+      }
+    },
+    {
+      "fr": 1,
+      "fc": 3,
+      "tr": 3,
+      "tc": 3,
+      "team_key": "r",
+      "flags": {
+        "is_capture": false,
+        "is_en_passant": false,
+        "is_castling": false,
+        "is_promotion": false,
+        "promoted_to": null,
+        "captured_at": null,
+        "rook_from": null,
+        "rook_to": null
+      }
+    },
+    {
+      "fr": 6,
+      "fc": 3,
+      "tr": 4,
+      "tc": 3,
+      "team_key": "l",
+      "flags": {
+        "is_capture": false,
+        "is_en_passant": false,
+        "is_castling": false,
+        "is_promotion": false,
+        "promoted_to": null,
+        "captured_at": null,
+        "rook_from": null,
+        "rook_to": null
+      }
+    },
+    {
+      "fr": 4,
+      "fc": 4,
+      "tr": 5,
+      "tc": 3,
+      "team_key": "r",
+      "flags": {
+        "is_capture": true,
+        "is_en_passant": true,
+        "is_castling": false,
+        "is_promotion": false,
+        "promoted_to": null,
+        "captured_at": [
+          4,
+          3
+        ],
+        "rook_from": null,
+        "rook_to": null
+      }
+    }
+  ],
+  "failure": {
+    "ply": 20,
+    "kind": "grid_mismatch",
+    "detail": "js\u2194spec:(4,3): {'type': 'Pawn', 'team_r': False} vs None; hash: py=4b2b504044c42cd0 js=f8e8f90fcf66fc2a",
+    "py_hash": "4b2b504044c42cd0",
+    "js_hash": "f8e8f90fcf66fc2a",
+    "status": "fixed"
+  },
+  "seed": 3743585872
+}

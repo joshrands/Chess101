@@ -602,3 +602,97 @@ class TestKingPrintPiece:
         king.print_piece()
         out = capsys.readouterr().out
         assert "3" in out and "6" in out
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Double check (BUG-07 regression)
+# ─────────────────────────────────────────────────────────────────────────────
+
+class TestDoubleCheck:
+    """In double check, only king moves are legal — no piece can block or
+    capture two attackers at once.  BUG-07: am_i_gonna_die used to
+    overwrite god_save_the_king with each attacker, so sky_fall would
+    only filter against the last one found."""
+
+    def test_double_check_clears_god_save_the_king(self):
+        """god_save_the_king must be empty in double check so that
+        sky_fall filters out all non-king moves."""
+        tr = Team(64, 180, 232)
+        tl = Team(255, 140, 0)
+        board = empty_board()
+
+        # R-King at (3,5), in double check from:
+        #   L-Queen at (3,2) — horizontal
+        #   L-Bishop at (2,4) — diagonal
+        king = King(3, 5, tr)
+        king.touched = True
+        board[3][5] = king
+        board[3][2] = Queen(3, 2, tl)
+        board[2][4] = Bishop(2, 4, tl)
+        board[7][4] = King(7, 4, tl)  # L-King (needed for valid board)
+
+        in_check = king.calc_targets(board)
+        assert in_check is True
+        assert king.god_save_the_king == [], (
+            "Double check must clear god_save_the_king so only king moves "
+            "are legal"
+        )
+
+    def test_double_check_non_king_pieces_have_no_moves(self):
+        """A pawn that could capture one attacker must still have zero
+        legal moves in double check."""
+        tr = Team(64, 180, 232)
+        tl = Team(255, 140, 0)
+        board = empty_board()
+
+        king = King(3, 5, tr)
+        king.touched = True
+        board[3][5] = king
+        board[3][2] = Queen(3, 2, tl)   # horizontal check
+        board[2][4] = Bishop(2, 4, tl)  # diagonal check
+        board[7][4] = King(7, 4, tl)
+
+        # R-Pawn at (2,1) could capture the Queen at (3,2) — but must
+        # not be allowed in double check
+        pawn = Pawn(2, 1, tr)
+        board[2][1] = pawn
+
+        in_check = king.calc_targets(board)
+        assert in_check is True
+
+        pawn.calc_targets(board)
+        pawn.sky_fall(king)
+        assert pawn.targets == [], (
+            "Pawn must have no legal moves in double check, even if it "
+            "could capture one of the attackers"
+        )
+
+    def test_single_check_still_allows_block(self):
+        """Single check must still allow blocking/capturing moves (not
+        broken by the double-check fix)."""
+        tr = Team(64, 180, 232)
+        tl = Team(255, 140, 0)
+        board = empty_board()
+
+        king = King(3, 5, tr)
+        king.touched = True
+        board[3][5] = king
+        board[3][2] = Queen(3, 2, tl)  # single check, horizontal
+        board[7][4] = King(7, 4, tl)
+
+        # R-Rook at (0,3) can block at (3,3)
+        rook = Rook(0, 3, tr)
+        board[0][3] = rook
+
+        in_check = king.calc_targets(board)
+        assert in_check is True
+        assert len(king.god_save_the_king) > 0, (
+            "Single check must populate god_save_the_king"
+        )
+
+        rook.calc_targets(board)
+        rook.sky_fall(king)
+        blocking = [(t.row, t.col) for t in rook.targets]
+        assert (3, 3) in blocking, (
+            "Rook must be able to block at (3,3) in single check"
+        )

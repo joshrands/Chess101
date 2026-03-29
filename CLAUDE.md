@@ -53,8 +53,8 @@ python3 -m venv .venv
 # Custom port (default 65101)
 .venv/bin/python run_simulator.py --host --port 65200
 
-# Replay a fuzzer corpus file interactively
-.venv/bin/python run_simulator.py --replay harness/crashes/chess/chess_*.corpus.json
+# Replay a fuzzer corpus file interactively (must be a .corpus.json, not a plain .json)
+.venv/bin/python run_simulator.py --replay harness/crashes/chess/chess_20260328T225141_legal_moves_ply19.corpus.json
 ```
 
 **Raspberry Pi (requires sudo for LED matrix access):**
@@ -88,6 +88,7 @@ sudo python3 GameManager.py --join 192.168.1.42
 .venv/bin/python -m pytest tests/test_lockstep_chess.py -v       # Python↔JS chess engine lockstep parity
 .venv/bin/python -m pytest tests/test_lockstep_networked.py -v  # Python↔JS↔Spectator three-way lockstep parity
 .venv/bin/python -m pytest tests/test_corpus_replay.py -v       # auto-discovered corpus regression tests
+.venv/bin/python -m pytest tests/test_serialization_parity.py -v # bridge↔network↔JS serialization parity
 
 # JS scanner — runs under Node.js, no npm install needed:
 node tests/test_chessmatrix_js.js
@@ -99,10 +100,15 @@ node tests/test_sim_js.js --verbose
 
 # Lockstep fuzzers — standalone, save disagreements to harness/crashes/:
 .venv/bin/python harness/fuzz_chessmatrix.py --iterations 1000
+.venv/bin/python harness/fuzz_chess.py --iterations 100
 .venv/bin/python harness/fuzz_networked.py --iterations 100
 
-# Replay a fuzzer crash through both decoders with debug output:
+# Replay a ChessMatrix crash through both decoders with debug output:
 .venv/bin/python harness/replay_crash.py harness/crashes/chessmatrix/disagree_000042_ABCDEF.png --stages
+
+# Replay a chess/networked corpus file interactively (pause/step/takeover):
+# Use .corpus.json files (not plain crash .json files)
+.venv/bin/python run_simulator.py --replay harness/crashes/chess/<file>.corpus.json
 ```
 
 `conftest.py` stubs out `rgbmatrix` and `smbus` so all test files run on Mac without Pi hardware.
@@ -157,14 +163,24 @@ bazel test //tests:test_chessmatrix_js
 bazel test //tests:test_lockstep_chessmatrix
 bazel test //tests:test_lockstep_chess
 bazel test //tests:test_lockstep_networked
+bazel test //tests:test_serialization_parity
+bazel test //tests:test_corpus_replay
 
-# Run the lockstep fuzzers:
+# Lockstep fuzzers — save disagreements to harness/crashes/:
 bazel run //harness:fuzz_chessmatrix -- --iterations 1000
 bazel run //harness:fuzz_chess -- --iterations 100
 bazel run //harness:fuzz_networked -- --iterations 100
 
-# Replay a fuzzer crash image through both decoders:
+# Fuzzer options (all three accept these):
+#   --iterations N    Number of random games to play (default varies)
+#   --seed N          RNG seed for reproducibility (default 42)
+#   --max-ply N       Max plies per game before declaring draw (chess/networked only, default 120)
+
+# Replay a ChessMatrix crash image through both decoders:
 bazel run //harness:replay_crash -- "$PWD/path/to/crash.png" --stages
+
+# Replay a chess/networked corpus file interactively in the simulator:
+bazel run //:run_simulator -- --replay "$PWD/harness/crashes/chess/chess_YYYYMMDD_kind_plyN.corpus.json"
 
 # Regenerate BUILD files after adding/removing Python files or imports:
 bazel run //:gazelle
@@ -332,6 +348,7 @@ Chess101/
     ├── test_lockstep_chess.py       # Python↔JS chess engine lockstep parity
     ├── test_lockstep_networked.py   # Python↔JS↔Spectator three-way lockstep parity
     ├── test_corpus_replay.py        # Auto-discovered corpus regression tests
+    ├── test_serialization_parity.py # Bridge↔network↔JS serialization parity
     ├── test_chessmatrix_js.js       # ChessMatrix scanning pipeline (Node.js)
     ├── test_sim_js.js              # Web sim logic regression tests (Node.js)
     └── fixtures/chessmatrix/        # PNG fixtures: real phone photos + synthetics

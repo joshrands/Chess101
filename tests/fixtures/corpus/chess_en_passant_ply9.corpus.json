@@ -1,0 +1,200 @@
+{
+  "version": 1,
+  "type": "chess",
+  "created": "2026-03-29T04:58:15.077577+00:00",
+  "source": "fuzz_chess",
+  "team_r_rgb": [
+    64,
+    180,
+    232
+  ],
+  "team_l_rgb": [
+    255,
+    140,
+    0
+  ],
+  "moves": [
+    {
+      "fr": 1,
+      "fc": 1,
+      "tr": 2,
+      "tc": 1,
+      "team_key": "r",
+      "flags": {
+        "is_capture": false,
+        "is_en_passant": false,
+        "is_castling": false,
+        "is_promotion": false,
+        "promoted_to": null,
+        "captured_at": null,
+        "rook_from": null,
+        "rook_to": null
+      }
+    },
+    {
+      "fr": 7,
+      "fc": 1,
+      "tr": 5,
+      "tc": 2,
+      "team_key": "l",
+      "flags": {
+        "is_capture": false,
+        "is_en_passant": false,
+        "is_castling": false,
+        "is_promotion": false,
+        "promoted_to": null,
+        "captured_at": null,
+        "rook_from": null,
+        "rook_to": null
+      }
+    },
+    {
+      "fr": 1,
+      "fc": 2,
+      "tr": 3,
+      "tc": 2,
+      "team_key": "r",
+      "flags": {
+        "is_capture": false,
+        "is_en_passant": false,
+        "is_castling": false,
+        "is_promotion": false,
+        "promoted_to": null,
+        "captured_at": null,
+        "rook_from": null,
+        "rook_to": null
+      }
+    },
+    {
+      "fr": 7,
+      "fc": 0,
+      "tr": 7,
+      "tc": 1,
+      "team_key": "l",
+      "flags": {
+        "is_capture": false,
+        "is_en_passant": false,
+        "is_castling": false,
+        "is_promotion": false,
+        "promoted_to": null,
+        "captured_at": null,
+        "rook_from": null,
+        "rook_to": null
+      }
+    },
+    {
+      "fr": 1,
+      "fc": 4,
+      "tr": 3,
+      "tc": 4,
+      "team_key": "r",
+      "flags": {
+        "is_capture": false,
+        "is_en_passant": false,
+        "is_castling": false,
+        "is_promotion": false,
+        "promoted_to": null,
+        "captured_at": null,
+        "rook_from": null,
+        "rook_to": null
+      }
+    },
+    {
+      "fr": 6,
+      "fc": 6,
+      "tr": 4,
+      "tc": 6,
+      "team_key": "l",
+      "flags": {
+        "is_capture": false,
+        "is_en_passant": false,
+        "is_castling": false,
+        "is_promotion": false,
+        "promoted_to": null,
+        "captured_at": null,
+        "rook_from": null,
+        "rook_to": null
+      }
+    },
+    {
+      "fr": 3,
+      "fc": 4,
+      "tr": 4,
+      "tc": 4,
+      "team_key": "r",
+      "flags": {
+        "is_capture": false,
+        "is_en_passant": false,
+        "is_castling": false,
+        "is_promotion": false,
+        "promoted_to": null,
+        "captured_at": null,
+        "rook_from": null,
+        "rook_to": null
+      }
+    },
+    {
+      "fr": 4,
+      "fc": 6,
+      "tr": 3,
+      "tc": 6,
+      "team_key": "l",
+      "flags": {
+        "is_capture": false,
+        "is_en_passant": false,
+        "is_castling": false,
+        "is_promotion": false,
+        "promoted_to": null,
+        "captured_at": null,
+        "rook_from": null,
+        "rook_to": null
+      }
+    },
+    {
+      "fr": 1,
+      "fc": 7,
+      "tr": 3,
+      "tc": 7,
+      "team_key": "r",
+      "flags": {
+        "is_capture": false,
+        "is_en_passant": false,
+        "is_castling": false,
+        "is_promotion": false,
+        "promoted_to": null,
+        "captured_at": null,
+        "rook_from": null,
+        "rook_to": null
+      }
+    },
+    {
+      "fr": 3,
+      "fc": 6,
+      "tr": 2,
+      "tc": 7,
+      "team_key": "l",
+      "flags": {
+        "is_capture": true,
+        "is_en_passant": true,
+        "is_castling": false,
+        "is_promotion": false,
+        "promoted_to": null,
+        "captured_at": [
+          3,
+          7
+        ],
+        "rook_from": null,
+        "rook_to": null
+      }
+    }
+  ],
+  "failure": {
+    "ply": 9,
+    "kind": "board_hash",
+    "detail": "py=dccd18841e97359d js=a11b1c5ab6db688e",
+    "py_hash": "dccd18841e97359d",
+    "js_hash": "a11b1c5ab6db688e",
+    "status": "fixed"
+  },
+  "seed": 382947942
+}

@@ -59,6 +59,8 @@ load("@rules_python//python:defs.bzl", "py_binary", "py_library")
 # ── Harness resolves (sys.path-based imports in fuzzer scripts) ──────────────
 # gazelle:resolve py python_bridge //harness:python_bridge
 # gazelle:resolve py python_bridge.JsBridge //harness:python_bridge
+# gazelle:resolve py chess_helpers //harness:chess_helpers
+# gazelle:resolve py corpus //harness:corpus
 
 # ── Internal cross-package resolves ──────────────────────────────────────────
 # gazelle:resolve py hardware //hardware

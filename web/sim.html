@@ -358,7 +358,7 @@ class King extends Piece{
   amIGonnaDie(grid){
     // Clear friendly critical flags
     for(const row of grid)for(const p of row)if(p&&p.team.r===this.team.r)p.critical=false;
-    let ar=-1,ac=-1;
+    let ar=-1,ac=-1,attackerCount=0;
     for(let i=-1;i<=1;i++){
       for(let j=-1;j<=1;j++){
         if(i===0&&j===0)continue;
@@ -373,12 +373,12 @@ class King extends Piece{
         } else if(er!==-1){
           const ep=grid[er][ec];
           if(orthogonal){
-            if(ep instanceof Rook||ep instanceof Queen){this.godSaveTheKing=this.pleaseGodSaveTheKing(er,ec);ar=er;ac=ec;}
-            else if(ep instanceof King&&Math.abs(er-this.row)+Math.abs(ec-this.col)===1){this.godSaveTheKing=this.pleaseGodSaveTheKing(er,ec);ar=er;ac=ec;}
+            if(ep instanceof Rook||ep instanceof Queen){this.godSaveTheKing=this.pleaseGodSaveTheKing(er,ec);ar=er;ac=ec;attackerCount++;}
+            else if(ep instanceof King&&Math.abs(er-this.row)+Math.abs(ec-this.col)===1){this.godSaveTheKing=this.pleaseGodSaveTheKing(er,ec);ar=er;ac=ec;attackerCount++;}
           } else {
-            if(ep instanceof Bishop||ep instanceof Queen){this.godSaveTheKing=this.pleaseGodSaveTheKing(er,ec);ar=er;ac=ec;}
-            else if(ep instanceof King&&Math.abs(er-this.row)+Math.abs(ec-this.col)===2){this.godSaveTheKing=this.pleaseGodSaveTheKing(er,ec);ar=er;ac=ec;}
-            else if(ep instanceof Pawn&&(er-this.row)===this.direction){this.godSaveTheKing=this.pleaseGodSaveTheKing(er,ec);ar=er;ac=ec;}
+            if(ep instanceof Bishop||ep instanceof Queen){this.godSaveTheKing=this.pleaseGodSaveTheKing(er,ec);ar=er;ac=ec;attackerCount++;}
+            else if(ep instanceof King&&Math.abs(er-this.row)+Math.abs(ec-this.col)===2){this.godSaveTheKing=this.pleaseGodSaveTheKing(er,ec);ar=er;ac=ec;attackerCount++;}
+            else if(ep instanceof Pawn&&(er-this.row)===this.direction){this.godSaveTheKing=this.pleaseGodSaveTheKing(er,ec);ar=er;ac=ec;attackerCount++;}
           }
         }
       }
@@ -386,8 +386,11 @@ class King extends Piece{
     // Knight checks
     for(const[dr,dc]of[[-2,-1],[-2,1],[-1,-2],[-1,2],[1,-2],[1,2],[2,-1],[2,1]]){
       const[kr,kc]=this._knightInShiningArmor(grid,dr,dc);
-      if(kr!==-1){this.godSaveTheKing=[new Cell(kr,kc)];ar=kr;ac=kc;break;}
+      if(kr!==-1){this.godSaveTheKing=[new Cell(kr,kc)];ar=kr;ac=kc;attackerCount++;break;}
     }
+    // Double check: only king moves are legal — no piece can block/capture
+    // two attackers at once.  Clear godSaveTheKing so skyFall filters all.
+    if(attackerCount>1)this.godSaveTheKing=[];
     return[ar,ac];
   }
 }

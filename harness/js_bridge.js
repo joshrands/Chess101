@@ -103,6 +103,16 @@ function applyMove(grid, fr, fc, tr, tc, teamR, teamL) {
   grid[fr][fc] = null;
   const flags = { captured_at: null, rook_from: null, rook_to: null, promoted: false };
   if (piece instanceof Pawn) {
+    // For en passant (diagonal to empty square): ensure enPassantLoc is
+    // set so move() can detect the capture even when calcTargets was not
+    // called.  For regular captures: clear any stale enPassantLoc that
+    // coincidentally matches the target to prevent move() from treating
+    // a normal capture as en passant and removing an extra piece.
+    if (Math.abs(tc - fc) === 1 && captured === null) {
+      piece.enPassantLoc = new Cell(tr, tc);
+    } else {
+      piece.enPassantLoc = null;
+    }
     const enemy = piece.move(tr, tc, grid);
     if (enemy) { grid[enemy.row][enemy.col] = null; flags.captured_at = [enemy.row, enemy.col]; }
     // auto-promote

@@ -235,6 +235,7 @@ class King(Piece):
                     piece.critical = False
 
         attacker_row, attacker_col = -1, -1
+        attacker_count = 0
 
         for i in [-1, 0, 1]:
             for j in [-1, 0, 1]:
@@ -259,11 +260,13 @@ class King(Piece):
                             self.god_save_the_king = self.please_god_save_the_king(
                                 enemy_row, enemy_col)
                             attacker_row, attacker_col = enemy_row, enemy_col
+                            attacker_count += 1
                         elif isinstance(board[enemy_row][enemy_col], King):
                             if abs(enemy_row - self.row) + abs(enemy_col - self.col) == 1:
                                 self.god_save_the_king = self.please_god_save_the_king(
                                     enemy_row, enemy_col)
                                 attacker_row, attacker_col = enemy_row, enemy_col
+                                attacker_count += 1
                 else:
                     if scout_row != -1:
                         if enemy_row != -1:
@@ -279,16 +282,19 @@ class King(Piece):
                             self.god_save_the_king = self.please_god_save_the_king(
                                 enemy_row, enemy_col)
                             attacker_row, attacker_col = enemy_row, enemy_col
+                            attacker_count += 1
                         elif isinstance(board[enemy_row][enemy_col], King):
                             if abs(enemy_row - self.row) + abs(enemy_col - self.col) == 2:
                                 self.god_save_the_king = self.please_god_save_the_king(
                                     enemy_row, enemy_col)
                                 attacker_row, attacker_col = enemy_row, enemy_col
+                                attacker_count += 1
                         elif isinstance(board[enemy_row][enemy_col], Pawn):
                             if enemy_row - self.row == self.direction:
                                 self.god_save_the_king = self.please_god_save_the_king(
                                     enemy_row, enemy_col)
                                 attacker_row, attacker_col = enemy_row, enemy_col
+                                attacker_count += 1
 
         row_deltas = [2, 2, -2, -2, 1, 1, -1, -1]
         col_deltas = [1, -1, 1, -1, 2, -2, 2, -2]
@@ -298,7 +304,14 @@ class King(Piece):
             if knight_row != -1 and knight_col != -1:
                 self.god_save_the_king = [Cell(knight_row, knight_col)]
                 attacker_row, attacker_col = knight_row, knight_col
+                attacker_count += 1
                 break
+
+        # Double check: no single piece can resolve two checks at once,
+        # so only king moves are legal.  Clear god_save_the_king so that
+        # sky_fall filters out all non-king targets.
+        if attacker_count > 1:
+            self.god_save_the_king = []
 
         return attacker_row, attacker_col
 
