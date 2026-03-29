@@ -1,7 +1,8 @@
 """Fake LED matrix implementation for the Mac Pygame simulator.
 
 Redirects SetPixel calls to a pygame.Surface so that Board's rendering
-methods work without any Pi hardware.
+methods work without any Pi hardware.  Each LED pixel is rendered as a
+round dot with a soft glow, matching the JS simulator's aesthetic.
 """
 from __future__ import annotations
 
@@ -42,10 +43,11 @@ class FakeRGBMatrix:
     """Simulated RGBMatrix for the Mac Pygame simulator.
 
     Replaces the Pi's hardware RGBMatrix. Renders to a pygame.Surface
-    scaled up by SCALE so each 1-pixel LED cell appears as a large square.
+    with per-pixel LED dot rendering (round circles with glow) so each
+    LED pixel looks like a real LED instead of a blocky scaled square.
     """
 
-    SCALE = 30  # each 4×4 LED cell → 120×120 px; 32*30 = 960 px window
+    SCALE = 30  # each LED pixel → 30×30 px region; 32*30 = 960 px window
 
     def __init__(self, options=None) -> None:
         """Initialize with no attached screen; caller must set _screen before rendering.
@@ -55,6 +57,35 @@ class FakeRGBMatrix:
         """
         self._screen: pygame.Surface | None = None
         self._canvas = FakeFrameCanvas()
+        self._led_template: pygame.Surface | None = None
+
+    def _build_led_template(self) -> pygame.Surface:
+        """Build a grayscale LED dot template with glow, body, and highlight.
+
+        The template is a white-on-transparent surface that gets color-tinted
+        per pixel via BLEND_RGB_MULT at render time.
+        """
+        s = self.SCALE
+        surf = pygame.Surface((s, s), pygame.SRCALPHA)
+        cx, cy = s // 2, s // 2
+
+        # Soft outer glow
+        glow_r = int(s * 0.48)
+        glow_surf = pygame.Surface((s, s), pygame.SRCALPHA)
+        pygame.draw.circle(glow_surf, (255, 255, 255, 45), (cx, cy), glow_r)
+        surf.blit(glow_surf, (0, 0))
+
+        # Main LED body
+        body_r = int(s * 0.38)
+        pygame.draw.circle(surf, (255, 255, 255, 255), (cx, cy), body_r)
+
+        # Specular highlight
+        hl_r = max(2, int(s * 0.13))
+        hl_x = cx - int(s * 0.08)
+        hl_y = cy - int(s * 0.08)
+        pygame.draw.circle(surf, (255, 255, 255, 55), (hl_x, hl_y), hl_r)
+
+        return surf
 
     def CreateFrameCanvas(self) -> FakeFrameCanvas:
         """Return the single shared FakeFrameCanvas.
@@ -69,17 +100,36 @@ class FakeRGBMatrix:
         return canvas
 
     def blit_to_screen(self) -> None:
-        """Scale and blit the 32×32 LED surface to the pygame screen.
+        """Render the 32×32 LED surface to the pygame screen as glowing dots.
         Does NOT call pygame.display.flip() — caller controls when to present."""
         if self._screen is None:
             return
-        scaled = pygame.transform.scale(
-            self._canvas._surface,
-            (32 * self.SCALE, 32 * self.SCALE),
-        )
-        self._screen.blit(scaled, (0, 0))
+
+        # Lazy-init the template (pygame must be initialized first)
+        if self._led_template is None:
+            self._led_template = self._build_led_template()
+
+        s = self.SCALE
+        board_w = 32 * s
+        board_h = 32 * s
+
+        # Clear the board area to dark background
+        pygame.draw.rect(self._screen, (5, 8, 16), (0, 0, board_w, board_h))
+
+        raw = self._canvas._surface
+        template = self._led_template
+
+        for ly in range(32):
+            for lx in range(32):
+                r, g, b, _a = raw.get_at((lx, ly))
+                if r == 0 and g == 0 and b == 0:
+                    continue
+                # Tint the template with this pixel's color
+                tinted = template.copy()
+                tinted.fill((r, g, b), special_flags=pygame.BLEND_RGB_MULT)
+                self._screen.blit(tinted, (lx * s, ly * s))
 
     def flip(self) -> None:
-        """Scale the canvas, blit it to the pygame screen, and present the frame."""
+        """Render LEDs, blit to the pygame screen, and present the frame."""
         self.blit_to_screen()
         pygame.display.flip()

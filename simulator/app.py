@@ -55,12 +55,13 @@ _BOARD_W  = 32 * _SCALE   # 960 — width of the LED canvas area
 _PANEL_W  = 340           # side panel width
 _WIN_W    = _BOARD_W + _PANEL_W
 
-# Panel colour palette
-_P_BG    = (18,  22,  32)   # background
-_P_SEP   = (45,  50,  68)   # divider lines
-_P_TEXT  = (185, 192, 210)  # normal text
-_P_DIM   = (95,  103, 125)  # labels / secondary text
-_P_GOOD  = (85,  200, 115)  # green  (low peace-time)
+# Panel colour palette — aligned with JS sim dark theme
+_P_BG    = (7,   12,  24)   # background (matches JS #070c18)
+_P_SEP   = (30,  42,  58)   # divider lines
+_P_TEXT  = (200, 208, 224)  # normal text
+_P_DIM   = (58,  74,  96)   # labels / secondary text
+_P_ACCENT = (0,  255, 136)  # accent green (matches JS #00ff88)
+_P_GOOD  = (0,   255, 136)  # green  (low peace-time) — matches accent
 _P_WARN  = (228, 172, 52)   # yellow (caution)
 _P_BAD   = (232, 72,  62)   # red    (check / danger)
 
@@ -730,7 +731,11 @@ class GameRunner:
         b.matrix.blit_to_screen()
 
     def _draw_piece_overlay(self, grid=None) -> None:
-        """Draw chess pieces as Unicode-symbol circles on top of the scaled LED surface.
+        """Draw chess pieces as Unicode glyphs on top of the scaled LED surface.
+
+        Matches the JS sim's approach: a dark semi-transparent pedestal circle
+        behind each glyph, with brightness-based text coloring and a thin
+        outline for legibility.
 
         Uses grid enumeration indices (not piece.row/col) so the overlay always
         matches the actual board state even if a piece's internal coords lag.
@@ -747,8 +752,10 @@ class GameRunner:
         b = self._b
         team_r_r = b.team_r.r  # used to pick which Unicode glyph variant
 
-        r_circle = int(_CELL_PX * 0.38)    # piece circle radius
-        shadow_off = max(3, r_circle // 8)  # drop-shadow offset
+        pedestal_r = int(_CELL_PX * 0.38)
+
+        # Shared alpha surface for translucent circles
+        pedestal_surf = pygame.Surface((_CELL_PX, _CELL_PX), pygame.SRCALPHA)
 
         for row_idx, row in enumerate(grid):
             for col_idx, piece in enumerate(row):
@@ -757,29 +764,27 @@ class GameRunner:
                 cx = col_idx * _CELL_PX + _CELL_PX // 2
                 cy = row_idx * _CELL_PX + _CELL_PX // 2
                 tc = (piece.team.r, piece.team.g, piece.team.b)
+                is_white = piece.team.r == team_r_r
 
-                # Drop shadow
-                pygame.draw.circle(screen, (20, 20, 20),
-                                   (cx + shadow_off, cy + shadow_off), r_circle)
-                # Team-colour fill
-                pygame.draw.circle(screen, tc, (cx, cy), r_circle)
-                # Thin white ring
-                pygame.draw.circle(screen, (255, 255, 255), (cx, cy), r_circle, 2)
+                # Translucent team-color circle
+                pedestal_surf.fill((0, 0, 0, 0))
+                pygame.draw.circle(pedestal_surf, (tc[0], tc[1], tc[2], 75),
+                                   (_CELL_PX // 2, _CELL_PX // 2), pedestal_r)
+                screen.blit(pedestal_surf,
+                            (col_idx * _CELL_PX, row_idx * _CELL_PX))
 
                 # Pick glyph: team_r → hollow/white variant, team_l → solid/black variant
                 glyphs = _PIECE_UNICODE.get(type(piece), ('?', '?'))
-                symbol = glyphs[0] if piece.team.r == team_r_r else glyphs[1]
+                symbol = glyphs[0] if is_white else glyphs[1]
 
-                # Text colour: white on dark teams, near-black on light teams
-                brightness = 0.299 * tc[0] + 0.587 * tc[1] + 0.114 * tc[2]
-                text_color = (20, 20, 20) if brightness > 140 else (245, 245, 245)
+                # White team = white text + dark outline, black team = dark text + light outline
+                text_color = (245, 245, 245) if is_white else (20, 20, 20)
+                outline_c = (0, 0, 0) if is_white else (255, 255, 255)
 
-                # Render with a 1-px outline for legibility (draw shadow then draw symbol)
+                # Render with a 1-px outline for legibility
                 surf = self._font.render(symbol, True, text_color)
                 rect = surf.get_rect(center=(cx, cy))
-                outline_surf = self._font.render(
-                    symbol, True,
-                    (20, 20, 20) if brightness <= 140 else (230, 230, 230))
+                outline_surf = self._font.render(symbol, True, outline_c)
                 for dx, dy in ((-1, 0), (1, 0), (0, -1), (0, 1)):
                     screen.blit(outline_surf, rect.move(dx, dy))
                 screen.blit(surf, rect)
@@ -797,7 +802,7 @@ class GameRunner:
                         cy = row_idx * _CELL_PX + _CELL_PX // 2
                         if (pygame.time.get_ticks() // 500) % 2:
                             pygame.draw.circle(screen, (255, 255, 255),
-                                               (cx, cy), r_circle + 4, 3)
+                                               (cx, cy), pedestal_r + 4, 3)
 
     def _render_playing(self) -> None:
         """Render one frame of the active chess game to the LED canvas.
@@ -1251,6 +1256,9 @@ class GameRunner:
         h   = 32 * _SCALE
 
         pygame.draw.rect(screen, _P_BG, (x0, 0, w, h))
+        # Accent glow line at left edge of panel (board-panel border)
+        pygame.draw.line(screen, (0, 80, 44), (x0, 0), (x0, h))
+        pygame.draw.line(screen, (0, 50, 28), (x0 + 1, 0), (x0 + 1, h))
 
         y = 10
 
@@ -1272,7 +1280,7 @@ class GameRunner:
             pygame.draw.circle(screen, _P_SEP, (cx, cy), r, 1)
 
         # ── Title ────────────────────────────────────────────────────────────
-        text("Chess 101", pfont_lg, _P_TEXT)
+        text("Chess 101", pfont_lg, _P_ACCENT)
         sep()
 
         # ── Phase ────────────────────────────────────────────────────────────

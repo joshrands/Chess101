@@ -1012,16 +1012,6 @@ function renderPlaying(now){
   // AI display board overlay
   const displayGrid=aiThinking&&aiDisplayGrid?aiDisplayGrid:grid;
 
-  // Draw pieces — outer LEDs keep checker color; only center 2×2 is painted with team color
-  if(displayGrid){
-    for(let r=0;r<8;r++)for(let c=0;c<8;c++){
-      const p=displayGrid[r][c];if(!p)continue;
-      for(let i=1;i<=2;i++)for(let j=1;j<=2;j++){
-        setPixel(c*4+j,r*4+i,p.team.r,p.team.g,p.team.b);
-      }
-    }
-  }
-
   // Highlight targets
   if(selectedPiece&&!aiThinking){
     for(const t of selectedPiece.targets){
@@ -1080,12 +1070,17 @@ function drawPieceOverlay(g){
   ctx.textAlign='center';ctx.textBaseline='middle';
   const fs=Math.floor(CELL_PX*0.52);
   ctx.font=`bold ${fs}px serif`;
+  const pr=Math.floor(CELL_PX*0.38); // piece circle radius
   for(let r=0;r<8;r++)for(let c=0;c<8;c++){
     const p=g[r][c];if(!p)continue;
     const cx=c*CELL_PX+CELL_PX/2,cy=r*CELL_PX+CELL_PX/2;
-    const isBlackTeam=teamL&&p.team.r===teamL.r;
-    const outlineColor=isBlackTeam?'rgba(255,255,255,0.9)':'rgba(0,0,0,0.85)';
-    const fillColor=isBlackTeam?'rgba(10,10,10,0.97)':'rgba(255,255,255,0.95)';
+    const isWhite=teamR&&p.team.r===teamR.r;
+    // Translucent team-color circle
+    ctx.fillStyle=`rgba(${p.team.r},${p.team.g},${p.team.b},0.3)`;
+    ctx.beginPath();ctx.arc(cx,cy,pr,0,Math.PI*2);ctx.fill();
+    // Glyph: white team = white text + dark outline, black team = dark text + light outline
+    const outlineColor=isWhite?'rgba(0,0,0,0.9)':'rgba(255,255,255,0.85)';
+    const fillColor=isWhite?'rgba(255,255,255,0.95)':'rgba(10,10,10,0.95)';
     ctx.fillStyle=outlineColor;
     ctx.fillText(pieceGlyph(p),cx-1,cy-1);
     ctx.fillText(pieceGlyph(p),cx+1,cy-1);
