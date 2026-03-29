@@ -1,0 +1,162 @@
+{
+  "version": 1,
+  "type": "chess",
+  "created": "2026-03-29T00:00:00+00:00",
+  "source": "manual_double_check",
+  "team_r_rgb": [
+    64,
+    180,
+    232
+  ],
+  "team_l_rgb": [
+    255,
+    140,
+    0
+  ],
+  "moves": [
+    {
+      "fr": 0,
+      "fc": 1,
+      "tr": 2,
+      "tc": 0,
+      "team_key": "r",
+      "flags": {
+        "is_en_passant": false,
+        "is_castling": false,
+        "is_promotion": false,
+        "captured_at": null,
+        "rook_from": null,
+        "rook_to": null
+      }
+    },
+    {
+      "fr": 6,
+      "fc": 4,
+      "tr": 4,
+      "tc": 4,
+      "team_key": "l",
+      "flags": {
+        "is_en_passant": false,
+        "is_castling": false,
+        "is_promotion": false,
+        "captured_at": null,
+        "rook_from": null,
+        "rook_to": null
+      }
+    },
+    {
+      "fr": 1,
+      "fc": 3,
+      "tr": 3,
+      "tc": 3,
+      "team_key": "r",
+      "flags": {
+        "is_en_passant": false,
+        "is_castling": false,
+        "is_promotion": false,
+        "captured_at": null,
+        "rook_from": null,
+        "rook_to": null
+      }
+    },
+    {
+      "fr": 7,
+      "fc": 4,
+      "tr": 6,
+      "tc": 4,
+      "team_key": "l",
+      "flags": {
+        "is_en_passant": false,
+        "is_castling": false,
+        "is_promotion": false,
+        "captured_at": null,
+        "rook_from": null,
+        "rook_to": null
+      }
+    },
+    {
+      "fr": 1,
+      "fc": 5,
+      "tr": 2,
+      "tc": 5,
+      "team_key": "r",
+      "flags": {
+        "is_en_passant": false,
+        "is_castling": false,
+        "is_promotion": false,
+        "captured_at": null,
+        "rook_from": null,
+        "rook_to": null
+      }
+    },
+    {
+      "fr": 7,
+      "fc": 3,
+      "tr": 7,
+      "tc": 4,
+      "team_key": "l",
+      "flags": {
+        "is_en_passant": false,
+        "is_castling": false,
+        "is_promotion": false,
+        "captured_at": null,
+        "rook_from": null,
+        "rook_to": null
+      }
+    },
+    {
+      "fr": 0,
+      "fc": 2,
+      "tr": 5,
+      "tc": 7,
+      "team_key": "r",
+      "flags": {
+        "is_en_passant": false,
+        "is_castling": false,
+        "is_promotion": false,
+        "captured_at": null,
+        "rook_from": null,
+        "rook_to": null
+      }
+    },
+    {
+      "fr": 6,
+      "fc": 4,
+      "tr": 5,
+      "tc": 3,
+      "team_key": "l",
+      "flags": {
+        "is_en_passant": false,
+        "is_castling": false,
+        "is_promotion": false,
+        "captured_at": null,
+        "rook_from": null,
+        "rook_to": null
+      }
+    },
+    {
+      "fr": 3,
+      "fc": 3,
+      "tr": 4,
+      "tc": 4,
+      "team_key": "r",
+      "flags": {
+        "is_en_passant": false,
+        "is_castling": false,
+        "is_promotion": false,
+        "captured_at": [
+          4,
+          4
+        ],
+        "rook_from": null,
+        "rook_to": null
+      }
+    }
+  ],
+  "failure": {
+    "ply": 9,
+    "kind": "double_check_demo",
+    "detail": "Double check: R-Queen at d8 checks along d-file, R-Pawn at e4 checks diagonally. L-King at d3 has 5 escape squares but no other L-piece can move."
+  },
+  "seed": 2113
+}
