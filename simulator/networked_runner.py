@@ -973,15 +973,17 @@ class NetworkedGameRunner(GameRunner):
             # stamp its class name so the remote side can apply the same promotion.
             if pm["flags"].is_promotion:
                 pm["flags"].promoted_to = type(b.grid[pm["tr"]][pm["tc"]]).__name__
-            h = board_hash(b.grid, self.peace_time, team_key, b.team_r)
-            self._net_seq += 1
-            msg = build_move_msg(
-                self._net_seq,
-                pm["fr"], pm["fc"], pm["tr"], pm["tc"],
-                pm["piece"], pm["flags"], h,
-            )
-            self._net_send(msg)
-            self._waiting_for_ack = True
+            # In LOCAL mode there is no peer — skip network send and ack wait
+            if self._local_team_key != "both":
+                h = board_hash(b.grid, self.peace_time, team_key, b.team_r)
+                self._net_seq += 1
+                msg = build_move_msg(
+                    self._net_seq,
+                    pm["fr"], pm["fc"], pm["tr"], pm["tc"],
+                    pm["piece"], pm["flags"], h,
+                )
+                self._net_send(msg)
+                self._waiting_for_ack = True
             self._log_move(
                 "You", pm["piece"],
                 pm["fr"], pm["fc"], pm["tr"], pm["tc"],

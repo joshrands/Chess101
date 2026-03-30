@@ -1252,6 +1252,67 @@ class TestLocalWarGames:
         assert runner._b.computer_player_l is False
 
 
+class TestLocalPlayingMoves:
+    """LOCAL mode must allow both teams to make moves without network ack.
+
+    Regression: _next_turn set _waiting_for_ack=True even in LOCAL mode
+    (no peer to send ack), permanently blocking input for the second team.
+    """
+
+    def _make_playing_runner(self, _pygame_fixture):
+        """Create a LOCAL runner advanced to PLAYING with both sides Human."""
+        runner = _make_local_runner(_pygame_fixture)
+        runner._handle_color_pick(_click(2, 0))
+        runner._handle_color_pick(_click(5, 1))
+        runner._handle_war_games(_click(3, 0))   # team_r = Human
+        runner._handle_war_games(_click(4, 7))   # team_l = Human
+        assert runner.phase == Phase.PLAYING
+        return runner
+
+    def test_second_move_not_blocked(self, _pygame):
+        """After team_r moves, team_l must be able to select and move a piece."""
+        runner = self._make_playing_runner(_pygame)
+        b = runner._b
+
+        # team_r moves pawn from (1,4) to (3,4)
+        assert runner._current_team.r == b.team_r.r
+        runner._handle_playing(_click(1, 4))  # select pawn
+        assert runner._selected_piece is not None, "team_r pawn must be selectable"
+        runner._handle_playing(_click(3, 4))  # move pawn
+
+        # Now it's team_l's turn
+        assert runner._current_team.r == b.team_l.r, "turn must switch to team_l"
+        assert not runner._waiting_for_ack, (
+            "_waiting_for_ack must be False in LOCAL mode — no peer to ack"
+        )
+
+        # team_l selects pawn at (6,4)
+        runner._handle_playing(_click(6, 4))
+        assert runner._selected_piece is not None, (
+            "team_l must be able to select a piece on their turn"
+        )
+
+        # team_l moves pawn to (4,4)
+        runner._handle_playing(_click(4, 4))
+        assert runner._current_team.r == b.team_r.r, (
+            "turn must switch back to team_r after team_l moves"
+        )
+
+    def test_waiting_for_ack_stays_false_in_local(self, _pygame):
+        """LOCAL mode must never set _waiting_for_ack."""
+        runner = self._make_playing_runner(_pygame)
+
+        # Make several moves, verify ack flag never set
+        moves = [(1, 0, 3, 0), (6, 0, 4, 0), (1, 1, 3, 1)]
+        for fr, fc, tr, tc in moves:
+            runner._handle_playing(_click(fr, fc))
+            runner._handle_playing(_click(tr, tc))
+            assert not runner._waiting_for_ack, (
+                f"_waiting_for_ack must stay False in LOCAL mode after move "
+                f"({fr},{fc})->({tr},{tc})"
+            )
+
+
 class TestNetworkedAISuppression:
     """Networked runner must suppress AI for the remote team's turn.
 
