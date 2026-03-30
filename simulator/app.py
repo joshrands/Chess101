@@ -225,6 +225,7 @@ class GameRunner:
         self._ai_result: Optional[Tree] = None
         self._ai_display_board: Optional[list] = None
         self._ai_display_lock = threading.Lock()
+        self._anim: Optional[dict] = None  # {piece, piece_type, is_white, from_r, from_c, to_r, to_c, start_ms, on_done}
 
         # Game-over transient state
         self._winner_team: Optional[Team] = None
@@ -729,6 +730,70 @@ class GameRunner:
 
         b.matrix.blit_to_screen()
 
+    # ── Move animation ──────────────────────────────────────────────────────────
+
+    _ANIM_MS = 300
+
+    def _start_anim(self, piece: Piece, from_r: int, from_c: int,
+                    to_r: int, to_c: int, on_done) -> None:
+        team_r_r = self._b.team_r.r
+        is_white = piece.team.r == team_r_r
+        glyphs = _PIECE_UNICODE.get(type(piece), ('?', '?'))
+        symbol = glyphs[0] if is_white else glyphs[1]
+        self._anim = {
+            'piece': piece, 'symbol': symbol, 'is_white': is_white,
+            'from_r': from_r, 'from_c': from_c, 'to_r': to_r, 'to_c': to_c,
+            'start_ms': pygame.time.get_ticks(), 'on_done': on_done,
+        }
+
+    def _update_anim(self) -> None:
+        if self._anim is None:
+            return
+        a = self._anim
+        now = pygame.time.get_ticks()
+        prog = min(1.0, (now - a['start_ms']) / self._ANIM_MS)
+        t = 1.0 - (1.0 - prog) ** 2  # ease-out quadratic
+        from_cx = a['from_c'] * _CELL_PX + _CELL_PX // 2
+        from_cy = a['from_r'] * _CELL_PX + _CELL_PX // 2
+        to_cx = a['to_c'] * _CELL_PX + _CELL_PX // 2
+        to_cy = a['to_r'] * _CELL_PX + _CELL_PX // 2
+        a['cx'] = int(from_cx + (to_cx - from_cx) * t)
+        a['cy'] = int(from_cy + (to_cy - from_cy) * t)
+        if prog >= 1.0:
+            cb = a['on_done']
+            self._anim = None
+            if cb:
+                cb()
+
+    def _draw_anim_piece(self) -> None:
+        if self._anim is None or 'cx' not in self._anim:
+            return
+        a = self._anim
+        screen = self._b.matrix._screen
+        if screen is None:
+            return
+        piece = a['piece']
+        cx, cy = a['cx'], a['cy']
+        tc = (piece.team.r, piece.team.g, piece.team.b)
+        is_white = a['is_white']
+        pedestal_r = int(_CELL_PX * 0.38)
+
+        pedestal_surf = pygame.Surface((_CELL_PX, _CELL_PX), pygame.SRCALPHA)
+        pedestal_surf.fill((0, 0, 0, 0))
+        pygame.draw.circle(pedestal_surf, (tc[0], tc[1], tc[2], 140),
+                           (_CELL_PX // 2, _CELL_PX // 2), pedestal_r)
+        screen.blit(pedestal_surf, (cx - _CELL_PX // 2, cy - _CELL_PX // 2))
+
+        text_color = (245, 245, 245) if is_white else (20, 20, 20)
+        outline_c = (0, 0, 0) if is_white else (255, 255, 255)
+        symbol = a['symbol']
+        surf = self._font.render(symbol, True, text_color)
+        rect = surf.get_rect(center=(cx, cy))
+        outline_surf = self._font.render(symbol, True, outline_c)
+        for dx, dy in ((-1, 0), (1, 0), (0, -1), (0, 1)):
+            screen.blit(outline_surf, rect.move(dx, dy))
+        screen.blit(surf, rect)
+
     def _draw_piece_overlay(self, grid=None) -> None:
         """Draw chess pieces as Unicode glyphs on top of the scaled LED surface.
 
@@ -756,9 +821,13 @@ class GameRunner:
         # Shared alpha surface for translucent circles
         pedestal_surf = pygame.Surface((_CELL_PX, _CELL_PX), pygame.SRCALPHA)
 
+        anim_dest = (self._anim['to_r'], self._anim['to_c']) if self._anim and show_selection else None
         for row_idx, row in enumerate(grid):
             for col_idx, piece in enumerate(row):
                 if piece is None:
+                    continue
+                # Skip destination cell of animating piece (drawn by _draw_anim_piece)
+                if anim_dest and (row_idx, col_idx) == anim_dest:
                     continue
                 cx = col_idx * _CELL_PX + _CELL_PX // 2
                 cy = row_idx * _CELL_PX + _CELL_PX // 2
@@ -844,7 +913,9 @@ class GameRunner:
                                  p.team.r, p.team.g, p.team.b)
 
             b.matrix.blit_to_screen()
+            self._update_anim()
             self._draw_piece_overlay()
+            self._draw_anim_piece()
 
             if self._promoting_pawn is not None:
                 self._render_promotion_overlay()
@@ -1100,7 +1171,7 @@ class GameRunner:
             return
         if event.type != pygame.MOUSEBUTTONDOWN:
             return
-        if self._ai_thinking:
+        if self._ai_thinking or self._anim is not None:
             return
         cell = self._px_to_cell(*event.pos)
         if cell is None:
@@ -1225,11 +1296,15 @@ class GameRunner:
                         self.peace_time = 0
                     else:
                         self.peace_time += 1
-                    b.grid[tgt_r][tgt_c] = b.grid[old_r][old_c]
+                    piece = b.grid[old_r][old_c]
+                    b.grid[tgt_r][tgt_c] = piece
                     self._apply_move(old_r, old_c, tgt_r, tgt_c)
                     self._move_count += 1
+                    if piece is not None:
+                        self._start_anim(piece, old_r, old_c, tgt_r, tgt_c, self._next_turn)
                 self._ai_thinking = False
-                self._next_turn()
+                if self._anim is None:
+                    self._next_turn()
 
     def _render_panel_extra(self, text, sep, pfont_sm, pfont_md) -> None:
         """Hook for subclasses to inject extra panel rows before the log.

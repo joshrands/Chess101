@@ -1129,7 +1129,8 @@ class NetworkedGameRunner(GameRunner):
         else:
             self.peace_time += 1
 
-        b.grid[tr][tc] = b.grid[fr][fc]
+        moving_piece = b.grid[fr][fc]
+        b.grid[tr][tc] = moving_piece
         self._apply_move(fr, fc, tr, tc)
         self._move_count += 1
 
@@ -1183,8 +1184,11 @@ class NetworkedGameRunner(GameRunner):
         # Remember last remote move so _render_playing can blink the destination
         self._remote_last_move = (fr, fc, tr, tc)
 
-        # Advance turn (this side becomes the next player)
-        self._next_turn()
+        # Animate the remote move then advance turn
+        if moving_piece is not None:
+            self._start_anim(moving_piece, fr, fc, tr, tc, self._next_turn)
+        else:
+            self._next_turn()
 
     def _check_keepalive(self) -> None:
         """Send ping every 10s; treat no pong in 30s as disconnect."""

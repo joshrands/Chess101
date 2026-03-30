@@ -48,6 +48,14 @@ a.back:hover{color:#00ff88}
 #scan-canvas2{display:none}
 #scan-note{font-size:10px;color:#3a7050}
 #stop-scan2{font-size:10px;color:#3a4a60;background:none;border:none;cursor:pointer;text-decoration:underline}
+@media(max-width:720px){
+  body{justify-content:flex-start;padding-top:8px}
+  #app{flex-direction:column;width:100%;border-radius:0;border-left:none;border-right:none}
+  #board-wrap{width:100%}
+  #board{width:100%!important;height:auto!important}
+  #panel{width:100%;max-height:40vh;border-left:none;border-top:1px solid #1e2a3a}
+  #join-box{min-width:unset;width:90vw;max-width:300px}
+}
 </style>
 </head>
 <body>
@@ -600,6 +608,11 @@ let aiThinking=false;
 let aiWorker=null;
 let aiDisplayGrid=null;
 
+// Move animation state (visual only — grid updates immediately)
+const ANIM_MS=300;
+let animPieces=[]; // [{piece,glyph,isWhite,cx,cy,toR,toC,startMs}] — active sliding pieces
+let animOnDone=null; // called when all animPieces finish
+
 // Color pick state
 let selectedRIdx=null,selectedLIdx=null;
 
@@ -765,6 +778,70 @@ function nextTurn(){
   beginTurn(currentTeam);
 }
 
+// ── Move animation ────────────────────────────────────────────────────────────
+function buildAnimEntries(piece,fr,fc,tr,tc){
+  if(!piece)return[];
+  const isWhite=teamR&&piece.team.r===teamR.r;
+  const entries=[{piece,glyph:pieceGlyph(piece),isWhite,fromR:fr,fromC:fc,toR:tr,toC:tc}];
+  // Detect castling: King moves 2 columns
+  if(piece instanceof King&&Math.abs(tc-fc)===2){
+    const rookFromC=tc>fc?7:0;
+    const rookToC=tc>fc?5:3;
+    const rook=grid[tr][rookFromC];
+    if(rook)entries.push({piece:rook,glyph:pieceGlyph(rook),isWhite,fromR:tr,fromC:rookFromC,toR:tr,toC:rookToC});
+  }
+  return entries;
+}
+
+function startAnims(entries,onDone){
+  // entries: [{piece,glyph,isWhite,fromR,fromC,toR,toC}]
+  const now=performance.now();
+  animPieces=entries.map(e=>Object.assign({},e,{startMs:now}));
+  animOnDone=onDone;
+}
+
+function updateAnims(now){
+  if(!animPieces.length)return false;
+  let allDone=true;
+  for(const a of animPieces){
+    const prog=Math.min(1,(now-a.startMs)/ANIM_MS);
+    const t=1-(1-prog)**2; // ease-out quad
+    const fromCx=a.fromC*CELL_PX+CELL_PX/2, fromCy=a.fromR*CELL_PX+CELL_PX/2;
+    const toCx=a.toC*CELL_PX+CELL_PX/2,   toCy=a.toR*CELL_PX+CELL_PX/2;
+    a.cx=fromCx+(toCx-fromCx)*t;
+    a.cy=fromCy+(toCy-fromCy)*t;
+    if(prog<1)allDone=false;
+  }
+  if(allDone){
+    animPieces=[];
+    const cb=animOnDone;animOnDone=null;
+    if(cb)cb();
+    return false;
+  }
+  return true;
+}
+
+function drawAnimPieces(){
+  if(!animPieces.length)return;
+  ctx.save();
+  ctx.textAlign='center';ctx.textBaseline='middle';
+  const fs=Math.floor(CELL_PX*0.52);
+  ctx.font=`bold ${fs}px serif`;
+  const pr=Math.floor(CELL_PX*0.38);
+  for(const a of animPieces){
+    const{cx,cy,piece,glyph,isWhite}=a;
+    ctx.fillStyle=`rgba(${piece.team.r},${piece.team.g},${piece.team.b},0.55)`;
+    ctx.beginPath();ctx.arc(cx,cy,pr,0,Math.PI*2);ctx.fill();
+    const outC=isWhite?'rgba(0,0,0,0.9)':'rgba(255,255,255,0.85)';
+    const fillC=isWhite?'rgba(255,255,255,0.95)':'rgba(10,10,10,0.95)';
+    ctx.fillStyle=outC;
+    ctx.fillText(glyph,cx-1,cy-1);ctx.fillText(glyph,cx+1,cy-1);
+    ctx.fillText(glyph,cx-1,cy+1);ctx.fillText(glyph,cx+1,cy+1);
+    ctx.fillStyle=fillC;ctx.fillText(glyph,cx,cy);
+  }
+  ctx.restore();
+}
+
 // ── AI ────────────────────────────────────────────────────────────────────────
 function launchAI(){
   if(aiWorker){aiWorker.terminate();aiWorker=null;}
@@ -774,21 +851,23 @@ function launchAI(){
   aiWorker.onmessage=function(e){
     if(!aiThinking)return;
     const move=e.data;
+    aiThinking=false;aiDisplayGrid=null;
+    if(aiWorker){aiWorker.terminate();aiWorker=null;}
     if(move){
       const{fromRow:fr,fromCol:fc,toRow:tr,toCol:tc}=move;
       const capture=grid[tr][tc];
       if(capture)peaceTime=0;else peaceTime++;
       const piece=grid[fr][fc];
       if(piece){logMove(currentTeam,piece,fr,fc,tr,tc,!!capture);}
+      const entries=buildAnimEntries(piece,fr,fc,tr,tc);
       grid[tr][tc]=grid[fr][fc];
       applyMove(fr,fc,tr,tc);
       moveCount++;
-      // Send to peer if online
       sendMoveToRelay(fr,fc,tr,tc);
+      startAnims(entries,nextTurn);
+    } else {
+      nextTurn();
     }
-    aiThinking=false;aiDisplayGrid=null;
-    if(aiWorker){aiWorker.terminate();aiWorker=null;}
-    nextTurn();
   };
   aiWorker.postMessage({
     grid:serializeGrid(grid),
@@ -898,10 +977,11 @@ function handleRemoteMove(msg){
   if(capture)peaceTime=0;else peaceTime++;
   const piece=grid[fr][fc];
   if(piece)logMove(currentTeam,piece,fr,fc,tr,tc,!!capture);
+  const entries=buildAnimEntries(piece,fr,fc,tr,tc);
   grid[tr][tc]=grid[fr][fc];
   applyMove(fr,fc,tr,tc);
   moveCount++;
-  nextTurn();
+  startAnims(entries,nextTurn);
 }
 
 // ── Start game ────────────────────────────────────────────────────────────────
@@ -1041,6 +1121,7 @@ function renderPlaying(now){
   }
 
   flip();
+  updateAnims(now);
   drawPieceOverlay(displayGrid);
 }
 
@@ -1073,6 +1154,8 @@ function drawPieceOverlay(g){
   const pr=Math.floor(CELL_PX*0.38); // piece circle radius
   for(let r=0;r<8;r++)for(let c=0;c<8;c++){
     const p=g[r][c];if(!p)continue;
+    // Skip pieces being animated at their destination (drawn by drawAnimPieces)
+    if(animPieces.some(a=>a.toR===r&&a.toC===c&&a.piece===p))continue;
     const cx=c*CELL_PX+CELL_PX/2,cy=r*CELL_PX+CELL_PX/2;
     const isWhite=teamR&&p.team.r===teamR.r;
     // Translucent team-color circle
@@ -1090,6 +1173,7 @@ function drawPieceOverlay(g){
     ctx.fillText(pieceGlyph(p),cx,cy);
   }
   ctx.restore();
+  drawAnimPieces();
 }
 
 function render(now){
@@ -1161,6 +1245,14 @@ canvas.addEventListener('click',function(e){
   const py=(e.clientY-rect.top)*(canvas.height/rect.height);
   handleClick(px,py);
 });
+canvas.addEventListener('touchstart',function(e){
+  e.preventDefault();
+  const touch=e.touches[0];
+  const rect=canvas.getBoundingClientRect();
+  const px=(touch.clientX-rect.left)*(canvas.width/rect.width);
+  const py=(touch.clientY-rect.top)*(canvas.height/rect.height);
+  handleClick(px,py);
+},{passive:false});
 
 function handleClick(px,py){
   if(replayMode)return; // block clicks during corpus replay
@@ -1228,7 +1320,7 @@ function handleWarGamesClick(cell){
 }
 
 function handlePlayingClick(cell){
-  if(aiThinking)return;
+  if(aiThinking||animPieces.length)return;
   const isAI=(currentTeam.r===teamR.r&&computerR)||(currentTeam.r===teamL.r&&computerL);
   if(isAI||!isMyTurn())return;
   if(!cell){selectedPiece=null;return;}
