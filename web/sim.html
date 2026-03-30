@@ -1015,7 +1015,7 @@ function renderPlaying(now){
   // Highlight targets
   if(selectedPiece&&!aiThinking){
     for(const t of selectedPiece.targets){
-      lightCell(t.row,t.col,Math.floor(selectedPiece.team.r*0.6),Math.floor(selectedPiece.team.g*0.6),Math.floor(selectedPiece.team.b*0.6));
+      lightCell(t.row,t.col,selectedPiece.team.r,selectedPiece.team.g,selectedPiece.team.b);
     }
   }
 
@@ -1076,7 +1076,7 @@ function drawPieceOverlay(g){
     const cx=c*CELL_PX+CELL_PX/2,cy=r*CELL_PX+CELL_PX/2;
     const isWhite=teamR&&p.team.r===teamR.r;
     // Translucent team-color circle
-    ctx.fillStyle=`rgba(${p.team.r},${p.team.g},${p.team.b},0.3)`;
+    ctx.fillStyle=`rgba(${p.team.r},${p.team.g},${p.team.b},0.55)`;
     ctx.beginPath();ctx.arc(cx,cy,pr,0,Math.PI*2);ctx.fill();
     // Glyph: white team = white text + dark outline, black team = dark text + light outline
     const outlineColor=isWhite?'rgba(0,0,0,0.9)':'rgba(255,255,255,0.85)';

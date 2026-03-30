@@ -58,6 +58,7 @@ class FakeRGBMatrix:
         self._screen: pygame.Surface | None = None
         self._canvas = FakeFrameCanvas()
         self._led_template: pygame.Surface | None = None
+        self._tinted: pygame.Surface | None = None  # reusable scratch surface
 
     def _build_led_template(self) -> pygame.Surface:
         """Build a grayscale LED dot template with glow, body, and highlight.
@@ -71,19 +72,11 @@ class FakeRGBMatrix:
 
         # Soft outer glow
         glow_r = int(s * 0.48)
-        glow_surf = pygame.Surface((s, s), pygame.SRCALPHA)
-        pygame.draw.circle(glow_surf, (255, 255, 255, 45), (cx, cy), glow_r)
-        surf.blit(glow_surf, (0, 0))
+        pygame.draw.circle(surf, (255, 255, 255, 40), (cx, cy), glow_r)
 
         # Main LED body
         body_r = int(s * 0.38)
         pygame.draw.circle(surf, (255, 255, 255, 255), (cx, cy), body_r)
-
-        # Specular highlight
-        hl_r = max(2, int(s * 0.13))
-        hl_x = cx - int(s * 0.08)
-        hl_y = cy - int(s * 0.08)
-        pygame.draw.circle(surf, (255, 255, 255, 55), (hl_x, hl_y), hl_r)
 
         return surf
 
@@ -108,6 +101,7 @@ class FakeRGBMatrix:
         # Lazy-init the template (pygame must be initialized first)
         if self._led_template is None:
             self._led_template = self._build_led_template()
+            self._tinted = self._led_template.copy()
 
         s = self.SCALE
         board_w = 32 * s
@@ -118,14 +112,16 @@ class FakeRGBMatrix:
 
         raw = self._canvas._surface
         template = self._led_template
+        tinted = self._tinted
+        assert tinted is not None
 
         for ly in range(32):
             for lx in range(32):
                 r, g, b, _a = raw.get_at((lx, ly))
                 if r == 0 and g == 0 and b == 0:
                     continue
-                # Tint the template with this pixel's color
-                tinted = template.copy()
+                # Tint the reusable scratch surface with this pixel's color
+                tinted.blit(template, (0, 0))
                 tinted.fill((r, g, b), special_flags=pygame.BLEND_RGB_MULT)
                 self._screen.blit(tinted, (lx * s, ly * s))
 

@@ -263,15 +263,14 @@ class GameRunner:
         # Not yet decided — need None so WAR_GAMES knows nothing is selected yet
         self._b.computer_player_r = None
         self._b.computer_player_l = None
-        # Font for piece overlay and panel UI — try fonts with good Unicode coverage
+        # Piece overlay font — needs Unicode chess glyph coverage, bold for clarity
         font_size = int(_CELL_PX * 0.52)
-        _ui_font_name = None
         for _fname in ("applesymbols", "arial", "dejavusans", None):
             if _fname is None or pygame.font.match_font(_fname):
-                self._font = pygame.font.SysFont(_fname, font_size)
-                _ui_font_name = _fname
+                self._font = pygame.font.SysFont(_fname, font_size, bold=True)
                 break
-        # Panel UI fonts — same font family so →, ●, ✓, … render correctly
+        # Panel UI fonts — same family for consistent Unicode coverage
+        _ui_font_name = _fname
         self._pfont_sm = pygame.font.SysFont(_ui_font_name, 13)
         self._pfont_md = pygame.font.SysFont(_ui_font_name, 15)
         self._pfont_lg = pygame.font.SysFont(_ui_font_name, 18, bold=True)
@@ -768,7 +767,7 @@ class GameRunner:
 
                 # Translucent team-color circle
                 pedestal_surf.fill((0, 0, 0, 0))
-                pygame.draw.circle(pedestal_surf, (tc[0], tc[1], tc[2], 75),
+                pygame.draw.circle(pedestal_surf, (tc[0], tc[1], tc[2], 140),
                                    (_CELL_PX // 2, _CELL_PX // 2), pedestal_r)
                 screen.blit(pedestal_surf,
                             (col_idx * _CELL_PX, row_idx * _CELL_PX))
