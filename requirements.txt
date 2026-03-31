@@ -5,6 +5,7 @@ websockets>=12.0
 zeroconf>=0.131
 chessmatrix>=1.1.1
 opencv-python
+cairosvg
 
 # Pi hardware stack — only installable on Raspberry Pi (omit on Mac)
 # smbus2

@@ -587,9 +587,27 @@ function flip(){
   }
 }
 
-// ── Piece glyphs ──────────────────────────────────────────────────────────────
+// ── Piece glyphs (fallback for log text only) ─────────────────────────────────
 const GLYPHS={Pawn:'♟',Rook:'♜',Knight:'♞',Bishop:'♝',Queen:'♛',King:'♚'};
 function pieceGlyph(p){return GLYPHS[p.constructor.name]||'?';}
+
+// ── Piece images (cburnett SVG set) ───────────────────────────────────────────
+const PIECE_IMGS={};
+if(typeof Image!=='undefined'){
+  const PIECE_BASE='pieces/cburnett/';
+  const nameMap={Pawn:'P',Rook:'R',Knight:'N',Bishop:'B',Queen:'Q',King:'K'};
+  for(const[cls,abbr]of Object.entries(nameMap)){
+    for(const col of['w','b']){
+      const img=new Image();
+      img.src=PIECE_BASE+col+abbr+'.svg';
+      PIECE_IMGS[col+cls]=img;
+    }
+  }
+}
+function pieceImg(p){
+  const col=(teamR&&p.team.r===teamR.r)?'w':'b';
+  return PIECE_IMGS[col+p.constructor.name]||null;
+}
 
 // ── Game state ────────────────────────────────────────────────────────────────
 const Phase={LOBBY:0,COLOR_PICK:1,WAR_GAMES:2,PLAYING:3,GAME_OVER:4};
@@ -823,23 +841,9 @@ function updateAnims(now){
 
 function drawAnimPieces(){
   if(!animPieces.length)return;
-  ctx.save();
-  ctx.textAlign='center';ctx.textBaseline='middle';
-  const fs=Math.floor(CELL_PX*0.52);
-  ctx.font=`bold ${fs}px serif`;
-  const pr=Math.floor(CELL_PX*0.38);
   for(const a of animPieces){
-    const{cx,cy,piece,glyph,isWhite}=a;
-    ctx.fillStyle=`rgba(${piece.team.r},${piece.team.g},${piece.team.b},0.55)`;
-    ctx.beginPath();ctx.arc(cx,cy,pr,0,Math.PI*2);ctx.fill();
-    const outC=isWhite?'rgba(0,0,0,0.9)':'rgba(255,255,255,0.85)';
-    const fillC=isWhite?'rgba(255,255,255,0.95)':'rgba(10,10,10,0.95)';
-    ctx.fillStyle=outC;
-    ctx.fillText(glyph,cx-1,cy-1);ctx.fillText(glyph,cx+1,cy-1);
-    ctx.fillText(glyph,cx-1,cy+1);ctx.fillText(glyph,cx+1,cy+1);
-    ctx.fillStyle=fillC;ctx.fillText(glyph,cx,cy);
+    if(a.cx!==undefined)drawOnePiece(a.piece,a.cx,a.cy);
   }
-  ctx.restore();
 }
 
 // ── AI ────────────────────────────────────────────────────────────────────────
@@ -1145,34 +1149,40 @@ function renderGameOver(now){
   flip();
 }
 
+function drawOnePiece(p,cx,cy){
+  const img=pieceImg(p);
+  const sz=Math.floor(CELL_PX*0.82);
+  const half=sz/2;
+  // Subtle team-color glow ring behind the piece
+  const pr=Math.floor(CELL_PX*0.42);
+  ctx.save();
+  ctx.globalAlpha=0.35;
+  ctx.fillStyle=`rgb(${p.team.r},${p.team.g},${p.team.b})`;
+  ctx.beginPath();ctx.arc(cx,cy,pr,0,Math.PI*2);ctx.fill();
+  ctx.restore();
+  if(img&&img.complete&&img.naturalWidth>0){
+    ctx.drawImage(img,cx-half,cy-half,sz,sz);
+  } else {
+    // Fallback glyph while image loads
+    ctx.save();
+    ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.font=`bold ${Math.floor(CELL_PX*0.52)}px serif`;
+    const isWhite=teamR&&p.team.r===teamR.r;
+    ctx.fillStyle=isWhite?'rgba(255,255,255,0.95)':'rgba(10,10,10,0.95)';
+    ctx.fillText(pieceGlyph(p),cx,cy);
+    ctx.restore();
+  }
+}
+
 function drawPieceOverlay(g){
   if(!g)return;
-  ctx.save();
-  ctx.textAlign='center';ctx.textBaseline='middle';
-  const fs=Math.floor(CELL_PX*0.52);
-  ctx.font=`bold ${fs}px serif`;
-  const pr=Math.floor(CELL_PX*0.38); // piece circle radius
   for(let r=0;r<8;r++)for(let c=0;c<8;c++){
     const p=g[r][c];if(!p)continue;
     // Skip pieces being animated at their destination (drawn by drawAnimPieces)
     if(animPieces.some(a=>a.toR===r&&a.toC===c&&a.piece===p))continue;
     const cx=c*CELL_PX+CELL_PX/2,cy=r*CELL_PX+CELL_PX/2;
-    const isWhite=teamR&&p.team.r===teamR.r;
-    // Translucent team-color circle
-    ctx.fillStyle=`rgba(${p.team.r},${p.team.g},${p.team.b},0.55)`;
-    ctx.beginPath();ctx.arc(cx,cy,pr,0,Math.PI*2);ctx.fill();
-    // Glyph: white team = white text + dark outline, black team = dark text + light outline
-    const outlineColor=isWhite?'rgba(0,0,0,0.9)':'rgba(255,255,255,0.85)';
-    const fillColor=isWhite?'rgba(255,255,255,0.95)':'rgba(10,10,10,0.95)';
-    ctx.fillStyle=outlineColor;
-    ctx.fillText(pieceGlyph(p),cx-1,cy-1);
-    ctx.fillText(pieceGlyph(p),cx+1,cy-1);
-    ctx.fillText(pieceGlyph(p),cx-1,cy+1);
-    ctx.fillText(pieceGlyph(p),cx+1,cy+1);
-    ctx.fillStyle=fillColor;
-    ctx.fillText(pieceGlyph(p),cx,cy);
+    drawOnePiece(p,cx,cy);
   }
-  ctx.restore();
   drawAnimPieces();
 }
 

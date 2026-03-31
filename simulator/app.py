@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import collections
 import copy
+import io
 import logging
+import pathlib
 import random
 import sys
 import textwrap
@@ -278,6 +280,9 @@ class GameRunner:
         # Name-entry screen fonts
         self._pfont_xl    = pygame.font.SysFont(_ui_font_name, 36, bold=True)
         self._pfont_entry = pygame.font.SysFont(_ui_font_name, 52, bold=True)
+        # Piece images — loaded in background thread so startup isn't delayed
+        self._piece_surfs: dict[tuple, pygame.Surface] = {}
+        threading.Thread(target=self._load_piece_images, daemon=True).start()
 
     # ── Internal narrowing helpers ─────────────────────────────────────────────
 
@@ -730,18 +735,72 @@ class GameRunner:
 
         b.matrix.blit_to_screen()
 
+    # ── Piece images ────────────────────────────────────────────────────────────
+
+    _PIECE_ABBR: dict[type, str] = {}  # filled after class body with piece types
+
+    def _load_piece_images(self) -> None:
+        """Load cburnett SVG piece images into pygame surfaces via cairosvg."""
+        try:
+            import cairosvg  # type: ignore[import]
+        except ImportError:
+            logger.warning("cairosvg not installed — piece images unavailable; using glyph fallback")
+            return
+        svg_dir = pathlib.Path(__file__).parent.parent / "web" / "pieces" / "cburnett"
+        if not svg_dir.exists():
+            logger.warning("Piece SVG dir not found at %s — using glyph fallback", svg_dir)
+            return
+        abbr_map = {Pawn: 'P', Rook: 'R', Knight: 'N', Bishop: 'B', Queen: 'Q', King: 'K'}
+        sz = int(_CELL_PX * 0.82)
+        for cls, abbr in abbr_map.items():
+            for is_white, color_prefix in ((True, 'w'), (False, 'b')):
+                svg_path = svg_dir / f"{color_prefix}{abbr}.svg"
+                try:
+                    png_bytes = cairosvg.svg2png(url=str(svg_path), output_width=sz, output_height=sz)
+                    surf = pygame.image.load(io.BytesIO(png_bytes), "piece.png").convert_alpha()
+                    self._piece_surfs[(cls, is_white)] = surf
+                except Exception as exc:
+                    logger.warning("Failed to load %s: %s", svg_path, exc)
+
+    def _draw_one_piece(self, screen: pygame.Surface, piece: Piece, cx: int, cy: int,
+                        team_r_r: int) -> None:
+        """Draw a single piece (image or glyph fallback) centered at (cx, cy)."""
+        is_white = piece.team.r == team_r_r
+        surf = self._piece_surfs.get((type(piece), is_white))
+        tc = (piece.team.r, piece.team.g, piece.team.b)
+        pedestal_r = int(_CELL_PX * 0.42)
+
+        # Subtle team-color glow ring
+        pedestal_surf = pygame.Surface((_CELL_PX, _CELL_PX), pygame.SRCALPHA)
+        pedestal_surf.fill((0, 0, 0, 0))
+        pygame.draw.circle(pedestal_surf, (tc[0], tc[1], tc[2], 90),
+                           (_CELL_PX // 2, _CELL_PX // 2), pedestal_r)
+        screen.blit(pedestal_surf, (cx - _CELL_PX // 2, cy - _CELL_PX // 2))
+
+        if surf is not None:
+            sz = surf.get_width()
+            screen.blit(surf, (cx - sz // 2, cy - sz // 2))
+        else:
+            # Glyph fallback
+            glyphs = _PIECE_UNICODE.get(type(piece), ('?', '?'))
+            symbol = glyphs[0] if is_white else glyphs[1]
+            text_color = (245, 245, 245) if is_white else (20, 20, 20)
+            outline_c = (0, 0, 0) if is_white else (255, 255, 255)
+            s = self._font.render(symbol, True, text_color)
+            rect = s.get_rect(center=(cx, cy))
+            os_ = self._font.render(symbol, True, outline_c)
+            for dx, dy in ((-1, 0), (1, 0), (0, -1), (0, 1)):
+                screen.blit(os_, rect.move(dx, dy))
+            screen.blit(s, rect)
+
     # ── Move animation ──────────────────────────────────────────────────────────
 
     _ANIM_MS = 300
 
     def _start_anim(self, piece: Piece, from_r: int, from_c: int,
                     to_r: int, to_c: int, on_done) -> None:
-        team_r_r = self._b.team_r.r
-        is_white = piece.team.r == team_r_r
-        glyphs = _PIECE_UNICODE.get(type(piece), ('?', '?'))
-        symbol = glyphs[0] if is_white else glyphs[1]
         self._anim = {
-            'piece': piece, 'symbol': symbol, 'is_white': is_white,
+            'piece': piece,
             'from_r': from_r, 'from_c': from_c, 'to_r': to_r, 'to_c': to_c,
             'start_ms': pygame.time.get_ticks(), 'on_done': on_done,
         }
@@ -772,27 +831,7 @@ class GameRunner:
         screen = self._b.matrix._screen
         if screen is None:
             return
-        piece = a['piece']
-        cx, cy = a['cx'], a['cy']
-        tc = (piece.team.r, piece.team.g, piece.team.b)
-        is_white = a['is_white']
-        pedestal_r = int(_CELL_PX * 0.38)
-
-        pedestal_surf = pygame.Surface((_CELL_PX, _CELL_PX), pygame.SRCALPHA)
-        pedestal_surf.fill((0, 0, 0, 0))
-        pygame.draw.circle(pedestal_surf, (tc[0], tc[1], tc[2], 140),
-                           (_CELL_PX // 2, _CELL_PX // 2), pedestal_r)
-        screen.blit(pedestal_surf, (cx - _CELL_PX // 2, cy - _CELL_PX // 2))
-
-        text_color = (245, 245, 245) if is_white else (20, 20, 20)
-        outline_c = (0, 0, 0) if is_white else (255, 255, 255)
-        symbol = a['symbol']
-        surf = self._font.render(symbol, True, text_color)
-        rect = surf.get_rect(center=(cx, cy))
-        outline_surf = self._font.render(symbol, True, outline_c)
-        for dx, dy in ((-1, 0), (1, 0), (0, -1), (0, 1)):
-            screen.blit(outline_surf, rect.move(dx, dy))
-        screen.blit(surf, rect)
+        self._draw_one_piece(screen, a['piece'], a['cx'], a['cy'], self._b.team_r.r)
 
     def _draw_piece_overlay(self, grid=None) -> None:
         """Draw chess pieces as Unicode glyphs on top of the scaled LED surface.
@@ -814,12 +853,7 @@ class GameRunner:
             grid = self._b.grid
 
         b = self._b
-        team_r_r = b.team_r.r  # used to pick which Unicode glyph variant
-
-        pedestal_r = int(_CELL_PX * 0.38)
-
-        # Shared alpha surface for translucent circles
-        pedestal_surf = pygame.Surface((_CELL_PX, _CELL_PX), pygame.SRCALPHA)
+        team_r_r = b.team_r.r
 
         anim_dest = (self._anim['to_r'], self._anim['to_c']) if self._anim and show_selection else None
         for row_idx, row in enumerate(grid):
@@ -831,31 +865,7 @@ class GameRunner:
                     continue
                 cx = col_idx * _CELL_PX + _CELL_PX // 2
                 cy = row_idx * _CELL_PX + _CELL_PX // 2
-                tc = (piece.team.r, piece.team.g, piece.team.b)
-                is_white = piece.team.r == team_r_r
-
-                # Translucent team-color circle
-                pedestal_surf.fill((0, 0, 0, 0))
-                pygame.draw.circle(pedestal_surf, (tc[0], tc[1], tc[2], 140),
-                                   (_CELL_PX // 2, _CELL_PX // 2), pedestal_r)
-                screen.blit(pedestal_surf,
-                            (col_idx * _CELL_PX, row_idx * _CELL_PX))
-
-                # Pick glyph: team_r → hollow/white variant, team_l → solid/black variant
-                glyphs = _PIECE_UNICODE.get(type(piece), ('?', '?'))
-                symbol = glyphs[0] if is_white else glyphs[1]
-
-                # White team = white text + dark outline, black team = dark text + light outline
-                text_color = (245, 245, 245) if is_white else (20, 20, 20)
-                outline_c = (0, 0, 0) if is_white else (255, 255, 255)
-
-                # Render with a 1-px outline for legibility
-                surf = self._font.render(symbol, True, text_color)
-                rect = surf.get_rect(center=(cx, cy))
-                outline_surf = self._font.render(symbol, True, outline_c)
-                for dx, dy in ((-1, 0), (1, 0), (0, -1), (0, 1)):
-                    screen.blit(outline_surf, rect.move(dx, dy))
-                screen.blit(surf, rect)
+                self._draw_one_piece(screen, piece, cx, cy, team_r_r)
 
         if not show_selection:
             return
@@ -870,7 +880,7 @@ class GameRunner:
                         cy = row_idx * _CELL_PX + _CELL_PX // 2
                         if (pygame.time.get_ticks() // 500) % 2:
                             pygame.draw.circle(screen, (255, 255, 255),
-                                               (cx, cy), pedestal_r + 4, 3)
+                                               (cx, cy), int(_CELL_PX * 0.46), 3)
 
     def _render_playing(self) -> None:
         """Render one frame of the active chess game to the LED canvas.

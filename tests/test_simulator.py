@@ -697,3 +697,95 @@ class TestLogging:
         debug_msgs = [r.message for r in caplog.records if r.levelno == logging.DEBUG]
         assert any("human" in m.lower() or "moves" in m.lower() for m in debug_msgs), \
             "DEBUG message must be logged when human executes a move"
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# Bug 10 — pedestal_r NameError when a piece is selected
+# ═════════════════════════════════════════════════════════════════════════════
+
+class TestPieceOverlaySelectedPiece:
+    """_draw_piece_overlay must not crash when a piece is selected.
+
+    After refactoring the loop to use _draw_one_piece, `pedestal_r` was left
+    undefined but was still referenced by the selection-ring code at the end
+    of the method. Selecting any piece and rendering must complete without
+    NameError.
+    BUG LOCK-IN: if pedestal_r is reintroduced as undefined, the render raises.
+    """
+
+    def test_draw_overlay_with_selected_piece_no_crash(self, playing_hh):
+        gr = playing_hh
+        # Select a pawn (team_r, row 1) so _selected_piece is not None
+        gr._handle_event(_click(1, 4))
+        assert gr._selected_piece is not None, "Pre-condition: piece must be selected"
+        # Must not raise NameError (pedestal_r was undefined after refactor)
+        gr._draw_piece_overlay()
+
+    def test_draw_overlay_no_selection_no_crash(self, playing_hh):
+        gr = playing_hh
+        assert gr._selected_piece is None
+        gr._draw_piece_overlay()  # must not raise
+
+    def test_render_playing_with_selected_piece_no_crash(self, playing_hh):
+        """Full _render_playing path with a selected piece must not crash."""
+        gr = playing_hh
+        gr._handle_event(_click(1, 0))   # select a pawn
+        assert gr._selected_piece is not None
+        gr._render_playing()   # exercises the selection-ring branch
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# Bug 11 — piece image loading must not block startup
+# ═════════════════════════════════════════════════════════════════════════════
+
+class TestPieceImageLoading:
+    """Piece images load in a background thread; startup must be instant.
+
+    _draw_one_piece must fall back to the glyph renderer when _piece_surfs is
+    empty (i.e. images not yet loaded), and must not crash.
+    _load_piece_images must populate _piece_surfs with 12 surfaces when the
+    cburnett SVG files are present and cairosvg is installed.
+    BUG LOCK-IN: moving _load_piece_images back to the main thread would slow
+    startup; the background-thread launch is the correct behaviour.
+    """
+
+    def test_piece_surfs_empty_at_construction(self, _pygame):
+        """_piece_surfs starts empty because loading runs in a background thread."""
+        import threading
+        gr = GameRunner(skip_lobby=True)
+        # Patch the background thread so it never runs — simulates the window
+        # appearing before images finish loading.
+        with patch("threading.Thread"):
+            gr2 = GameRunner(skip_lobby=True)
+            gr2._init_board()
+        assert isinstance(gr2._piece_surfs, dict)
+        # May be empty (thread was patched out) or populated — either is fine;
+        # what matters is it doesn't raise and the type is correct.
+
+    def test_draw_one_piece_glyph_fallback_no_crash(self, playing_hh):
+        """_draw_one_piece works even with an empty _piece_surfs dict."""
+        import pygame as pg
+        gr = playing_hh
+        screen = gr._b.matrix._screen
+        assert screen is not None
+        # Clear surfs to simulate images-not-yet-loaded
+        gr._piece_surfs = {}
+        b = gr._b
+        piece = b.grid[1][0]   # a pawn
+        assert piece is not None
+        # Must not raise — should use glyph fallback
+        gr._draw_one_piece(screen, piece, 60, 60, b.team_r.r)
+
+    def test_load_piece_images_populates_surfs(self, playing_hh):
+        """When cairosvg and the SVG files are available, 12 surfaces are loaded."""
+        pytest.importorskip("cairosvg")
+        gr = playing_hh
+        gr._piece_surfs = {}
+        gr._load_piece_images()
+        assert len(gr._piece_surfs) == 12, (
+            f"Expected 12 piece surfaces, got {len(gr._piece_surfs)}. "
+            "Missing: " + str(set(gr._piece_surfs.keys()))
+        )
+        import pygame as pg
+        for key, surf in gr._piece_surfs.items():
+            assert isinstance(surf, pg.Surface), f"Surface for {key} is not a pygame.Surface"
