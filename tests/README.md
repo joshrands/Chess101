@@ -71,7 +71,7 @@ The `relay_url` fixture (in `conftest.py`) selects the mode automatically: `RELA
 |---|---|---|
 | `conftest.py` | Shared fixtures and hardware stubs | 228 |
 | `test_gameplay.py` | Pawn logic + GameRunner move execution (headless) | 343 |
-| `test_simulator.py` | GameRunner regression tests (9 bugs) | 699 |
+| `test_simulator.py` | GameRunner regression tests (9 bugs + eval bar, trails, kibitzer, themes) | 947 |
 | `test_board.py` | Board controller: init, piece placement, rules, rendering | 584 |
 | `test_pieces.py` | Pawn, Bishop, Rook, Knight, Queen | 698 |
 | `test_king.py` | King: walk, check detection, castling, pin logic | 558 |
@@ -167,6 +167,12 @@ Each test class is anchored to a specific bug. Tests are intentionally narrow so
 | `TestPeaceTimeTracking` | Bug 7 | Capture resets `peace_time` to 0; non-capture increments by 1 |
 | `TestNextTurnCleanup` | Bug 8 | `_next_turn` clears selected piece, check state, flips active team |
 | `TestLogging` | Bug 9 | Key game events emitted at correct log levels (INFO / DEBUG) |
+| `TestPieceOverlaySelectedPiece` | Feature | Selected-piece overlay renders without crash |
+| `TestPieceImageLoading` | Feature | SVG piece images load and fallback to glyphs correctly |
+| `TestEvalBar` | Feature | `_calc_eval()` returns 0 at start; correct deltas after captures |
+| `TestMoveTrails` | Feature | Trail includes from-cell; rook gets intermediates; knight doesn't; reset clears |
+| `TestKibitzer` | Feature | Capture/check comments logged with 💡; toggled off = no log |
+| `TestBoardThemes` | Feature | 5 themes exist with distinct names; T cycles theme; K toggles kibitzer |
 
 Helpers:
 - `_click(row, col)` — synthesises a `MOUSEBUTTONDOWN` at the centre pixel of a board cell

@@ -789,3 +789,159 @@ class TestPieceImageLoading:
         import pygame as pg
         for key, surf in gr._piece_surfs.items():
             assert isinstance(surf, pg.Surface), f"Surface for {key} is not a pygame.Surface"
+
+# ── Eval bar ──────────────────────────────────────────────────────────────────
+
+class TestEvalBar:
+    """_calc_eval() returns correct material balance values."""
+
+    def test_eval_zero_at_start(self, playing_hh):
+        """Equal material at game start → eval is 0."""
+        gr = playing_hh
+        assert gr._calc_eval() == 0
+
+    def test_eval_positive_when_teamL_loses_queen(self, playing_hh):
+        """Removing teamL's queen (+9) should give teamR a +9 lead."""
+        gr = playing_hh
+        b = gr._b
+        b.grid[7][3] = None  # remove teamL queen
+        assert gr._calc_eval() == 9
+
+    def test_eval_negative_when_teamR_loses_queen(self, playing_hh):
+        """Removing teamR's queen should give teamL a +9 lead (eval = -9)."""
+        gr = playing_hh
+        b = gr._b
+        b.grid[0][3] = None  # remove teamR queen
+        assert gr._calc_eval() == -9
+
+    def test_eval_rook_diff(self, playing_hh):
+        """Removing one rook (value 5) on each side → net 0."""
+        gr = playing_hh
+        b = gr._b
+        b.grid[0][0] = None  # remove teamR rook
+        b.grid[7][0] = None  # remove teamL rook
+        assert gr._calc_eval() == 0
+
+
+# ── Move trails ────────────────────────────────────────────────────────────────
+
+class TestMoveTrails:
+    """_add_move_trail populates _move_trails correctly."""
+
+    def test_trail_adds_from_cell(self, playing_hh):
+        """After adding a trail the from-cell is in the cell list."""
+        gr = playing_hh
+        b = gr._b
+        gr._add_move_trail(1, 0, 3, 0, b.team_r)
+        assert len(gr._move_trails) == 1
+        cells = gr._move_trails[0]["cells"]
+        assert (1, 0) in cells
+
+    def test_trail_includes_intermediate_for_rook_move(self, playing_hh):
+        """Rook moving across a rank produces intermediate squares."""
+        gr = playing_hh
+        b = gr._b
+        gr._add_move_trail(3, 0, 3, 7, b.team_r)  # rook slides 7 squares
+        cells = gr._move_trails[0]["cells"]
+        assert len(cells) > 2  # from + intermediates (not to)
+
+    def test_trail_no_intermediates_for_knight(self, playing_hh):
+        """Knight jumps have no intermediate squares."""
+        gr = playing_hh
+        b = gr._b
+        gr._add_move_trail(0, 1, 2, 2, b.team_r)  # knight jump
+        cells = gr._move_trails[0]["cells"]
+        assert len(cells) == 1  # just the from-cell
+
+    def test_trail_reset_on_new_game(self, playing_hh):
+        """_move_trails is cleared when _reset() is called."""
+        gr = playing_hh
+        b = gr._b
+        gr._add_move_trail(1, 0, 3, 0, b.team_r)
+        assert len(gr._move_trails) == 1
+        gr._reset()
+        assert len(gr._move_trails) == 0
+
+
+# ── AI kibitzer ────────────────────────────────────────────────────────────────
+
+class TestKibitzer:
+    """_do_kibitz logs heuristic commentary for the last move."""
+
+    def test_kibitz_capture_logged(self, playing_hh, caplog):
+        """A capture move produces a 💡 kibitz log entry."""
+        gr = playing_hh
+        b = gr._b
+        gr._kibitz_on = True
+        gr._pending_kibitz = {
+            "piece": b.grid[1][0],   # pawn
+            "capture": b.grid[7][7], # rook (value 5)
+            "fr": 1, "fc": 0, "tr": 7, "tc": 7,
+            "team": b.team_r,
+        }
+        with caplog.at_level(logging.INFO):
+            gr._do_kibitz(False)
+        assert any("💡" in r.message for r in caplog.records)
+
+    def test_kibitz_check_logged(self, playing_hh, caplog):
+        """A check delivers a Check mention in the kibitz log."""
+        gr = playing_hh
+        b = gr._b
+        gr._kibitz_on = True
+        gr._pending_kibitz = {
+            "piece": b.grid[0][3],  # queen (quiet move, but isCheck=True)
+            "capture": None,
+            "fr": 0, "fc": 3, "tr": 4, "tc": 3,
+            "team": b.team_r,
+        }
+        with caplog.at_level(logging.INFO):
+            gr._do_kibitz(True)
+        kib_msgs = [r.message for r in caplog.records if "💡" in r.message]
+        assert any("Check" in m for m in kib_msgs)
+
+    def test_kibitz_off_no_log(self, playing_hh, caplog):
+        """When kibitzer is OFF, no 💡 entry is logged."""
+        gr = playing_hh
+        b = gr._b
+        gr._kibitz_on = False
+        gr._pending_kibitz = {
+            "piece": b.grid[1][0], "capture": b.grid[7][7],
+            "fr": 1, "fc": 0, "tr": 7, "tc": 7, "team": b.team_r,
+        }
+        with caplog.at_level(logging.INFO):
+            gr._do_kibitz(False)
+        assert not any("💡" in r.message for r in caplog.records)
+
+
+# ── Board themes ───────────────────────────────────────────────────────────────
+
+class TestBoardThemes:
+    """T key cycles board themes and updates checker color."""
+
+    def test_theme_list_has_five_entries(self):
+        """_THEMES should have 5 entries matching the 5 named themes."""
+        from simulator.app import _THEMES
+        assert len(_THEMES) == 5
+
+    def test_theme_names_are_distinct(self):
+        """All theme names are unique."""
+        from simulator.app import _THEMES
+        names = [t["name"] for t in _THEMES]
+        assert len(names) == len(set(names))
+
+    def test_t_key_cycles_theme(self, playing_hh):
+        """Pressing T increments _theme_idx and updates board checker color."""
+        gr = playing_hh
+        initial_idx = gr._theme_idx
+        gr._handle_event(_keydown(pygame.K_t))
+        expected_idx = (initial_idx + 1) % 5
+        assert gr._theme_idx == expected_idx
+        from simulator.app import _THEMES
+        assert gr._b.theme_checker_color == _THEMES[expected_idx]["checker"]
+
+    def test_k_key_toggles_kibitzer(self, playing_hh):
+        """Pressing K flips _kibitz_on."""
+        gr = playing_hh
+        before = gr._kibitz_on
+        gr._handle_event(_keydown(pygame.K_k))
+        assert gr._kibitz_on == (not before)

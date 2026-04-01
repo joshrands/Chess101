@@ -83,6 +83,17 @@ _LOG_SRC = {
     "game.board":    "brd",
 }
 
+# ── Board themes ───────────────────────────────────────────────────────────────
+_THEMES = [
+    {"name": "Default", "checker": (255, 255, 255)},
+    {"name": "Inferno", "checker": (255,  80,  20)},
+    {"name": "Void",    "checker": (  0, 180, 255)},
+    {"name": "Jade",    "checker": (  0, 200,  80)},
+    {"name": "Frost",   "checker": (160, 210, 255)},
+]
+_TRAIL_DUR_MS = 600
+_KIBITZ_VALS  = {"Pawn": 1, "Knight": 3, "Bishop": 3, "Rook": 5, "Queen": 9, "King": 0}
+
 
 class _PanelLogHandler(logging.Handler):
     """Captures log records into a deque for display in the side panel."""
@@ -251,6 +262,14 @@ class GameRunner:
         self._think_l = 0
         self._think_r = 0
         self._last_think_ms = 0
+
+        # Move trails, kibitzer, themes
+        self._move_trails: list = []          # [{cells, team, start_ms, dur}]
+        self._pending_kibitz: Optional[dict] = None   # set on move, consumed in _begin_turn
+        if not hasattr(self, "_theme_idx"):
+            self._theme_idx = 0              # persists across resets
+        if not hasattr(self, "_kibitz_on"):
+            self._kibitz_on = True           # persists across resets
 
     def _init_board(self) -> None:
         """Create a fresh Board with fake hardware wired up (call after pygame.init())."""
@@ -489,6 +508,112 @@ class GameRunner:
         self._winner_team = b.team_r if losing_team.r == b.team_l.r else b.team_l
         self.phase = Phase.GAME_OVER
 
+    # ── Eval bar ──────────────────────────────────────────────────────────────
+
+    def _calc_eval(self) -> int:
+        """Return material balance: positive = team_r ahead, negative = team_l ahead."""
+        b = self._b
+        if not hasattr(b, "grid") or b.grid is None:
+            return 0
+        sr, sl = 0, 0
+        for row in b.grid:
+            for p in row:
+                if p is None:
+                    continue
+                v = _KIBITZ_VALS.get(type(p).__name__, 0)
+                if p.team.r == b.team_r.r:
+                    sr += v
+                else:
+                    sl += v
+        return sr - sl
+
+    # ── Move trails ────────────────────────────────────────────────────────────
+
+    def _add_move_trail(self, fr: int, fc: int, tr: int, tc: int, team: "Team") -> None:
+        """Record a glowing trail for the cells traversed by a piece move."""
+        cells = [(fr, fc)]
+        dr = (1 if tr > fr else -1 if tr < fr else 0)
+        dc = (1 if tc > fc else -1 if tc < fc else 0)
+        # Include intermediate squares for sliding rays
+        if (dr != 0 or dc != 0) and (dr == 0 or dc == 0 or abs(tr - fr) == abs(tc - fc)):
+            r, c = fr + dr, fc + dc
+            while (r, c) != (tr, tc) and 0 <= r < 8 and 0 <= c < 8:
+                cells.append((r, c))
+                r += dr
+                c += dc
+        self._move_trails.append({
+            "cells": cells,
+            "team": team,
+            "start_ms": pygame.time.get_ticks(),
+            "dur": _TRAIL_DUR_MS,
+        })
+
+    def _render_trails(self, screen: "pygame.Surface") -> None:
+        """Blit fading team-colored overlays onto trail cells on the screen."""
+        now = pygame.time.get_ticks()
+        surf = pygame.Surface((_CELL_PX, _CELL_PX), pygame.SRCALPHA)
+        for i in range(len(self._move_trails) - 1, -1, -1):
+            t = self._move_trails[i]
+            age = now - t["start_ms"]
+            if age >= t["dur"]:
+                self._move_trails.pop(i)
+                continue
+            frac = 1.0 - age / t["dur"]
+            alpha = int(frac * 110)
+            team = t["team"]
+            surf.fill((team.r, team.g, team.b, alpha))
+            for r, c in t["cells"]:
+                screen.blit(surf, (c * _CELL_PX, r * _CELL_PX))
+
+    # ── AI kibitzer ────────────────────────────────────────────────────────────
+
+    def _do_kibitz(self, is_check: bool) -> None:
+        """Generate and log a heuristic commentary line for the last move."""
+        if not self._kibitz_on or self._pending_kibitz is None:
+            return
+        kib = self._pending_kibitz
+        self._pending_kibitz = None
+        piece = kib.get("piece")
+        capture = kib.get("capture")
+        fr, fc, tr, tc = kib["fr"], kib["fc"], kib["tr"], kib["tc"]
+        team = kib["team"]
+
+        from pieces.king import King
+        from pieces.pawn import Pawn
+        isCastle = isinstance(piece, King) and abs(tc - fc) == 2
+        isPromo = isinstance(piece, Pawn) and tr in (0, 7)
+
+        msg: Optional[str] = None
+        if isPromo:
+            msg = "Pawn promoted to Queen — powerful!"
+        elif isCastle:
+            msg = "Castled — king tucked away safely."
+        elif capture is not None:
+            val = _KIBITZ_VALS.get(type(capture).__name__, 0)
+            ev = self._calc_eval()
+            lead = ev if (team.r == self._b.team_r.r) else -ev
+            if val >= 9:
+                msg = f"Queen taken! {team.name} made a massive gain."
+            elif val >= 5:
+                msg = f"Rook captured — {team.name} up in material."
+            elif val >= 3:
+                msg = f"Minor piece captured (+{val})."
+            else:
+                msg = f"Pawn taken. {team.name} dominates." if lead > 4 else "Pawn taken."
+        elif is_check:
+            msg = f"Check! {team.name} is attacking the king."
+        elif piece is not None:
+            pname = type(piece).__name__
+            if pname == "Pawn":
+                flavor = ["Solid pawn push.", "Center control.", "Structural move."]
+                msg = flavor[self._move_count % len(flavor)]
+            elif pname != "King":
+                flavor = ["Active piece placement.", "Improving piece activity.", "Developing the position."]
+                msg = flavor[self._move_count % len(flavor)]
+
+        if msg:
+            logger.info("💡 %s", msg)
+
     def _begin_turn(self, team: Team) -> None:
         """Set up the board state at the start of a team's turn.
 
@@ -548,6 +673,7 @@ class GameRunner:
 
         self._in_check = check
         self._king_check_pos = (king_row, king_col) if check else None
+        self._do_kibitz(check)
         if check:
             logger.debug("KING IS IN CHECK")
         logger.info("Player: %s's move.", team.name)
@@ -923,6 +1049,9 @@ class GameRunner:
                                  p.team.r, p.team.g, p.team.b)
 
             b.matrix.blit_to_screen()
+            screen = b.matrix._screen
+            if screen is not None:
+                self._render_trails(screen)
             self._update_anim()
             self._draw_piece_overlay()
             self._draw_anim_piece()
@@ -1154,6 +1283,14 @@ class GameRunner:
             self._reset()
             self._init_board()
             return
+        if event.type == pygame.KEYDOWN and event.key == pygame.K_t:
+            self._theme_idx = (self._theme_idx + 1) % len(_THEMES)
+            self._b.theme_checker_color = _THEMES[self._theme_idx]["checker"]
+            return
+        if event.type == pygame.KEYDOWN and event.key == pygame.K_k:
+            self._kibitz_on = not self._kibitz_on
+            logger.info("Kibitzer %s", "ON" if self._kibitz_on else "OFF")
+            return
         if self._promoting_pawn is not None:
             if event.type == pygame.MOUSEBUTTONDOWN:
                 cell = self._px_to_cell(*event.pos)
@@ -1200,10 +1337,18 @@ class GameRunner:
                     logger.debug(
                         "Human moves piece at %s%s to %s%s",
                         old_r, old_c, row, col)
-                    if b.grid[row][col] is not None:
+                    captured = b.grid[row][col]
+                    if captured is not None:
                         self.peace_time = 0
                     else:
                         self.peace_time += 1
+                    moving_piece = b.grid[old_r][old_c]
+                    self._add_move_trail(old_r, old_c, row, col, current_team)
+                    self._pending_kibitz = {
+                        "piece": moving_piece, "capture": captured,
+                        "fr": old_r, "fc": old_c, "tr": row, "tc": col,
+                        "team": current_team,
+                    }
                     b.grid[row][col] = b.grid[old_r][old_c]
                     self._apply_move(old_r, old_c, row, col)
                     self._move_count += 1
@@ -1302,11 +1447,19 @@ class GameRunner:
                     logger.debug(
                         "the best move involves moving the piece at square %s%s to %s%s",
                         old_r, old_c, tgt_r, tgt_c)
-                    if b.grid[tgt_r][tgt_c] is not None:
+                    ai_captured = b.grid[tgt_r][tgt_c]
+                    if ai_captured is not None:
                         self.peace_time = 0
                     else:
                         self.peace_time += 1
                     piece = b.grid[old_r][old_c]
+                    assert self._current_team is not None
+                    self._add_move_trail(old_r, old_c, tgt_r, tgt_c, self._current_team)
+                    self._pending_kibitz = {
+                        "piece": piece, "capture": ai_captured,
+                        "fr": old_r, "fc": old_c, "tr": tgt_r, "tc": tgt_c,
+                        "team": self._current_team,
+                    }
                     b.grid[tgt_r][tgt_c] = piece
                     self._apply_move(old_r, old_c, tgt_r, tgt_c)
                     self._move_count += 1
@@ -1435,6 +1588,23 @@ class GameRunner:
                                  (x0 + pad, y, filled, bar_h), border_radius=4)
             y += bar_h + 8
 
+            # ── Eval bar ──────────────────────────────────────────────────
+            ev = self._calc_eval()
+            r_pct = max(5, min(95, 50 + round(ev / 39 * 50)))
+            ev_bar_w = w - pad * 2
+            ev_bar_h = 7
+            tr_color = (b.team_r.r, b.team_r.g, b.team_r.b)
+            tl_color = (b.team_l.r, b.team_l.g, b.team_l.b)
+            pygame.draw.rect(screen, _P_SEP, (x0 + pad, y, ev_bar_w, ev_bar_h), border_radius=3)
+            r_fill = int(ev_bar_w * r_pct / 100)
+            if r_fill > 0:
+                pygame.draw.rect(screen, tr_color, (x0 + pad, y, r_fill, ev_bar_h), border_radius=3)
+            if ev_bar_w - r_fill > 0:
+                pygame.draw.rect(screen, tl_color, (x0 + pad + r_fill, y, ev_bar_w - r_fill, ev_bar_h), border_radius=3)
+            y += ev_bar_h + 4
+            adv_str = "Even" if ev == 0 else (f"{b.team_r.name} +{ev}" if ev > 0 else f"{b.team_l.name} +{-ev}")
+            text(adv_str, pfont_sm, _P_DIM)
+
             # ── Alerts ────────────────────────────────────────────────────
             if self._in_check:
                 blink = (pygame.time.get_ticks() // 380) % 2
@@ -1455,6 +1625,12 @@ class GameRunner:
                     text(f"  {wt.name} wins!",
                          pfont_lg, (wt.r, wt.g, wt.b))
                 text("Press N to play again", pfont_sm, _P_DIM)
+
+        # ── Theme / Kibitzer status ───────────────────────────────────────────
+        theme_name = _THEMES[self._theme_idx]["name"]
+        kib_color = _P_ACCENT if self._kibitz_on else _P_DIM
+        text(f"Theme   {theme_name}  (T)", pfont_sm, _P_DIM)
+        text(f"Kib     {'ON' if self._kibitz_on else 'OFF'}  (K)", pfont_sm, kib_color)
 
         self._render_panel_extra(text, sep, pfont_sm, pfont_md)
 

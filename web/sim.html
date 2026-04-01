@@ -62,6 +62,8 @@ a.back:hover{color:#00ff88}
 #board3d{background:radial-gradient(ellipse at 50% 30%,#606060 0%,#2a2a2a 35%,#0d0d0d 75%,#000 100%)}
 #btn3d{position:absolute;top:8px;right:8px;z-index:10;background:rgba(5,8,16,.85);border:1px solid #1e3a28;color:#00ff88;font-family:'Courier New',monospace;font-size:11px;padding:4px 10px;border-radius:12px;cursor:pointer;letter-spacing:.08em}
 #btn3d:hover{background:rgba(0,255,136,.1)}
+#react-overlay{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:5}
+.log-kib{color:#7090c0}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
@@ -72,6 +74,7 @@ a.back:hover{color:#00ff88}
     <canvas id="board" width="640" height="640" style="visibility:hidden"></canvas>
     <canvas id="board3d" style="display:block;position:absolute;top:0;left:0;width:100%;height:100%"></canvas>
     <button id="btn3d" onclick="toggleView()">2D</button>
+    <canvas id="react-overlay" width="640" height="640"></canvas>
   </div>
   <div id="panel">
     <div id="panel-top"></div>
@@ -562,6 +565,18 @@ const PALETTE=[
   [25,255,35,'Green'],[245,125,0,'Orange'],[0,25,230,'Dark Blue'],[28,225,180,'Cyan']
 ];
 
+// ── Board themes ──────────────────────────────────────────────────────────────
+const THEMES={
+  default:{name:'Default',lightMult:[1.0,1.0,1.05],darkMult:[1.0,1.0,1.0],dark3d:0x0a0e16,light3d:0x141e2c,ambient:0x2a3050,ambientI:1.2},
+  inferno:{name:'Inferno',lightMult:[1.0,0.32,0.08],darkMult:[0.6,0.10,0.02],dark3d:0x1a0400,light3d:0x3c1000,ambient:0x3a1008,ambientI:1.0},
+  void:{name:'Void',lightMult:[0.0,0.70,1.0],darkMult:[0.0,0.20,0.40],dark3d:0x020008,light3d:0x06001a,ambient:0x080020,ambientI:1.0},
+  jade:{name:'Jade',lightMult:[0.08,0.80,0.30],darkMult:[0.02,0.25,0.08],dark3d:0x021006,light3d:0x08261a,ambient:0x082015,ambientI:1.0},
+  frost:{name:'Frost',lightMult:[0.60,0.82,1.0],darkMult:[0.20,0.30,0.45],dark3d:0x060e1e,light3d:0x0e1e36,ambient:0x101828,ambientI:1.1}
+};
+const THEME_ORDER=['default','inferno','void','jade','frost'];
+let currentTheme='default';
+let currentThemeObj=THEMES.default;
+
 // ── Engine source for Worker ──────────────────────────────────────────────────
 const ENGINE_SRC=document.getElementById('chess-engine').textContent;
 
@@ -644,6 +659,17 @@ const ANIM_MS=300;
 let animPieces=[]; // [{piece,glyph,isWhite,cx,cy,toR,toC,startMs}] — active sliding pieces
 let animOnDone=null; // called when all animPieces finish
 
+// Move trails (glowing fade after piece moves)
+let moveTrails=[]; // [{cells:[{r,c}], team:{r,g,b}, startMs, dur}]
+const TRAIL_DUR=600;
+
+// Spectator reactions (floating emoji)
+let reactions=[]; // [{emoji, x, y, vy, alpha, startMs, ttl}]
+
+// AI kibitzer
+let kibOn=true;
+let _pendingKibitz=null; // {piece, capture, fr, fc, tr, tc, team} — set by logMove, consumed by _doKibitz
+
 // 3D view state
 let threeD=true;
 let threeInited=false;
@@ -698,6 +724,8 @@ function logMove(team,piece,fromR,fromC,toR,toC,capture){
   moveLog.push({text:`${team.name}: ${pieceGlyph(piece)} ${from}${cap}→${to}`,teamR:team.r===teamR.r});
   if(moveLog.length>80)moveLog.shift();
   addLog(`${team.name}: ${pieceGlyph(piece)} ${from}${cap}→${to}`);
+  // Store info for kibitzer (inCheck resolved later in beginTurn)
+  _pendingKibitz={piece,capture:capture||null,fr:fromR,fc:fromC,tr:toR,tc:toC,team};
 }
 function addLog(msg){logLines.push({msg,ts:Date.now()});if(logLines.length>60)logLines.shift();}
 
@@ -728,6 +756,7 @@ function resetGame(){
   moveLog.length=0;logLines.length=0;
   localColorSent=false;remoteColorReceived=false;localWarSent=false;remoteWarReceived=false;
   netPhase='idle';
+  moveTrails=[];reactions=[];_pendingKibitz=null;
 }
 
 // ── Draw rules ────────────────────────────────────────────────────────────────
@@ -774,6 +803,123 @@ function applyMove(oldR,oldC,toR,toC){
   grid[oldR][oldC]=null;
 }
 
+// ── Eval bar ──────────────────────────────────────────────────────────────────
+const _EVAL_VALS={Pawn:1,Knight:3,Bishop:3,Rook:5,Queen:9,King:0};
+function calcEval(){
+  if(!grid||!teamR||!teamL)return 0;
+  let sr=0,sl=0;
+  for(let r=0;r<8;r++)for(let c=0;c<8;c++){
+    const p=grid[r][c];if(!p)continue;
+    const v=_EVAL_VALS[p.constructor.name]||0;
+    if(p.team.r===teamR.r)sr+=v;else sl+=v;
+  }
+  return sr-sl; // positive = teamR ahead
+}
+
+// ── Board themes ──────────────────────────────────────────────────────────────
+function applyTheme(name){
+  const t=THEMES[name];if(!t)return;
+  currentTheme=name;currentThemeObj=t;
+  if(!three)return;
+  for(let r=0;r<8;r++)for(let c=0;c<8;c++){
+    const dark=(r+c)%2===1;
+    const hex=dark?t.dark3d:t.light3d;
+    three.boardSquares[r][c].material.color.setHex(hex);
+    three.boardSquares[r][c].material.emissive.setHex(hex);
+  }
+  if(three.ambientLight){three.ambientLight.color.setHex(t.ambient);three.ambientLight.intensity=t.ambientI;}
+}
+
+// ── Move trails ───────────────────────────────────────────────────────────────
+function addMoveTrail(fr,fc,tr,tc,team){
+  if(!team)return;
+  const cells=[{r:fr,c:fc}];
+  const dr=Math.sign(tr-fr),dc=Math.sign(tc-fc);
+  // Include intermediate squares for sliding rays (rook/bishop/queen)
+  if((dr!==0||dc!==0)&&(dr===0||dc===0||Math.abs(tr-fr)===Math.abs(tc-fc))){
+    let r=fr+dr,c=fc+dc;
+    while((r!==tr||c!==tc)&&r>=0&&r<8&&c>=0&&c<8){cells.push({r,c});r+=dr;c+=dc;}
+  }
+  moveTrails.push({cells,team:{r:team.r,g:team.g,b:team.b},startMs:performance.now(),dur:TRAIL_DUR});
+}
+
+function renderTrails(now){
+  for(let i=moveTrails.length-1;i>=0;i--){
+    const t=moveTrails[i];
+    const age=now-t.startMs;
+    if(age>=t.dur){moveTrails.splice(i,1);continue;}
+    const frac=1-age/t.dur;
+    const bright=Math.round(frac*160);
+    for(const{r,c}of t.cells){
+      const[er,eg,eb]=getPixel(c*4,r*4);
+      lightCell(r,c,
+        Math.min(255,er+Math.round(t.team.r*bright/255)),
+        Math.min(255,eg+Math.round(t.team.g*bright/255)),
+        Math.min(255,eb+Math.round(t.team.b*bright/255))
+      );
+    }
+  }
+}
+
+// ── Spectator reactions ───────────────────────────────────────────────────────
+function spawnReaction(emoji){
+  reactions.push({emoji,x:60+Math.random()*520,y:590+Math.random()*50,vy:-(0.8+Math.random()*0.8),startMs:performance.now(),ttl:2500});
+}
+
+function renderReactions(now){
+  const rc=document.getElementById('react-overlay');if(!rc)return;
+  const rctx=rc.getContext('2d');
+  rctx.clearRect(0,0,rc.width,rc.height);
+  for(let i=reactions.length-1;i>=0;i--){
+    const rx=reactions[i];
+    const age=now-rx.startMs;
+    if(age>=rx.ttl){reactions.splice(i,1);continue;}
+    rx.y+=rx.vy;
+    const frac=age/rx.ttl;
+    const alpha=1-frac;
+    const size=Math.round(32*(1+frac*0.4));
+    rctx.save();rctx.globalAlpha=alpha;
+    rctx.font=`${size}px serif`;rctx.textAlign='center';
+    rctx.fillText(rx.emoji,rx.x,rx.y);
+    rctx.restore();
+  }
+}
+
+// ── AI kibitzer ───────────────────────────────────────────────────────────────
+function _doKibitz(isCheck){
+  if(!kibOn||!_pendingKibitz)return;
+  const{piece,capture,fr,fc,tr,tc,team}=_pendingKibitz;
+  _pendingKibitz=null;
+  const isCastle=piece instanceof King&&Math.abs(tc-fc)===2;
+  const isPromo=piece instanceof Pawn&&(tr===0||tr===7);
+  let msg=null;
+  if(isPromo){
+    msg='Pawn promoted to Queen — powerful!';
+  }else if(isCastle){
+    msg='Castled — king tucked away safely.';
+  }else if(capture){
+    const val=_EVAL_VALS[capture.constructor.name]||0;
+    const ev=calcEval();
+    const lead=team.r===teamR.r?ev:-ev;
+    if(val>=9)msg=`Queen taken! ${team.name} made a massive gain.`;
+    else if(val>=5)msg=`Rook captured — ${team.name} up in material.`;
+    else if(val>=3)msg=`Minor piece captured (+${val}).`;
+    else msg=lead>4?`Pawn taken. ${team.name} dominates.`:'Pawn taken.';
+  }else if(isCheck){
+    msg=`Check! ${team.name} is attacking the king.`;
+  }else if(piece){
+    const pname=piece.constructor.name;
+    if(pname==='Pawn'){
+      const flavor=['Solid pawn push.','Center control.','Structural move.'];
+      msg=flavor[moveCount%flavor.length];
+    }else if(pname!=='King'){
+      const flavor=['Active piece placement.','Improving piece activity.','Developing the position.'];
+      msg=flavor[moveCount%flavor.length];
+    }
+  }
+  if(msg)addLog('💡 '+msg);
+}
+
 // ── Begin turn ────────────────────────────────────────────────────────────────
 function beginTurn(team){
   if(bobRoss(team))return;
@@ -801,6 +947,7 @@ function beginTurn(team){
     return;
   }
   inCheck=check;
+  _doKibitz(check);
   if(inCheck)addLog(`${team.name} is in check!`);
   const isAI=(team.r===teamR.r&&computerR)||(team.r===teamL.r&&computerL);
   if(isAI&&isMyTurn()){aiThinking=true;launchAI();}
@@ -834,6 +981,11 @@ function startAnims(entries,onDone){
   const now=performance.now();
   animPieces=entries.map(e=>Object.assign({},e,{startMs:now}));
   animOnDone=onDone;
+  // Add move trail for the primary piece
+  if(entries.length>0&&currentTeam){
+    const e=entries[0];
+    addMoveTrail(e.fromR,e.fromC,e.toR,e.toC,currentTeam);
+  }
 }
 
 function updateAnims(now){
@@ -1009,6 +1161,8 @@ function handleRelayMsg(msg){
     if(ev==='checkmate'||ev==='stalemate')phase=Phase.GAME_OVER;
   } else if(t==='new_game'){
     resetGame();phase=Phase.LOBBY;
+  } else if(t==='reaction'){
+    spawnReaction(msg.emoji||'🔥');
   } else if(t==='ping'){
     netSend({type:'pong',seq:msg.seq||0});
   } else if(t==='pong'){
@@ -1135,14 +1289,15 @@ function renderPlaying(now){
   // Checker background — static dim; FROM/TO highlights carry the AI thinking visual
   checkerBrightness=60;
   const cb=checkerBrightness;
+  const tl=currentThemeObj.lightMult,td=currentThemeObj.darkMult;
   for(let r=0;r<8;r++)for(let c=0;c<8;c++){
     const light=(r+c)%2===0;
     if(light){
       const v=Math.min(255,Math.floor(cb*3.2));
-      lightCell(r,c,v,v,Math.min(255,Math.floor(v*1.05)));
+      lightCell(r,c,Math.min(255,Math.round(v*tl[0])),Math.min(255,Math.round(v*tl[1])),Math.min(255,Math.round(v*tl[2])));
     } else {
       const v=Math.floor(cb*0.10);
-      lightCell(r,c,v,v,v);
+      lightCell(r,c,Math.round(v*td[0]),Math.round(v*td[1]),Math.round(v*td[2]));
     }
   }
 
@@ -1184,6 +1339,7 @@ function renderPlaying(now){
     }
   }
 
+  renderTrails(now);
   updateAnims(now);
   if(threeD){renderThree(now);return;}
   flip();
@@ -1277,6 +1433,16 @@ function renderPanel(){
     html+=`<div class="p-label">Move</div><div class="p-val">${moveCount}</div>`;
     const pct=Math.min(100,peaceTime*2);
     html+=`<div class="p-label">Peace-time <span style="color:#8090a0">${peaceTime}/50</span></div><div class="p-bar-wrap"><div class="p-bar" style="width:${pct}%;background:${peaceTime>40?'#ff6060':'#00ff88'}"></div></div>`;
+    if(grid&&teamR&&teamL){
+      const ev=calcEval();
+      const rPct=Math.max(5,Math.min(95,50+Math.round(ev/39*50)));
+      const advStr=ev===0?'Even':(ev>0?`${teamR.name} +${ev}`:`${teamL.name} +${-ev}`);
+      html+=`<div class="p-label">Eval</div>`;
+      html+=`<div style="display:flex;height:8px;border-radius:4px;overflow:hidden;margin:4px 0 4px;background:#1a2030">`;
+      html+=`<div style="width:${rPct}%;background:rgb(${teamR.r},${teamR.g},${teamR.b});transition:width .4s"></div>`;
+      html+=`<div style="width:${100-rPct}%;background:rgb(${teamL.r},${teamL.g},${teamL.b})"></div></div>`;
+      html+=`<div style="font-size:10px;color:#6a7a9a;margin-bottom:2px">${advStr}</div>`;
+    }
     if(inCheck)html+=`<div class="p-alert check">⚠ CHECK</div>`;
     if(aiThinking)html+=`<div class="p-alert ai">AI thinking…</div>`;
     if(isWaitingForRemote())html+=`<div class="p-alert ai">Waiting for opponent…</div>`;
@@ -1294,6 +1460,8 @@ function renderPanel(){
   if(roomCode&&wsRole!=='local')html+=`<div class="p-alert room">ROOM: ${roomCode}</div>`;
   if(netPhase==='waiting_peer')html+=`<div class="p-alert ai">Waiting for opponent…</div>`;
   if(replayCorpus)html+=replayPanelHtml();
+  html+=`<div style="margin-top:10px;font-size:10px;color:#2a3a50">Theme: <span style="color:#4a6a8a">${currentThemeObj.name}</span> · <kbd style="color:#3a5070">T</kbd></div>`;
+  html+=`<div style="font-size:10px;color:#2a3a50">Kibitzer: <span style="color:${kibOn?'#00ff88':'#3a4a60'}">${kibOn?'ON':'OFF'}</span> · <kbd style="color:#3a5070">K</kbd></div>`;
   top.innerHTML=html;
 
   const logDiv=document.getElementById('panel-log');
@@ -1405,6 +1573,7 @@ function handlePlayingClick(cell){
         const capture=grid[row][col];
         if(capture)peaceTime=0;else peaceTime++;
         logMove(currentTeam,selectedPiece,oldR,oldC,row,col,!!capture);
+        addMoveTrail(oldR,oldC,row,col,currentTeam);
         grid[row][col]=grid[oldR][oldC];
         applyMove(oldR,oldC,row,col);
         moveCount++;
@@ -1442,6 +1611,16 @@ document.addEventListener('keydown',function(e){
       replayCorpus=null;replayMode=false;replayTakeoverPly=null;
       resetGame();phase=Phase.LOBBY;
     }
+  }
+  if(e.key==='t'||e.key==='T'){
+    if(!replayMode){
+      const idx=(THEME_ORDER.indexOf(currentTheme)+1)%THEME_ORDER.length;
+      applyTheme(THEME_ORDER[idx]);
+    }
+  }
+  if(e.key==='k'||e.key==='K'){
+    kibOn=!kibOn;
+    addLog(`Kibitzer ${kibOn?'ON':'OFF'}`);
   }
   if(phase===Phase.LOBBY){
     if(e.key==='ArrowDown')lobbySelected=(lobbySelected+1)%3;
@@ -1782,7 +1961,7 @@ function initThree(){
   controls.update();
 
   // Lighting
-  scene.add(new THREE.AmbientLight(0x2a3050,1.2));
+  const ambientLight=new THREE.AmbientLight(0x2a3050,1.2);scene.add(ambientLight);
   const dir=new THREE.DirectionalLight(0xffffff,1.2);
   dir.position.set(4,12,8);scene.add(dir);
   // Fill light from camera-side so dark pieces catch specular highlights
@@ -1841,7 +2020,7 @@ function initThree(){
   ghostMesh.visible=false;
   scene.add(ghostMesh);
 
-  three={scene,camera,renderer,controls,boardSquares,pool,animMesh,ghostMesh,lights:{ptR,ptL}};
+  three={scene,camera,renderer,controls,boardSquares,pool,animMesh,ghostMesh,lights:{ptR,ptL},ambientLight};
   _loadStlPieces(); // replace geometric primitives with STL meshes (also updates ghostMesh via ptype match on first use)
 
   // Resize handler — keeps renderer resolution synced with CSS layout on orientation change etc.
@@ -2032,6 +2211,7 @@ function frame(now){
     }
   }
   render(now);
+  renderReactions(now);
   if(now-lastPanelMs>100){renderPanel();lastPanelMs=now;}
   requestAnimationFrame(frame);
 }

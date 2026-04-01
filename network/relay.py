@@ -268,7 +268,18 @@ async def _handle_spectate(ws, msg: dict) -> None:
 
     logger.info("[%s] Spectator joined", code)
     try:
-        await ws.wait_closed()
+        async for raw in ws:
+            try:
+                msg = json.loads(raw)
+            except json.JSONDecodeError:
+                continue
+            # Spectators may only send reaction messages; forward to all room members.
+            if msg.get("type") == "reaction":
+                for p in room.players.values():
+                    await _send(p.ws, raw)
+                for spec_ws in room.spectators:
+                    if spec_ws is not ws:
+                        await _send(spec_ws, raw)
     except Exception:
         pass
     finally:

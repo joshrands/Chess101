@@ -162,7 +162,7 @@ class Board(SampleBase):
         row_increment = (end_row - start_row) / 8.0
         col_increment = (end_col - start_col) / 8.0
 
-    def light_checker_town(self, canvas, color: tuple[int, int, int] = (255, 255, 255)) -> None:
+    def light_checker_town(self, canvas, color: tuple[int, int, int] | None = None) -> None:
         """Paint the alternating checker pattern on the given canvas.
 
         Lights every dark square of the standard chess checkerboard in the
@@ -170,8 +170,11 @@ class Board(SampleBase):
 
         Args:
             canvas: The RGBMatrix frame canvas to draw onto.
-            color: RGB tuple used for the lit squares (default full white).
+            color: RGB tuple used for the lit squares (default uses
+                ``self.theme_checker_color`` if set, otherwise full white).
         """
+        if color is None:
+            color = getattr(self, "theme_checker_color", (255, 255, 255))
         r, g, b = color
         for x in range(4):
             for y in range(4):
@@ -180,7 +183,7 @@ class Board(SampleBase):
             for y in range(4):
                 self.light_cell(canvas, 2 * x, 1 + 2 * y, r, g, b)
 
-    def choose_light_checker_town(self, color: tuple[int, int, int] = (255, 255, 255)) -> None:
+    def choose_light_checker_town(self, color: tuple[int, int, int] | None = None) -> None:
         """Paint the checker pattern at the current pulsing brightness level.
 
         Scales each channel of *color* by ``checker_brightness / 255``,
@@ -188,8 +191,11 @@ class Board(SampleBase):
         setup.  Draws onto self.canvas directly.
 
         Args:
-            color: Base RGB tuple to scale (default full white).
+            color: Base RGB tuple to scale (default uses
+                ``self.theme_checker_color`` if set, otherwise full white).
         """
+        if color is None:
+            color = getattr(self, "theme_checker_color", (255, 255, 255))
         r, g, b = map(lambda val: int(val * (self.checker_brightness / 255)), color)
         self.light_checker_town(self.canvas, color=(r, g, b))
 

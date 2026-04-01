@@ -96,6 +96,7 @@ function buildSandbox() {
     URL: { createObjectURL: () => 'blob:test' },
     Blob: class { constructor() {} },
     Math,
+    performance: { now: () => Date.now() },
     setTimeout,
     setInterval,
     parseInt,
@@ -351,6 +352,215 @@ test('renderColorPick dims unselected cells on the selected row', () => {
   assertEqual(row5col0.r, palette0[0]);
   assertEqual(row5col0.g, palette0[1]);
   assertEqual(row5col0.b, palette0[2]);
+});
+
+// ── Eval bar ──────────────────────────────────────────────────────────────────
+
+console.log('\nEval bar');
+
+test('calcEval returns 0 on starting position (equal material)', () => {
+  const { ctx } = buildSandbox();
+  vm.runInContext(`
+    teamR = new Team(64,180,232,'Blue');
+    teamL = new Team(190,25,255,'Purple');
+    teamR.r += 1;
+    initBoard();
+  `, ctx);
+  const ev = vm.runInContext(`calcEval()`, ctx);
+  assertEqual(ev, 0);
+});
+
+test('calcEval returns correct delta after removing a piece', () => {
+  const { ctx } = buildSandbox();
+  vm.runInContext(`
+    teamR = new Team(64,180,232,'Blue');
+    teamL = new Team(190,25,255,'Purple');
+    teamR.r += 1;
+    initBoard();
+    // Remove teamL queen (value 9) → teamR should lead by 9
+    grid[7][3] = null;
+  `, ctx);
+  const ev = vm.runInContext(`calcEval()`, ctx);
+  assertEqual(ev, 9);
+});
+
+test('calcEval returns negative when teamR loses a queen', () => {
+  const { ctx } = buildSandbox();
+  vm.runInContext(`
+    teamR = new Team(64,180,232,'Blue');
+    teamL = new Team(190,25,255,'Purple');
+    teamR.r += 1;
+    initBoard();
+    grid[0][3] = null; // remove teamR queen
+  `, ctx);
+  const ev = vm.runInContext(`calcEval()`, ctx);
+  assertEqual(ev, -9);
+});
+
+// ── Board themes ──────────────────────────────────────────────────────────────
+
+console.log('\nBoard themes');
+
+test('THEMES object has 5 distinct named themes', () => {
+  const { ctx } = buildSandbox();
+  const n = vm.runInContext(`Object.keys(THEMES).length`, ctx);
+  assertEqual(n, 5);
+  const names = vm.runInContext(`Object.values(THEMES).map(t=>t.name).join(',')`, ctx);
+  assert(names.includes('Inferno'), 'Missing Inferno theme');
+  assert(names.includes('Void'),    'Missing Void theme');
+  assert(names.includes('Jade'),    'Missing Jade theme');
+  assert(names.includes('Frost'),   'Missing Frost theme');
+});
+
+test('Inferno and Default themes have different dark square colors', () => {
+  const { ctx } = buildSandbox();
+  const diff = vm.runInContext(`THEMES.inferno.dark3d !== THEMES.default.dark3d`, ctx);
+  assert(diff, 'Inferno and Default share the same dark3d color');
+});
+
+test('applyTheme cycles currentTheme', () => {
+  const { ctx } = buildSandbox();
+  vm.runInContext(`applyTheme('inferno');`, ctx);
+  const name = vm.runInContext(`currentThemeObj.name`, ctx);
+  assertEqual(name, 'Inferno');
+});
+
+// ── Move trails ───────────────────────────────────────────────────────────────
+
+console.log('\nMove trails');
+
+test('addMoveTrail adds from-cell to moveTrails', () => {
+  const { ctx } = buildSandbox();
+  vm.runInContext(`
+    teamR = new Team(64,180,232,'Blue');
+    addMoveTrail(3, 2, 3, 5, teamR);
+  `, ctx);
+  const len = vm.runInContext(`moveTrails.length`, ctx);
+  assertEqual(len, 1);
+  const hasFrom = vm.runInContext(`moveTrails[0].cells.some(c => c.r === 3 && c.c === 2)`, ctx);
+  assert(hasFrom, 'Trail missing from-cell');
+});
+
+test('addMoveTrail includes intermediate squares for rook-like moves', () => {
+  const { ctx } = buildSandbox();
+  vm.runInContext(`
+    teamR = new Team(64,180,232,'Blue');
+    addMoveTrail(3, 0, 3, 7, teamR); // rook moves across rank
+  `, ctx);
+  // from (3,0) to (3,7): should include (3,1)...(3,6) as intermediates
+  const cellCount = vm.runInContext(`moveTrails[0].cells.length`, ctx);
+  assert(cellCount > 2, `Expected >2 cells for 7-square rook move, got ${cellCount}`);
+});
+
+test('addMoveTrail for knight (non-sliding) only includes from-cell', () => {
+  const { ctx } = buildSandbox();
+  vm.runInContext(`
+    teamR = new Team(64,180,232,'Blue');
+    addMoveTrail(0, 1, 2, 2, teamR); // knight jump
+  `, ctx);
+  const cellCount = vm.runInContext(`moveTrails[0].cells.length`, ctx);
+  assertEqual(cellCount, 1);
+});
+
+// ── AI kibitzer ───────────────────────────────────────────────────────────────
+
+console.log('\nAI kibitzer');
+
+test('kibitzer logs capture comment when _pendingKibitz has capture', () => {
+  const { ctx } = buildSandbox();
+  const logs = [];
+  vm.runInContext(`addLog = function(m) { _testSent.push({_log: m}); };`, ctx);
+
+  vm.runInContext(`
+    teamR = new Team(64,180,232,'Blue');
+    teamL = new Team(190,25,255,'Purple');
+    teamR.r += 1;
+    initBoard();
+    currentTeam = teamR;
+    kibOn = true;
+    // Simulate a pawn capture
+    _pendingKibitz = {
+      piece: grid[1][0],    // teamR pawn
+      capture: grid[7][0],  // teamL rook
+      fr: 1, fc: 0, tr: 7, tc: 0,
+      team: teamR
+    };
+    _doKibitz(false);
+  `, ctx);
+
+  const kibMsgs = sandbox => vm.runInContext(`_testSent`, ctx)
+    .filter(m => m._log && m._log.includes('💡'));
+  const msgs = vm.runInContext(`_testSent`, ctx).filter(m => m._log && m._log.includes('💡'));
+  assert(msgs.length > 0, 'Expected a kibitzer log message for capture');
+});
+
+test('kibitzer logs check comment when isCheck=true', () => {
+  const { ctx } = buildSandbox();
+  vm.runInContext(`addLog = function(m) { _testSent.push({_log: m}); };`, ctx);
+
+  vm.runInContext(`
+    teamR = new Team(64,180,232,'Blue');
+    teamL = new Team(190,25,255,'Purple');
+    teamR.r += 1;
+    initBoard();
+    currentTeam = teamR;
+    kibOn = true;
+    _pendingKibitz = {
+      piece: grid[0][3],  // queen
+      capture: null,
+      fr: 0, fc: 3, tr: 4, tc: 3,
+      team: teamR
+    };
+    _doKibitz(true);  // isCheck = true
+  `, ctx);
+
+  const msgs = vm.runInContext(`_testSent`, ctx).filter(m => m._log && m._log.includes('Check'));
+  assert(msgs.length > 0, 'Expected a Check kibitzer message');
+});
+
+test('kibitzer OFF: no comment logged', () => {
+  const { ctx } = buildSandbox();
+  vm.runInContext(`addLog = function(m) { _testSent.push({_log: m}); };`, ctx);
+
+  vm.runInContext(`
+    teamR = new Team(64,180,232,'Blue');
+    teamL = new Team(190,25,255,'Purple');
+    teamR.r += 1;
+    initBoard();
+    currentTeam = teamR;
+    kibOn = false;
+    _pendingKibitz = {piece: grid[1][0], capture: grid[7][0], fr:1,fc:0,tr:7,tc:0, team: teamR};
+    _doKibitz(false);
+  `, ctx);
+
+  const msgs = vm.runInContext(`_testSent`, ctx).filter(m => m._log && m._log.includes('💡'));
+  assertEqual(msgs.length, 0);
+});
+
+// ── Spectator reactions ───────────────────────────────────────────────────────
+
+console.log('\nSpectator reactions');
+
+test('handleRelayMsg spawns a reaction on reaction message', () => {
+  const { ctx } = buildSandbox();
+  vm.runInContext(`
+    reactions = [];
+    handleRelayMsg({type: 'reaction', emoji: '🔥'});
+  `, ctx);
+  const len = vm.runInContext(`reactions.length`, ctx);
+  assertEqual(len, 1);
+  const emoji = vm.runInContext(`reactions[0].emoji`, ctx);
+  assertEqual(emoji, '🔥');
+});
+
+test('spawnReaction uses default emoji when emoji missing', () => {
+  const { ctx } = buildSandbox();
+  vm.runInContext(`
+    reactions = [];
+    handleRelayMsg({type: 'reaction'});
+  `, ctx);
+  const emoji = vm.runInContext(`reactions[0].emoji`, ctx);
+  assertEqual(emoji, '🔥');
 });
 
 // ── Summary ────────────────────────────────────────────────────────────────

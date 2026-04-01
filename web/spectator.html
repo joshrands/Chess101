@@ -192,6 +192,28 @@
     font-size: 0.8rem;
     cursor: pointer;
   }
+
+  /* Reaction buttons */
+  #reaction-bar {
+    display: flex;
+    gap: 8px;
+    justify-content: center;
+    margin-top: 12px;
+    flex-wrap: wrap;
+  }
+  .react-btn {
+    background: #0e1624;
+    border: 1px solid #2a3848;
+    border-radius: 20px;
+    padding: 6px 14px;
+    font-size: 1.2rem;
+    cursor: pointer;
+    transition: background .15s, border-color .15s;
+    color: inherit;
+    line-height: 1;
+  }
+  .react-btn:hover { background: #1a2838; border-color: #4a6080; }
+  .react-btn:active { background: #243040; transform: scale(0.95); }
 </style>
 </head>
 <body>
@@ -220,6 +242,15 @@
       <div id="row-labels"></div>
       <canvas id="board" width="480" height="480"></canvas>
     </div>
+  </div>
+
+  <div id="reaction-bar" style="display:none">
+    <button class="react-btn" onclick="sendReaction('🔥')">🔥</button>
+    <button class="react-btn" onclick="sendReaction('!!')">!!</button>
+    <button class="react-btn" onclick="sendReaction('??')">??</button>
+    <button class="react-btn" onclick="sendReaction('👑')">👑</button>
+    <button class="react-btn" onclick="sendReaction('💥')">💥</button>
+    <button class="react-btn" onclick="sendReaction('⚡')">⚡</button>
   </div>
 
   <div id="panel">
@@ -477,6 +508,17 @@ function handleMessage(msg) {
     else             Object.assign(teamL, PALETTES[idx]);
     updatePanel();
   }
+
+  else if (t === 'reaction') {
+    const emoji = msg.emoji || '🔥';
+    logMove(`${emoji} reaction`);
+  }
+}
+
+function sendReaction(emoji) {
+  if (ws && ws.readyState === WebSocket.OPEN) {
+    ws.send(JSON.stringify({type: 'reaction', emoji}));
+  }
 }
 
 // Colour palette matching Board.team_array order
@@ -521,6 +563,7 @@ function connect(relayUrl, code) {
   ws.onopen = () => {
     ws.send(JSON.stringify({type: 'relay_spectate', room_code: roomCode}));
     setStatus(`Joined room ${roomCode} — waiting for board state…`);
+    document.getElementById('reaction-bar').style.display = 'flex';
   };
 
   ws.onmessage = (ev) => {
