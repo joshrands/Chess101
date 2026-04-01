@@ -53,6 +53,8 @@ a.back:hover{color:#00ff88}
   #app{flex-direction:column;width:100%;border-radius:0;border-left:none;border-right:none}
   #board-wrap{width:100%}
   #board{width:100%!important;height:auto!important}
+  /* board3d is position:absolute inside board-wrap; board-wrap height comes from hidden #board */
+  #board3d{touch-action:none} /* prevent page scroll from eating OrbitControls touch events */
   #panel{width:100%;max-height:40vh;border-left:none;border-top:1px solid #1e2a3a}
   #join-box{min-width:unset;width:90vw;max-width:300px}
 }
@@ -67,9 +69,9 @@ a.back:hover{color:#00ff88}
 <body>
 <div id="app">
   <div id="board-wrap">
-    <canvas id="board" width="640" height="640"></canvas>
-    <canvas id="board3d" style="display:none;position:absolute;top:0;left:0;width:100%;height:100%"></canvas>
-    <button id="btn3d" onclick="toggleView()">3D</button>
+    <canvas id="board" width="640" height="640" style="visibility:hidden"></canvas>
+    <canvas id="board3d" style="display:block;position:absolute;top:0;left:0;width:100%;height:100%"></canvas>
+    <button id="btn3d" onclick="toggleView()">2D</button>
   </div>
   <div id="panel">
     <div id="panel-top"></div>
@@ -635,6 +637,7 @@ let promotingPawn=null; // {row,col}
 let aiThinking=false;
 let aiWorker=null;
 let aiDisplayGrid=null;
+let aiCurrentCandidate=null; // {fr,fc,tr,tc} — candidate being shown during AI thinking
 
 // Move animation state (visual only — grid updates immediately)
 const ANIM_MS=300;
@@ -642,7 +645,7 @@ let animPieces=[]; // [{piece,glyph,isWhite,cx,cy,toR,toC,startMs}] — active s
 let animOnDone=null; // called when all animPieces finish
 
 // 3D view state
-let threeD=false;
+let threeD=true;
 let threeInited=false;
 let three=null; // {scene,camera,renderer,controls,boardSquares,pool,animMesh,lights}
 
@@ -718,7 +721,7 @@ function resetGame(){
   currentTeam=null;selectedPiece=null;inCheck=false;isDraw=false;winnerTeam=null;
   moveCount=0;peaceTime=0;promotingPawn=null;aiThinking=false;
   if(aiWorker){aiWorker.terminate();aiWorker=null;}
-  aiDisplayGrid=null;selectedRIdx=null;selectedLIdx=null;
+  aiDisplayGrid=null;aiCurrentCandidate=null;selectedRIdx=null;selectedLIdx=null;
   daysR=[];doubleR=[];daysL=[];doubleL=[];
   checkerBrightness=0;checkerDir=2;
   gameOverColors=null;blink=false;
@@ -869,7 +872,7 @@ const AI_CAND_MS=140;   // ms per candidate display
 
 function _applyAIMove(move){
   if(!aiThinking)return;
-  aiThinking=false;aiDisplayGrid=null;
+  aiThinking=false;aiDisplayGrid=null;aiCurrentCandidate=null;
   if(aiWorker){aiWorker.terminate();aiWorker=null;}
   if(move){
     const{fromRow:fr,fromCol:fc,toRow:tr,toCol:tc}=move;
@@ -907,10 +910,7 @@ function launchAI(){
   function showCandidate(ci){
     if(!aiThinking)return;
     if(candidates.length){
-      const{fr,fc,tr,tc}=candidates[ci%candidates.length];
-      const dg=deepCopyGrid(grid,teamR,teamL);
-      dg[tr][tc]=dg[fr][fc];dg[fr][fc]=null;
-      aiDisplayGrid=dg;
+      aiCurrentCandidate=candidates[ci%candidates.length];
     }
     _aiCandidatesShown++;
     if(_aiCandidatesShown>=AI_MIN_SHOW&&_aiPendingMove!==undefined){
@@ -1132,14 +1132,8 @@ function renderWarGames(now){
 
 function renderPlaying(now){
   clearBuf();
-  // Checker background — pulse when AI thinking or waiting for remote opponent
-  if(aiThinking||isWaitingForRemote()){
-    checkerBrightness+=checkerDir;
-    if(checkerBrightness<=0){checkerBrightness=0;checkerDir=2;}
-    if(checkerBrightness>=255){checkerBrightness=255;checkerDir=-2;}
-  } else {
-    checkerBrightness=60;
-  }
+  // Checker background — static dim; FROM/TO highlights carry the AI thinking visual
+  checkerBrightness=60;
   const cb=checkerBrightness;
   for(let r=0;r<8;r++)for(let c=0;c<8;c++){
     const light=(r+c)%2===0;
@@ -1152,8 +1146,15 @@ function renderPlaying(now){
     }
   }
 
-  // AI display board overlay
-  const displayGrid=aiThinking&&aiDisplayGrid?aiDisplayGrid:grid;
+  // Highlight AI candidate move: FROM square (full team color) + TO square (45% dim)
+  if(aiThinking&&aiCurrentCandidate&&currentTeam){
+    const{fr,fc,tr,tc}=aiCurrentCandidate;
+    const t=currentTeam;
+    lightCell(fr,fc,t.r,t.g,t.b);
+    lightCell(tr,tc,Math.floor(t.r*0.45),Math.floor(t.g*0.45),Math.floor(t.b*0.45));
+  }
+
+  const displayGrid=grid; // real board always; candidate shown via lightCell above
 
   // Highlight targets
   if(selectedPiece&&!aiThinking){
@@ -1762,9 +1763,12 @@ function _tintGroup(grp,team){
 
 function initThree(){
   const canvas3d=document.getElementById('board3d');
-  const W=640,H=640;
+  // Use actual CSS display size so the renderer matches the layout on any screen
+  const W=canvas3d.clientWidth||640;
+  const H=canvas3d.clientHeight||640;
   const renderer=new THREE.WebGLRenderer({canvas:canvas3d,antialias:true,alpha:true});
-  renderer.setSize(W,H);renderer.setPixelRatio(window.devicePixelRatio||1);
+  // setSize(w,h,false) — sets WebGL resolution but does NOT override canvas CSS size
+  renderer.setSize(W,H,false);renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,2));
   renderer.setClearColor(0x000000,0); // transparent — CSS gradient on #board3d shows through
 
   const scene=new THREE.Scene();
@@ -1831,8 +1835,27 @@ function initThree(){
   animMesh.userData.ptype='Pawn';
   scene.add(animMesh);
 
-  three={scene,camera,renderer,controls,boardSquares,pool,animMesh,lights:{ptR,ptL}};
-  _loadStlPieces(); // replace geometric primitives with STL meshes
+  // Ghost mesh — shown during AI thinking at the candidate TO square, semi-transparent
+  const ghostMesh=_makePieceMesh('Pawn');
+  ghostMesh.userData.ptype='Pawn';
+  ghostMesh.visible=false;
+  scene.add(ghostMesh);
+
+  three={scene,camera,renderer,controls,boardSquares,pool,animMesh,ghostMesh,lights:{ptR,ptL}};
+  _loadStlPieces(); // replace geometric primitives with STL meshes (also updates ghostMesh via ptype match on first use)
+
+  // Resize handler — keeps renderer resolution synced with CSS layout on orientation change etc.
+  function onResize(){
+    if(!three)return;
+    const el=document.getElementById('board3d');
+    const w=el.clientWidth,h=el.clientHeight;
+    if(w>0&&h>0){
+      three.renderer.setSize(w,h,false);
+      three.camera.aspect=w/h;
+      three.camera.updateProjectionMatrix();
+    }
+  }
+  window.addEventListener('resize',onResize);
 }
 
 function _hex(team){
@@ -1861,18 +1884,17 @@ function updateBoardEmissiveFromBuf(){
 
 function syncPieceMeshes(){
   if(!three||!grid)return;
-  // Use aiDisplayGrid when the AI is cycling through candidate moves
-  const displayGrid=(aiThinking&&aiDisplayGrid)?aiDisplayGrid:grid;
-  // Hide all pool meshes first
+  // Hide all pool meshes and ghost first
   for(const m of three.pool)m.visible=false;
   three.animMesh.visible=false;
+  three.ghostMesh.visible=false;
 
   // Animating piece destination — skip that cell
   const animDest=animPieces.length?[animPieces[0].toR,animPieces[0].toC]:null;
 
   for(let r=0;r<8;r++){
     for(let c=0;c<8;c++){
-      const p=displayGrid[r][c];if(!p)continue;
+      const p=grid[r][c];if(!p)continue;
       if(animDest&&animDest[0]===r&&animDest[1]===c)continue; // drawn by animMesh
       const typeName=p.constructor.name;
       // Scan full pool for any unused mesh of this type
@@ -1882,6 +1904,32 @@ function syncPieceMeshes(){
       _tintGroup(mesh,p.team);
       mesh.position.set(c,0.03,r);
       mesh.visible=true;
+    }
+  }
+
+  // Ghost piece — semi-transparent at candidate TO square during AI thinking
+  if(aiThinking&&aiCurrentCandidate){
+    const{fr,fc,tr,tc}=aiCurrentCandidate;
+    const p=grid[fr]&&grid[fr][fc];
+    if(p){
+      const typeName=p.constructor.name;
+      if(three.ghostMesh.userData.ptype!==typeName){
+        three.ghostMesh.userData.ptype=typeName;
+        while(three.ghostMesh.children.length)three.ghostMesh.remove(three.ghostMesh.children[0]);
+        const geo=STL_DATA[typeName]?_stlGeoFromB64(STL_DATA[typeName]):null;
+        const mat=new THREE.MeshStandardMaterial({
+          transparent:true,opacity:0.40,depthWrite:false,
+          metalness:0.3,roughness:0.4,emissiveIntensity:0.9
+        });
+        if(geo)three.ghostMesh.add(new THREE.Mesh(geo,mat));
+      }
+      // Tint ghost with raw team color so it reads as "that team's piece"
+      const col=_tc(p.team);
+      three.ghostMesh.traverse(ch=>{
+        if(ch.isMesh){ch.material.emissive=col.clone();ch.material.color=col.clone();}
+      });
+      three.ghostMesh.position.set(tc,0.03,tr);
+      three.ghostMesh.visible=true;
     }
   }
 
@@ -1927,7 +1975,10 @@ function updateTeamLights(){
 }
 
 function renderThree(now){
-  if(!three)return;
+  if(!three){
+    if(!threeInited&&typeof THREE!=='undefined'){initThree();threeInited=true;}
+    if(!three)return;
+  }
   updateBoardEmissiveFromBuf();
   if(phase===Phase.PLAYING){
     syncPieceMeshes();
