@@ -67,6 +67,7 @@ a.back:hover{color:#00ff88}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/utils/BufferGeometryUtils.js"></script>
 </head>
 <body>
 <div id="app">
@@ -1867,8 +1868,9 @@ const STL_DATA={
 function _stlGeoFromB64(b64){
   const bin=atob(b64),buf=new ArrayBuffer(bin.length),bytes=new Uint8Array(buf);
   for(let i=0;i<bin.length;i++)bytes[i]=bin.charCodeAt(i);
-  const geo=new THREE.BufferGeometry();
+  let geo=new THREE.BufferGeometry();
   geo.setAttribute("position",new THREE.BufferAttribute(new Float32Array(buf),3));
+  if(THREE.BufferGeometryUtils)geo=THREE.BufferGeometryUtils.mergeVertices(geo,1e-4);
   geo.computeVertexNormals();return geo;
 }
 function _loadStlPieces(){
@@ -1895,26 +1897,26 @@ function _makePieceMesh(type){
   const mat=new THREE.MeshStandardMaterial({metalness:0.35,roughness:0.4,emissiveIntensity:0.5});
   const add=(geo,yOff)=>{const m=new THREE.Mesh(geo,mat.clone());m.position.y=yOff;g.add(m);};
   if(type==='Pawn'){
-    add(new THREE.CylinderGeometry(0.13,0.18,0.12,10),0.06);
-    add(new THREE.SphereGeometry(0.17,10,8),0.28);
+    add(new THREE.CylinderGeometry(0.13,0.18,0.12,64),0.06);
+    add(new THREE.SphereGeometry(0.17,40,24),0.28);
   } else if(type==='Rook'){
-    add(new THREE.CylinderGeometry(0.20,0.23,0.42,10),0.21);
-    add(new THREE.CylinderGeometry(0.23,0.23,0.08,10),0.46);
+    add(new THREE.CylinderGeometry(0.20,0.23,0.42,64),0.21);
+    add(new THREE.CylinderGeometry(0.23,0.23,0.08,64),0.46);
   } else if(type==='Knight'){
-    add(new THREE.CylinderGeometry(0.17,0.22,0.16,10),0.08);
+    add(new THREE.CylinderGeometry(0.17,0.22,0.16,64),0.08);
     const head=new THREE.Mesh(new THREE.BoxGeometry(0.28,0.28,0.16),mat.clone());
     head.position.set(0.04,0.38,0);head.rotation.x=-0.4;g.add(head);
   } else if(type==='Bishop'){
-    add(new THREE.CylinderGeometry(0.14,0.20,0.52,10),0.26);
-    add(new THREE.SphereGeometry(0.12,8,6),0.58);
-    add(new THREE.ConeGeometry(0.04,0.10,8),0.73);
+    add(new THREE.CylinderGeometry(0.14,0.20,0.52,64),0.26);
+    add(new THREE.SphereGeometry(0.12,32,18),0.58);
+    add(new THREE.ConeGeometry(0.04,0.10,64),0.73);
   } else if(type==='Queen'){
-    add(new THREE.CylinderGeometry(0.20,0.26,0.62,10),0.31);
-    const torus=new THREE.Mesh(new THREE.TorusGeometry(0.18,0.04,6,12),mat.clone());
+    add(new THREE.CylinderGeometry(0.20,0.26,0.62,64),0.31);
+    const torus=new THREE.Mesh(new THREE.TorusGeometry(0.18,0.04,20,64),mat.clone());
     torus.position.y=0.66;torus.rotation.x=Math.PI/2;g.add(torus);
-    add(new THREE.SphereGeometry(0.10,8,6),0.80);
+    add(new THREE.SphereGeometry(0.10,32,18),0.80);
   } else { // King
-    add(new THREE.CylinderGeometry(0.20,0.26,0.70,10),0.35);
+    add(new THREE.CylinderGeometry(0.20,0.26,0.70,64),0.35);
     add(new THREE.BoxGeometry(0.08,0.24,0.08),0.87);
     add(new THREE.BoxGeometry(0.22,0.08,0.08),0.90);
   }
