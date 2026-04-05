@@ -1,0 +1,35 @@
+name: Chess101iOS
+options:
+  bundleIdPrefix: com.chess101
+  deploymentTarget:
+    iOS: "16.0"
+targets:
+  Chess101iOS:
+    type: application
+    platform: iOS
+    sources:
+      - Sources/Chess101iOS
+      - path: Sources/Chess101Engine
+        group: Sources/Chess101iOS/Engine
+    settings:
+      GENERATE_INFOPLIST_FILE: YES
+      INFOPLIST_KEY_UILaunchScreen_Generation: YES
+      INFOPLIST_KEY_UILaunchScreen_BackgroundColorName: LaunchBackground
+      INFOPLIST_KEY_UIApplicationSceneManifest_Generation: YES
+      INFOPLIST_KEY_NSCameraUsageDescription: "Chess 101 uses the camera to scan ChessMatrix room codes."
+      PRODUCT_BUNDLE_IDENTIFIER: com.chess101.ios
+      MARKETING_VERSION: "1.0"
+      CURRENT_PROJECT_VERSION: "1"
+      SWIFT_VERSION: "5.9"
+      DEVELOPMENT_TEAM: VZ95Y2RWRW
+      CODE_SIGN_IDENTITY: "iPhone Developer"
+      ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+  Chess101IOSTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - Tests/Chess101IOSTests
+    dependencies:
+      - target: Chess101iOS
+    settings:
+      GENERATE_INFOPLIST_FILE: YES

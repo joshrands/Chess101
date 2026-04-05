@@ -116,6 +116,40 @@ py_binary(
     ],
 )
 
+py_library(
+    name = "swift_bridge",
+    srcs = ["swift_bridge.py"],
+    visibility = ["//:__subpackages__"],
+)
+
+py_binary(
+    name = "fuzz_lockstep_swift",
+    srcs = ["fuzz_lockstep_swift.py"],
+    data = [
+        "js_bridge.js",
+        "//web:chess_engine_js",
+        "//web:chessmatrix_scanner_js",
+    ],
+    deps = [
+        ":chess_helpers",
+        ":corpus",
+        ":python_bridge",
+        ":swift_bridge",
+        "//core",
+        "//network",
+        "//pieces",
+    ],
+)
+
+py_binary(
+    name = "fuzz_relay",
+    srcs = ["fuzz_relay.py"],
+    deps = [
+        "//network",
+        "@pip//websockets",
+    ],
+)
+
 filegroup(
     name = "js_bridge",
     srcs = ["js_bridge.js"],

@@ -81,6 +81,7 @@ The `relay_url` fixture (in `conftest.py`) selects the mode automatically: `RELA
 | `test_networked_runner.py` | NetworkedGameRunner: reconnect, CODE_SCAN_BOARD, LOCAL mode, AI suppression | ~1280 |
 | `test_online_flow.py` | E2E: relay handshake → color-pick → war-games → playing | 459 |
 | `test_relay.py` | Relay protocol, forwarding, reconnect, anti-cheat | 1116 |
+| `fuzz_relay.py` (harness) | Relay delivery fuzzer: ordering, completeness, reconnect, spectator | 437 |
 | `test_chessmatrix_scanning.py` | ChessMatrix scanner: all pipeline stages + E2E (Python) | 1159 |
 | `test_chessmatrix_pipeline.py` | ChessMatrix pipeline via OpenCV debug tools | 190 |
 | `test_chessmatrix_js.js` | ChessMatrix scanner (JavaScript / Node.js) | 442 |
@@ -309,6 +310,39 @@ Higher-level helpers: `_do_host()`, `_do_guest()`, `_do_spectate()`, `_do_reconn
 | Anti-cheat | Server-side `validator.py` rejects illegal moves |
 | `RelayClient` | High-level wrapper: handshake, cold-start retry, reconnect guard |
 | Health endpoint | `GET /health` returns 200 for Docker readiness probe |
+
+For randomised stress-testing beyond these unit tests, see [`harness/fuzz_relay.py`](#fuzz_relaypy--relay-delivery-fuzzer) below.
+
+---
+
+### `fuzz_relay.py` — relay delivery fuzzer
+
+Standalone fuzzer in `harness/fuzz_relay.py`. Generates random sequences of create / join / send / disconnect / reconnect operations and verifies delivery invariants after each scenario. Does not require pytest — run directly.
+
+```bash
+# In-process relay (default, no external deps):
+.venv/bin/python harness/fuzz_relay.py --iterations 100
+
+# Against an external or live relay:
+RELAY_URL=ws://127.0.0.1:8765 .venv/bin/python harness/fuzz_relay.py --iterations 100
+RELAY_URL=wss://relay.chess101.net .venv/bin/python harness/fuzz_relay.py --iterations 50
+
+# Via Bazel:
+bazel run //harness:fuzz_relay -- --iterations 100
+```
+
+Invariants checked per scenario:
+
+| Scenario | Weight | What it verifies |
+|---|---|---|
+| `basic_forward` | 40 | Messages arrive in send order; none dropped |
+| `spectator` | 20 | Spectator receives all forwarded messages; per-sender order preserved |
+| `reconnect` | 20 | Reconnecting player receives full history replay |
+| `rapid_join_leave` | 10 | Server survives rapid create/close cycles; still responds afterward |
+| `invalid_codes` | 5 | Bad room code → `room_not_found`; bad token → `bad_token` |
+| `burst_messages` | 5 | 50–200 messages sent with no pacing; all arrive |
+
+`_rooms.clear()` is called between iterations so accumulated rooms don't trigger `server_full` errors.
 
 ---
 

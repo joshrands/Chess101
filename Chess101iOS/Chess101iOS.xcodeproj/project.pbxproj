@@ -1,0 +1,646 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		063B1D5908E0C35114F11E4B /* GamePhase.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4CE48F62492F1DF181B53FA /* GamePhase.swift */; };
+		06D1C8D3FB98CCD515C946F8 /* Queen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 691DED8BC0EA6730A84C6566 /* Queen.swift */; };
+		07784865B00F5AF3B0F404DA /* Bishop.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9D84DEE7B0C9716030710BBB /* Bishop.swift */; };
+		18EBCA35BA77AB9E932F4C88 /* Pawn.swift in Sources */ = {isa = PBXBuildFile; fileRef = CD75C0852832192C1293E040 /* Pawn.swift */; };
+		1F9B0E3A61EB7CAF451AEBC7 /* Rules.swift in Sources */ = {isa = PBXBuildFile; fileRef = 47C93F2E6941C972F4B9BB44 /* Rules.swift */; };
+		20CC47250469BC021D8F51D0 /* Team.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A4F6B1178152B2A35C9BCC1 /* Team.swift */; };
+		228DE6F18BD756DB6ED85F30 /* GameOverView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 90769EB1F8CA50DDE923484C /* GameOverView.swift */; };
+		249644BA9B841696E57170D2 /* Protocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = 862B78CFBE21BB871FE7CF44 /* Protocol.swift */; };
+		2D86B14762B4CAE721DF1181 /* ColorPickView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9EBA5543C5D1C2948A96760E /* ColorPickView.swift */; };
+		2E1B0B0CA4A162F35F7607CE /* Board.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7D78E8A5C80B7533A71A8340 /* Board.swift */; };
+		3107A905E5DBCCCF3EB8AF15 /* ScannerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B82A9919E84BF8F049806DD9 /* ScannerView.swift */; };
+		33E83E41AB2DE4F99E4A58D3 /* Piece.swift in Sources */ = {isa = PBXBuildFile; fileRef = 74FF1C33FE13FE739D25A1E6 /* Piece.swift */; };
+		37D4AE0711AB4A8F1D607C08 /* GameSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = E3960792358B6AEF92FD6399 /* GameSession.swift */; };
+		39E8DBF8C1DCD0E02FB338E3 /* Rook.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D6DCEA880FC136788BDD747 /* Rook.swift */; };
+		3C0C3D89641B21293BAB8F66 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 49E93AAF17BF23F3E1DDFC75 /* Assets.xcassets */; };
+		42BDA873B3B958097C357B39 /* RSCodec.swift in Sources */ = {isa = PBXBuildFile; fileRef = E83FEDC38A305752AC687AB9 /* RSCodec.swift */; };
+		4966E0623E9D555007A43B7C /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10AE88DCDFB53C7646F8096B /* ContentView.swift */; };
+		4D17C7EBB7E3886C90B8557C /* king.obj in Resources */ = {isa = PBXBuildFile; fileRef = 31AC6891F0046E6957A350A2 /* king.obj */; };
+		4DC0A8F37CABCCF842728F31 /* pawn.obj in Resources */ = {isa = PBXBuildFile; fileRef = 927B213E0E1A7544FEF62805 /* pawn.obj */; };
+		522220220F1A493DD520B394 /* EvalBarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8115DB39064BDC7C2668593C /* EvalBarView.swift */; };
+		522971330C72B717FD328090 /* rook.obj in Resources */ = {isa = PBXBuildFile; fileRef = B062AA8A03C68071348EA942 /* rook.obj */; };
+		5AA6A23330197ABF3713DFC5 /* LobbyView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 17A728CCD03373B739B62713 /* LobbyView.swift */; };
+		62E72EF5E668433FF238D00E /* Cell.swift in Sources */ = {isa = PBXBuildFile; fileRef = 43F3F47015071DC92F17DD0F /* Cell.swift */; };
+		6302F23CF28C9280AF9EA0EE /* King.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0961ADEE80DD93608560EC57 /* King.swift */; };
+		6528A18A7BA5A19147CFA4F8 /* GameTree.swift in Sources */ = {isa = PBXBuildFile; fileRef = E488CC769087CEFBA70A0FF2 /* GameTree.swift */; };
+		681ADE41B9A1E4C6F61B4FB0 /* PanelView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1997A3006CFD415E3FBFD47E /* PanelView.swift */; };
+		7867ABAF2A1C3B619B1AF574 /* BoardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F3FDE857E1F3881E3009755D /* BoardView.swift */; };
+		7928016A372871F65078697E /* EngineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9DE36F998E361DC621BA454D /* EngineTests.swift */; };
+		82A5393D18C911AC12A955F9 /* MoveAnimation.swift in Sources */ = {isa = PBXBuildFile; fileRef = D860B1CF825CEED0B3173975 /* MoveAnimation.swift */; };
+		88F763010EC0AF9EBF827614 /* RelayClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = E10F863EF66AF7A6D53F22C7 /* RelayClient.swift */; };
+		8B2AB7FB39495D5E1CF3AD0B /* WarGamesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F6BFB203C55A94C633C0573 /* WarGamesView.swift */; };
+		8FC37239E068C6C067EF7404 /* knight.obj in Resources */ = {isa = PBXBuildFile; fileRef = 454DC15CC6A4EC6E3E441623 /* knight.obj */; };
+		9285C45376AFB60600EC49A6 /* MoveFlags.swift in Sources */ = {isa = PBXBuildFile; fileRef = DAFCDC3AF46570F08EC1153F /* MoveFlags.swift */; };
+		99E09C27E01F6CDFB5E2668A /* Knight.swift in Sources */ = {isa = PBXBuildFile; fileRef = A611B83DDB3B16C5CE1EDCDB /* Knight.swift */; };
+		B02E3E889C063CC9FC41D4B7 /* ChessMatrixDecoder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 44BCB3E8F6EC164B90EC0A6E /* ChessMatrixDecoder.swift */; };
+		B8630C14F2BE19D12BC142D5 /* AlphaBeta.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0E793B535ECB518C68139595 /* AlphaBeta.swift */; };
+		BA38DBAB03BE33F7CA4CEFA7 /* queen.obj in Resources */ = {isa = PBXBuildFile; fileRef = 90448029DD55EF43F54BD80E /* queen.obj */; };
+		BEC4F74EFC0A8F123D86334C /* Board3DView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB6A29B9E94367FE2950F356 /* Board3DView.swift */; };
+		D6D8281F7E05821332AB208D /* Chess101App.swift in Sources */ = {isa = PBXBuildFile; fileRef = 98A4B01C345609D37CD1FE91 /* Chess101App.swift */; };
+		D7B1B26F4ADAC9E319DDA867 /* ChessMatrixEncoder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 564C1690F3F052CA05B2C140 /* ChessMatrixEncoder.swift */; };
+		E5603C335FB456A82E3B923A /* bishop.obj in Resources */ = {isa = PBXBuildFile; fileRef = 4333C8A3ADA7F38BFCD4C04A /* bishop.obj */; };
+		F38018A98C333C4FF8CE52AA /* RSCodecTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2232A128768FFCCE72AB43D /* RSCodecTests.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		249CAA22B9925239F432081C /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 9E97EB55400AE4138FCDAB5F /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 37CC9DAD40D6603657F0BE64;
+			remoteInfo = Chess101iOS;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXFileReference section */
+		0961ADEE80DD93608560EC57 /* King.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = King.swift; sourceTree = "<group>"; };
+		0E793B535ECB518C68139595 /* AlphaBeta.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlphaBeta.swift; sourceTree = "<group>"; };
+		10AE88DCDFB53C7646F8096B /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		17A728CCD03373B739B62713 /* LobbyView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LobbyView.swift; sourceTree = "<group>"; };
+		1997A3006CFD415E3FBFD47E /* PanelView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PanelView.swift; sourceTree = "<group>"; };
+		31AC6891F0046E6957A350A2 /* king.obj */ = {isa = PBXFileReference; path = king.obj; sourceTree = "<group>"; };
+		3AE8F9310EF91E2D9CCC885C /* Chess101IOSTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = Chess101IOSTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		4333C8A3ADA7F38BFCD4C04A /* bishop.obj */ = {isa = PBXFileReference; path = bishop.obj; sourceTree = "<group>"; };
+		43F3F47015071DC92F17DD0F /* Cell.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Cell.swift; sourceTree = "<group>"; };
+		44BCB3E8F6EC164B90EC0A6E /* ChessMatrixDecoder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChessMatrixDecoder.swift; sourceTree = "<group>"; };
+		454DC15CC6A4EC6E3E441623 /* knight.obj */ = {isa = PBXFileReference; path = knight.obj; sourceTree = "<group>"; };
+		47C93F2E6941C972F4B9BB44 /* Rules.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Rules.swift; sourceTree = "<group>"; };
+		49E93AAF17BF23F3E1DDFC75 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		564C1690F3F052CA05B2C140 /* ChessMatrixEncoder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChessMatrixEncoder.swift; sourceTree = "<group>"; };
+		691DED8BC0EA6730A84C6566 /* Queen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Queen.swift; sourceTree = "<group>"; };
+		74FF1C33FE13FE739D25A1E6 /* Piece.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Piece.swift; sourceTree = "<group>"; };
+		7D78E8A5C80B7533A71A8340 /* Board.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Board.swift; sourceTree = "<group>"; };
+		8115DB39064BDC7C2668593C /* EvalBarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EvalBarView.swift; sourceTree = "<group>"; };
+		862B78CFBE21BB871FE7CF44 /* Protocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Protocol.swift; sourceTree = "<group>"; };
+		8D6DCEA880FC136788BDD747 /* Rook.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Rook.swift; sourceTree = "<group>"; };
+		90448029DD55EF43F54BD80E /* queen.obj */ = {isa = PBXFileReference; path = queen.obj; sourceTree = "<group>"; };
+		90769EB1F8CA50DDE923484C /* GameOverView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameOverView.swift; sourceTree = "<group>"; };
+		927B213E0E1A7544FEF62805 /* pawn.obj */ = {isa = PBXFileReference; path = pawn.obj; sourceTree = "<group>"; };
+		98A4B01C345609D37CD1FE91 /* Chess101App.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Chess101App.swift; sourceTree = "<group>"; };
+		9A4F6B1178152B2A35C9BCC1 /* Team.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Team.swift; sourceTree = "<group>"; };
+		9D84DEE7B0C9716030710BBB /* Bishop.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Bishop.swift; sourceTree = "<group>"; };
+		9DE36F998E361DC621BA454D /* EngineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EngineTests.swift; sourceTree = "<group>"; };
+		9EBA5543C5D1C2948A96760E /* ColorPickView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ColorPickView.swift; sourceTree = "<group>"; };
+		9F6BFB203C55A94C633C0573 /* WarGamesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WarGamesView.swift; sourceTree = "<group>"; };
+		A611B83DDB3B16C5CE1EDCDB /* Knight.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Knight.swift; sourceTree = "<group>"; };
+		B062AA8A03C68071348EA942 /* rook.obj */ = {isa = PBXFileReference; path = rook.obj; sourceTree = "<group>"; };
+		B82A9919E84BF8F049806DD9 /* ScannerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScannerView.swift; sourceTree = "<group>"; };
+		BB6A29B9E94367FE2950F356 /* Board3DView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Board3DView.swift; sourceTree = "<group>"; };
+		CD75C0852832192C1293E040 /* Pawn.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Pawn.swift; sourceTree = "<group>"; };
+		D2232A128768FFCCE72AB43D /* RSCodecTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RSCodecTests.swift; sourceTree = "<group>"; };
+		D860B1CF825CEED0B3173975 /* MoveAnimation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MoveAnimation.swift; sourceTree = "<group>"; };
+		DAFCDC3AF46570F08EC1153F /* MoveFlags.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MoveFlags.swift; sourceTree = "<group>"; };
+		DFED6EA1E91A048E48CDA0AC /* Chess101iOS.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Chess101iOS.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		E10F863EF66AF7A6D53F22C7 /* RelayClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RelayClient.swift; sourceTree = "<group>"; };
+		E3960792358B6AEF92FD6399 /* GameSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameSession.swift; sourceTree = "<group>"; };
+		E488CC769087CEFBA70A0FF2 /* GameTree.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameTree.swift; sourceTree = "<group>"; };
+		E83FEDC38A305752AC687AB9 /* RSCodec.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RSCodec.swift; sourceTree = "<group>"; };
+		F3FDE857E1F3881E3009755D /* BoardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BoardView.swift; sourceTree = "<group>"; };
+		F4CE48F62492F1DF181B53FA /* GamePhase.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GamePhase.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXGroup section */
+		107B1FB4D14B8470D71E5A85 /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				4333C8A3ADA7F38BFCD4C04A /* bishop.obj */,
+				31AC6891F0046E6957A350A2 /* king.obj */,
+				454DC15CC6A4EC6E3E441623 /* knight.obj */,
+				927B213E0E1A7544FEF62805 /* pawn.obj */,
+				90448029DD55EF43F54BD80E /* queen.obj */,
+				B062AA8A03C68071348EA942 /* rook.obj */,
+			);
+			path = Models;
+			sourceTree = "<group>";
+		};
+		394ECC151D153812D5B5CEEE /* Engine */ = {
+			isa = PBXGroup;
+			children = (
+				E99708E71679435754EE7FC4 /* Chess101Engine */,
+			);
+			name = Engine;
+			sourceTree = "<group>";
+		};
+		3DDB79DE4A7243952F021935 /* ChessMatrix */ = {
+			isa = PBXGroup;
+			children = (
+				44BCB3E8F6EC164B90EC0A6E /* ChessMatrixDecoder.swift */,
+				564C1690F3F052CA05B2C140 /* ChessMatrixEncoder.swift */,
+				E83FEDC38A305752AC687AB9 /* RSCodec.swift */,
+			);
+			path = ChessMatrix;
+			sourceTree = "<group>";
+		};
+		4C42ADBA9BE87328ABB6E93B /* Chess101iOS */ = {
+			isa = PBXGroup;
+			children = (
+				49E93AAF17BF23F3E1DDFC75 /* Assets.xcassets */,
+				98A4B01C345609D37CD1FE91 /* Chess101App.swift */,
+				AFFB9C9089F995D8A041E87F /* AI */,
+				394ECC151D153812D5B5CEEE /* Engine */,
+				E5C9E5261B578C8045FBA49A /* Game */,
+				107B1FB4D14B8470D71E5A85 /* Models */,
+				AC9EC333809718EC0A15F974 /* Network */,
+				69CDA710A42C2C2C24322095 /* UI */,
+			);
+			name = Chess101iOS;
+			path = Sources/Chess101iOS;
+			sourceTree = "<group>";
+		};
+		60D401800E2197A8FA396F6D /* Components */ = {
+			isa = PBXGroup;
+			children = (
+				8115DB39064BDC7C2668593C /* EvalBarView.swift */,
+			);
+			path = Components;
+			sourceTree = "<group>";
+		};
+		69CDA710A42C2C2C24322095 /* UI */ = {
+			isa = PBXGroup;
+			children = (
+				BB6A29B9E94367FE2950F356 /* Board3DView.swift */,
+				F3FDE857E1F3881E3009755D /* BoardView.swift */,
+				9EBA5543C5D1C2948A96760E /* ColorPickView.swift */,
+				10AE88DCDFB53C7646F8096B /* ContentView.swift */,
+				90769EB1F8CA50DDE923484C /* GameOverView.swift */,
+				17A728CCD03373B739B62713 /* LobbyView.swift */,
+				1997A3006CFD415E3FBFD47E /* PanelView.swift */,
+				B82A9919E84BF8F049806DD9 /* ScannerView.swift */,
+				9F6BFB203C55A94C633C0573 /* WarGamesView.swift */,
+				60D401800E2197A8FA396F6D /* Components */,
+			);
+			path = UI;
+			sourceTree = "<group>";
+		};
+		8CFCC199E9EAC7D53ABCC91A = {
+			isa = PBXGroup;
+			children = (
+				4C42ADBA9BE87328ABB6E93B /* Chess101iOS */,
+				B17D6AFBF14FD3B0AF8550BF /* Chess101IOSTests */,
+				F5E7434A2DC089260D39F98F /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		AC9EC333809718EC0A15F974 /* Network */ = {
+			isa = PBXGroup;
+			children = (
+				E10F863EF66AF7A6D53F22C7 /* RelayClient.swift */,
+				3DDB79DE4A7243952F021935 /* ChessMatrix */,
+			);
+			path = Network;
+			sourceTree = "<group>";
+		};
+		AFFB9C9089F995D8A041E87F /* AI */ = {
+			isa = PBXGroup;
+			children = (
+				0E793B535ECB518C68139595 /* AlphaBeta.swift */,
+				E488CC769087CEFBA70A0FF2 /* GameTree.swift */,
+			);
+			path = AI;
+			sourceTree = "<group>";
+		};
+		B17D6AFBF14FD3B0AF8550BF /* Chess101IOSTests */ = {
+			isa = PBXGroup;
+			children = (
+				9DE36F998E361DC621BA454D /* EngineTests.swift */,
+				D2232A128768FFCCE72AB43D /* RSCodecTests.swift */,
+			);
+			name = Chess101IOSTests;
+			path = Tests/Chess101IOSTests;
+			sourceTree = "<group>";
+		};
+		E5C9E5261B578C8045FBA49A /* Game */ = {
+			isa = PBXGroup;
+			children = (
+				F4CE48F62492F1DF181B53FA /* GamePhase.swift */,
+				E3960792358B6AEF92FD6399 /* GameSession.swift */,
+				D860B1CF825CEED0B3173975 /* MoveAnimation.swift */,
+			);
+			path = Game;
+			sourceTree = "<group>";
+		};
+		E99708E71679435754EE7FC4 /* Chess101Engine */ = {
+			isa = PBXGroup;
+			children = (
+				9D84DEE7B0C9716030710BBB /* Bishop.swift */,
+				7D78E8A5C80B7533A71A8340 /* Board.swift */,
+				43F3F47015071DC92F17DD0F /* Cell.swift */,
+				0961ADEE80DD93608560EC57 /* King.swift */,
+				A611B83DDB3B16C5CE1EDCDB /* Knight.swift */,
+				DAFCDC3AF46570F08EC1153F /* MoveFlags.swift */,
+				CD75C0852832192C1293E040 /* Pawn.swift */,
+				74FF1C33FE13FE739D25A1E6 /* Piece.swift */,
+				862B78CFBE21BB871FE7CF44 /* Protocol.swift */,
+				691DED8BC0EA6730A84C6566 /* Queen.swift */,
+				8D6DCEA880FC136788BDD747 /* Rook.swift */,
+				47C93F2E6941C972F4B9BB44 /* Rules.swift */,
+				9A4F6B1178152B2A35C9BCC1 /* Team.swift */,
+			);
+			name = Chess101Engine;
+			path = ../Chess101Engine;
+			sourceTree = "<group>";
+		};
+		F5E7434A2DC089260D39F98F /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				DFED6EA1E91A048E48CDA0AC /* Chess101iOS.app */,
+				3AE8F9310EF91E2D9CCC885C /* Chess101IOSTests.xctest */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		37CC9DAD40D6603657F0BE64 /* Chess101iOS */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = D3A6CAB8D65AE10381E04488 /* Build configuration list for PBXNativeTarget "Chess101iOS" */;
+			buildPhases = (
+				61899E34AD905D0EC8077FC6 /* Sources */,
+				1940F7DA89B38F0C33E0555A /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = Chess101iOS;
+			packageProductDependencies = (
+			);
+			productName = Chess101iOS;
+			productReference = DFED6EA1E91A048E48CDA0AC /* Chess101iOS.app */;
+			productType = "com.apple.product-type.application";
+		};
+		FAAAF14325C07C6894D80348 /* Chess101IOSTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 8378078F0235DA2B7C09F483 /* Build configuration list for PBXNativeTarget "Chess101IOSTests" */;
+			buildPhases = (
+				DE839B67BD706A1EB344D8A6 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				09CD3EBBE2646856BF2E8B96 /* PBXTargetDependency */,
+			);
+			name = Chess101IOSTests;
+			packageProductDependencies = (
+			);
+			productName = Chess101IOSTests;
+			productReference = 3AE8F9310EF91E2D9CCC885C /* Chess101IOSTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		9E97EB55400AE4138FCDAB5F /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1430;
+				TargetAttributes = {
+					37CC9DAD40D6603657F0BE64 = {
+						DevelopmentTeam = VZ95Y2RWRW;
+					};
+				};
+			};
+			buildConfigurationList = 20077408220937559E2720B1 /* Build configuration list for PBXProject "Chess101iOS" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = 8CFCC199E9EAC7D53ABCC91A;
+			minimizedProjectReferenceProxies = 1;
+			preferredProjectObjectVersion = 77;
+			productRefGroup = F5E7434A2DC089260D39F98F /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				FAAAF14325C07C6894D80348 /* Chess101IOSTests */,
+				37CC9DAD40D6603657F0BE64 /* Chess101iOS */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		1940F7DA89B38F0C33E0555A /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				3C0C3D89641B21293BAB8F66 /* Assets.xcassets in Resources */,
+				E5603C335FB456A82E3B923A /* bishop.obj in Resources */,
+				4D17C7EBB7E3886C90B8557C /* king.obj in Resources */,
+				8FC37239E068C6C067EF7404 /* knight.obj in Resources */,
+				4DC0A8F37CABCCF842728F31 /* pawn.obj in Resources */,
+				BA38DBAB03BE33F7CA4CEFA7 /* queen.obj in Resources */,
+				522971330C72B717FD328090 /* rook.obj in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		61899E34AD905D0EC8077FC6 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				B8630C14F2BE19D12BC142D5 /* AlphaBeta.swift in Sources */,
+				07784865B00F5AF3B0F404DA /* Bishop.swift in Sources */,
+				2E1B0B0CA4A162F35F7607CE /* Board.swift in Sources */,
+				BEC4F74EFC0A8F123D86334C /* Board3DView.swift in Sources */,
+				7867ABAF2A1C3B619B1AF574 /* BoardView.swift in Sources */,
+				62E72EF5E668433FF238D00E /* Cell.swift in Sources */,
+				D6D8281F7E05821332AB208D /* Chess101App.swift in Sources */,
+				B02E3E889C063CC9FC41D4B7 /* ChessMatrixDecoder.swift in Sources */,
+				D7B1B26F4ADAC9E319DDA867 /* ChessMatrixEncoder.swift in Sources */,
+				2D86B14762B4CAE721DF1181 /* ColorPickView.swift in Sources */,
+				4966E0623E9D555007A43B7C /* ContentView.swift in Sources */,
+				522220220F1A493DD520B394 /* EvalBarView.swift in Sources */,
+				228DE6F18BD756DB6ED85F30 /* GameOverView.swift in Sources */,
+				063B1D5908E0C35114F11E4B /* GamePhase.swift in Sources */,
+				37D4AE0711AB4A8F1D607C08 /* GameSession.swift in Sources */,
+				6528A18A7BA5A19147CFA4F8 /* GameTree.swift in Sources */,
+				6302F23CF28C9280AF9EA0EE /* King.swift in Sources */,
+				99E09C27E01F6CDFB5E2668A /* Knight.swift in Sources */,
+				5AA6A23330197ABF3713DFC5 /* LobbyView.swift in Sources */,
+				82A5393D18C911AC12A955F9 /* MoveAnimation.swift in Sources */,
+				9285C45376AFB60600EC49A6 /* MoveFlags.swift in Sources */,
+				681ADE41B9A1E4C6F61B4FB0 /* PanelView.swift in Sources */,
+				18EBCA35BA77AB9E932F4C88 /* Pawn.swift in Sources */,
+				33E83E41AB2DE4F99E4A58D3 /* Piece.swift in Sources */,
+				249644BA9B841696E57170D2 /* Protocol.swift in Sources */,
+				06D1C8D3FB98CCD515C946F8 /* Queen.swift in Sources */,
+				42BDA873B3B958097C357B39 /* RSCodec.swift in Sources */,
+				88F763010EC0AF9EBF827614 /* RelayClient.swift in Sources */,
+				39E8DBF8C1DCD0E02FB338E3 /* Rook.swift in Sources */,
+				1F9B0E3A61EB7CAF451AEBC7 /* Rules.swift in Sources */,
+				3107A905E5DBCCCF3EB8AF15 /* ScannerView.swift in Sources */,
+				20CC47250469BC021D8F51D0 /* Team.swift in Sources */,
+				8B2AB7FB39495D5E1CF3AD0B /* WarGamesView.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		DE839B67BD706A1EB344D8A6 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				7928016A372871F65078697E /* EngineTests.swift in Sources */,
+				F38018A98C333C4FF8CE52AA /* RSCodecTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		09CD3EBBE2646856BF2E8B96 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 37CC9DAD40D6603657F0BE64 /* Chess101iOS */;
+			targetProxy = 249CAA22B9925239F432081C /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		011B2924F6BD9ADE59ABDA48 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.chess101.Chess101IOSTests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Chess101iOS.app/Chess101iOS";
+			};
+			name = Debug;
+		};
+		1B2C2A2D89A4A08C58CAC6C0 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		3450CD2D7C60B9D9DA28A1A7 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+		4AB39A52C875F0518DBA5658 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.chess101.Chess101IOSTests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Chess101iOS.app/Chess101iOS";
+			};
+			name = Release;
+		};
+		5658BF809904E21F76B03008 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = VZ95Y2RWRW;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_NSCameraUsageDescription = "Chess 101 uses the camera to scan ChessMatrix room codes.";
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UILaunchScreen_BackgroundColorName = LaunchBackground;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.chess101.ios;
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 5.9;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		9EC847DEBE9716DD51C953ED /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = VZ95Y2RWRW;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_NSCameraUsageDescription = "Chess 101 uses the camera to scan ChessMatrix room codes.";
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UILaunchScreen_BackgroundColorName = LaunchBackground;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.chess101.ios;
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 5.9;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		20077408220937559E2720B1 /* Build configuration list for PBXProject "Chess101iOS" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				1B2C2A2D89A4A08C58CAC6C0 /* Debug */,
+				3450CD2D7C60B9D9DA28A1A7 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		8378078F0235DA2B7C09F483 /* Build configuration list for PBXNativeTarget "Chess101IOSTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				011B2924F6BD9ADE59ABDA48 /* Debug */,
+				4AB39A52C875F0518DBA5658 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		D3A6CAB8D65AE10381E04488 /* Build configuration list for PBXNativeTarget "Chess101iOS" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				9EC847DEBE9716DD51C953ED /* Debug */,
+				5658BF809904E21F76B03008 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 9E97EB55400AE4138FCDAB5F /* Project object */;
+}

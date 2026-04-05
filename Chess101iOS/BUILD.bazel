@@ -1,0 +1,12 @@
+load("@rules_shell//shell:sh_test.bzl", "sh_test")
+
+sh_test(
+    name = "Chess101IOSTests",
+    srcs = ["run_swift_test.sh"],
+    data = glob(
+        ["Sources/**/*.swift", "Tests/**/*.swift"],
+    ) + ["Package.swift"],
+    local = True,  # swift needs real filesystem access for build artifacts
+    size = "large",
+    timeout = "moderate",
+)

@@ -1,0 +1,29 @@
+{
+  "images": [
+    {
+      "filename": "Icon_composer-iOS-Default-1024x1024@1x.png",
+      "idiom": "universal",
+      "platform": "ios",
+      "size": "1024x1024"
+    },
+    {
+      "appearances": [
+        { "appearance": "luminosity", "value": "dark" }
+      ],
+      "filename": "Icon_composer-iOS-Dark-1024x1024@1x.png",
+      "idiom": "universal",
+      "platform": "ios",
+      "size": "1024x1024"
+    },
+    {
+      "appearances": [
+        { "appearance": "luminosity", "value": "tinted" }
+      ],
+      "filename": "Icon_composer-iOS-TintedDark-1024x1024@1x.png",
+      "idiom": "universal",
+      "platform": "ios",
+      "size": "1024x1024"
+    }
+  ],
+  "info": { "author": "xcode", "version": 1 }
+}
