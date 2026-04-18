@@ -63,14 +63,21 @@ public enum ChessMatrixEncoder {
         return (r == 1 || r == 6) && (c == 1 || c == 6)
     }
 
+    // Border cell values: 4 = bright white, 5 = near-black.
+    // Pattern mirrors the Python chessmatrix library dark-mode output:
+    //   Row 7 (bottom) : all bright  — forms the L-finder with col 0
+    //   Col 0 (left)   : all bright  — forms the L-finder with row 7
+    //   Row 0 (top)    : alternating bright / dark  starting bright at col 0
+    //   Col 7 (right)  : alternating dark  / bright starting dark  at row 0
     private static func applyStructuralCells(_ grid: inout [[Int]]) {
-        // Border: alternating black(0)/white(-1 represented as 3)
-        for i in 0..<8 {
-            grid[0][i] = i % 2 == 0 ? 0 : 3
-            grid[7][i] = i % 2 == 0 ? 0 : 3
-            grid[i][0] = i % 2 == 0 ? 0 : 3
-            grid[i][7] = i % 2 == 0 ? 0 : 3
-        }
+        // Row 0: W D W D W D W D
+        for i in 0..<8 { grid[0][i] = i % 2 == 0 ? 4 : 5 }
+        // Row 7: all bright (L-finder bottom bar)
+        for i in 0..<8 { grid[7][i] = 4 }
+        // Col 0 (rows 1-6): all bright (L-finder left bar)
+        for r in 1..<7 { grid[r][0] = 4 }
+        // Col 7 (rows 1-6): D W D W D W  (r=1→D, r=2→W, …)
+        for r in 1..<7 { grid[r][7] = r % 2 == 0 ? 4 : 5 }
         // Calibration anchors: K=black(0), R=red(1), G=green(2), B=blue(3)
         grid[1][1] = 0; grid[1][6] = 1; grid[6][1] = 2; grid[6][6] = 3
     }
@@ -81,10 +88,12 @@ public enum ChessMatrixEncoder {
     public static func renderToRGBA(roomCode: String, cellSize: Int = 16) -> (bytes: [UInt8], width: Int, height: Int) {
         let grid = encode(roomCode: roomCode)
         let palette: [(r: UInt8, g: UInt8, b: UInt8)] = [
-            (0, 0, 0),       // 0 = black
-            (220, 50, 50),   // 1 = red
-            (50, 200, 80),   // 2 = green
-            (60, 120, 220),  // 3 = blue
+            (0, 0, 0),       // 0 = black (anchor K)
+            (220, 50, 50),   // 1 = red   (anchor R)
+            (50, 200, 80),   // 2 = green (anchor G)
+            (60, 120, 220),  // 3 = blue  (anchor B)
+            (235, 235, 235), // 4 = bright white (L-finder / timing cells)
+            (10, 10, 10),    // 5 = near-black   (timing cells)
         ]
         let size = 8 * cellSize
         var bytes = [UInt8](repeating: 255, count: size * size * 4)

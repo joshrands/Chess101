@@ -1,5 +1,8 @@
 
 import Foundation
+#if SWIFT_PACKAGE
+import Chess101Engine
+#endif
 
 /// Alpha-beta minimax search. Runs as a Swift `actor` for safe background execution.
 public actor AlphaBeta {

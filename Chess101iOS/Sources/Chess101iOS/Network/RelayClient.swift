@@ -51,6 +51,13 @@ public final class RelayClient: NSObject, URLSessionWebSocketDelegate {
     public var token: String?
     public var roomCode: String?
 
+    // MARK: - Keepalive
+
+    /// Called on a background thread when the connection appears to have gone silent.
+    public var onConnectionLost: (() -> Void)?
+    private var keepaliveTask: Task<Void, Never>?
+    private var lastPongTime: Date = Date()
+
     public init(url: URL = URL(string: "wss://relay.chess101.net")!) {
         self.url = url
         super.init()
@@ -76,9 +83,33 @@ public final class RelayClient: NSObject, URLSessionWebSocketDelegate {
     }
 
     public func disconnect() {
+        keepaliveTask?.cancel()
+        keepaliveTask = nil
         socket?.cancel(with: .normalClosure, reason: nil)
         failAllWaiters(with: RelayError.connectionFailed("Disconnected"))
         messageContinuation.finish()
+    }
+
+    // MARK: - Keepalive
+
+    /// Start sending periodic pings. Fires `onConnectionLost` if no pong arrives within 30 s.
+    public func startKeepalive() {
+        lastPongTime = Date()
+        keepaliveTask = Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(nanoseconds: 10_000_000_000)  // 10 s
+                guard let self, !Task.isCancelled else { return }
+                try? self.send(["type": "ping"])
+                // If we haven't heard a pong in 30 s, declare connection lost
+                self.lock.lock()
+                let elapsed = Date().timeIntervalSince(self.lastPongTime)
+                self.lock.unlock()
+                if elapsed > 30 {
+                    self.onConnectionLost?()
+                    return
+                }
+            }
+        }
     }
 
     // MARK: - URLSessionWebSocketDelegate
@@ -94,7 +125,6 @@ public final class RelayClient: NSObject, URLSessionWebSocketDelegate {
 
     public func urlSession(_ session: URLSession, task: URLSessionTask,
                            didCompleteWithError error: Error?) {
-        // Signal connection failure to anyone still waiting for the socket to open.
         lock.lock()
         let cont = openContinuation
         openContinuation = nil
@@ -172,11 +202,24 @@ public final class RelayClient: NSObject, URLSessionWebSocketDelegate {
         }
     }
 
-    /// Route an incoming message: wake any matching one-shot waiter, then
-    /// forward to the game message stream for GameSession.
+    /// Route an incoming message: handle keepalive frames, wake matching one-shot
+    /// waiters, then forward remaining game messages to the stream.
     private func dispatch(_ msg: [String: Any]) {
-        lock.lock()
         let type = msg["type"] as? String ?? ""
+
+        // Application-level keepalive: respond to ping, record pong
+        if type == "ping" {
+            try? send(["type": "pong"])
+            return
+        }
+        if type == "pong" {
+            lock.lock()
+            lastPongTime = Date()
+            lock.unlock()
+            return
+        }
+
+        lock.lock()
         var unmatched: [Waiter] = []
         var matched: CheckedContinuation<[String: Any], Error>? = nil
         for w in waiters {
@@ -191,8 +234,8 @@ public final class RelayClient: NSObject, URLSessionWebSocketDelegate {
 
         matched?.resume(returning: msg)
 
-        // Relay handshake messages are only for the one-shot waiter.
-        // Game messages go to the stream for GameSession to consume.
+        // Relay handshake messages are consumed by the one-shot waiter only.
+        // Everything else (game messages) goes to the stream for GameSession.
         let isHandshake = type.hasPrefix("relay_")
         if !isHandshake || matched == nil {
             messageContinuation.yield(msg)
@@ -201,15 +244,13 @@ public final class RelayClient: NSObject, URLSessionWebSocketDelegate {
 
     // MARK: - Helpers
 
-    /// Wait for the first incoming message whose `type` matches the predicate,
-    /// or throw `.timeout` after `timeout` seconds.
     private func waitForHandshake(timeout: TimeInterval = 30,
                                    matching: @escaping (String) -> Bool) async throws -> [String: Any] {
         let id = UUID()
         return try await withCheckedThrowingContinuation { cont in
             lock.lock()
             waiters.append(Waiter(id: id,
-                                  predicate: { (matching($0["type"] as? String ?? "")) },
+                                  predicate: { matching($0["type"] as? String ?? "") },
                                   continuation: cont))
             lock.unlock()
 
@@ -217,7 +258,7 @@ public final class RelayClient: NSObject, URLSessionWebSocketDelegate {
                 try? await Task.sleep(nanoseconds: UInt64(timeout * 1_000_000_000))
                 self.lock.lock()
                 guard let idx = self.waiters.firstIndex(where: { $0.id == id }) else {
-                    self.lock.unlock(); return   // already resolved
+                    self.lock.unlock(); return
                 }
                 self.waiters.remove(at: idx)
                 self.lock.unlock()

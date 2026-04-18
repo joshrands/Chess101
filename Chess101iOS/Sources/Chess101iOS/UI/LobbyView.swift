@@ -4,13 +4,15 @@ public struct LobbyView: View {
     @EnvironmentObject var session: GameSession
 
     private let options: [(LobbyOption, String, String)] = [
-        (.playLocally,  "Play Locally",  "person.2.fill"),
-        (.hostOnline,   "Host Online",   "antenna.radiowaves.left.and.right"),
-        (.joinOnline,   "Join Online",   "arrow.right.circle.fill"),
+        (.playLocally,  "Play Locally",   "person.2.fill"),
+        (.hostOnline,   "Host Online",    "antenna.radiowaves.left.and.right"),
+        (.joinOnline,   "Join Online",    "arrow.right.circle.fill"),
+        (.spectate,     "Watch Online",   "eye.fill"),
     ]
 
     @State private var selected: LobbyOption = .playLocally
     @State private var showJoinSheet: Bool = false
+    @State private var showSpectateSheet: Bool = false
     @State private var joinCode: String = ""
     @State private var showScanner: Bool = false
     @State private var scannedCode: String? = nil
@@ -89,10 +91,20 @@ public struct LobbyView: View {
             }
         }
         .sheet(isPresented: $showJoinSheet) {
-            joinSheet
-                .sheet(isPresented: $showScanner) {
-                    scannerSheet
-                }
+            codeEntrySheet(title: "ENTER ROOM CODE", buttonLabel: "JOIN") { code in
+                session.startJoinGame(code: code)
+            }
+            .sheet(isPresented: $showScanner) {
+                scannerSheet
+            }
+        }
+        .sheet(isPresented: $showSpectateSheet) {
+            codeEntrySheet(title: "WATCH A GAME", buttonLabel: "WATCH") { code in
+                session.startSpectateGame(code: code)
+            }
+            .sheet(isPresented: $showScanner) {
+                scannerSheet
+            }
         }
         .onChange(of: scannedCode) { code in
             if let code {
@@ -104,11 +116,12 @@ public struct LobbyView: View {
     }
 
     @ViewBuilder
-    private var joinSheet: some View {
+    private func codeEntrySheet(title: String, buttonLabel: String,
+                                 onConfirm: @escaping (String) -> Void) -> some View {
         ZStack {
             Color(red: 0.04, green: 0.05, blue: 0.07).ignoresSafeArea()
             VStack(spacing: 24) {
-                Text("ENTER ROOM CODE")
+                Text(title)
                     .font(.system(size: 18, weight: .bold, design: .monospaced))
                     .foregroundColor(Color(red: 0.0, green: 1.0, blue: 0.53))
 
@@ -126,10 +139,12 @@ public struct LobbyView: View {
                     .padding(.horizontal, 40)
 
                 Button {
+                    let code = joinCode
                     showJoinSheet = false
-                    session.startJoinGame(code: joinCode)
+                    showSpectateSheet = false
+                    onConfirm(code)
                 } label: {
-                    Text("JOIN")
+                    Text(buttonLabel)
                         .font(.system(size: 14, weight: .bold, design: .monospaced))
                         .foregroundColor(.black)
                         .frame(maxWidth: .infinity)
@@ -152,8 +167,11 @@ public struct LobbyView: View {
                 }
                 .padding(.horizontal, 40)
 
-                Button("Cancel") { showJoinSheet = false }
-                    .foregroundColor(Color(red: 0.5, green: 0.6, blue: 0.7))
+                Button("Cancel") {
+                    showJoinSheet = false
+                    showSpectateSheet = false
+                }
+                .foregroundColor(Color(red: 0.5, green: 0.6, blue: 0.7))
             }
             .padding(.top, 40)
         }
@@ -194,7 +212,8 @@ public struct LobbyView: View {
             joinCode = ""
             showJoinSheet = true
         case .spectate:
-            break // Not yet implemented
+            joinCode = ""
+            showSpectateSheet = true
         }
     }
 }
@@ -204,12 +223,13 @@ public struct LobbyView: View {
 private struct ChessMatrixGridView: View {
     let roomCode: String
 
-    // color 0=black, 1=red, 2=green, 3=blue
     private static let palette: [Color] = [
-        Color.black,
-        Color(red: 0.85, green: 0.1, blue: 0.1),
-        Color(red: 0.1, green: 0.75, blue: 0.1),
-        Color(red: 0.1, green: 0.3, blue: 0.9)
+        Color.black,                                   // 0 = black
+        Color(red: 0.85, green: 0.10, blue: 0.10),    // 1 = red
+        Color(red: 0.10, green: 0.75, blue: 0.10),    // 2 = green
+        Color(red: 0.10, green: 0.30, blue: 0.90),    // 3 = blue
+        Color(white: 0.92),                            // 4 = bright white (L-finder / timing)
+        Color(white: 0.04),                            // 5 = near-black  (timing)
     ]
 
     var body: some View {

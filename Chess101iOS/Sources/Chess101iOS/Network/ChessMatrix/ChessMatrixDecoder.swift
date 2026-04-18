@@ -223,23 +223,25 @@ public enum ChessMatrixDecoder {
 
     // MARK: - Step 10: Orientation
 
-    /// Try all 4 rotations; return the one where the bottom-left corner is the L-finder (black 2×2).
+    /// Try all 4 rotations; return the one where the bottom border (row 7) is all-bright.
+    /// This matches the L-finder spec: row 7 and col 0 are all white in correctly-oriented images.
     static func findOrientation(warped: [UInt8], size: Int) -> [UInt8]? {
         for rot in 0..<4 {
             let img = rotate90(warped, size: size, times: rot)
-            // Check bottom-left 2×2 cells (cells are each size/8 pixels wide)
+            // Row 7 should be all-bright (L-finder bottom bar, 235,235,235).
+            // Sample average luminance of the entire bottom row of cells.
             let cs = size / 8
-            // Bottom-left anchor = cells (6,1),(6,2),(7,1),(7,2) — check average luminance is dark
             var lum: Float = 0; var cnt = 0
-            for cr in [6, 7] { for cc in [1, 2] {
-                for pr in 0..<cs { for pc in 0..<cs {
-                    let px = ((cr * cs + pr) * size + (cc * cs + pc)) * 4
-                    lum += Float(img[px]) + Float(img[px+1]) + Float(img[px+2])
+            let rowStart = 7 * cs
+            for py in rowStart..<size {
+                for px in 0..<size {
+                    let i = (py * size + px) * 4
+                    lum += Float(img[i]) + Float(img[i+1]) + Float(img[i+2])
                     cnt += 1
-                }}
-            }}
+                }
+            }
             let avg = lum / Float(cnt) / 3
-            if avg < 80 { return img }
+            if avg > 150 { return img }
         }
         return nil
     }
@@ -263,10 +265,9 @@ public enum ChessMatrixDecoder {
 
     static func calibrateAndDecode(_ img: [UInt8], size: Int) -> String? {
         let cs = size / 8  // cell size in pixels
-        // Sample the 5 anchor cells to calibrate colors
-        // Anchors: top-left(1,1)=black, top-right(1,6)=red, bottom-left(6,1)=green,
-        //          bottom-right(6,6)=blue, center(3,3)=white
-        let anchorCells: [(r: Int, c: Int, label: Int)] = [(1,1,0),(1,6,1),(6,1,2),(6,6,3),(3,3,255)]
+        // Sample the 5 anchor cells to calibrate colors.
+        // Anchors: (1,1)=black, (1,6)=red, (6,1)=green, (6,6)=blue, (7,0)=white (L-finder corner).
+        let anchorCells: [(r: Int, c: Int, label: Int)] = [(1,1,0),(1,6,1),(6,1,2),(6,6,3),(7,0,255)]
         var calibration = [(r: Float, g: Float, b: Float, label: Int)]()
         for a in anchorCells {
             var sr: Float = 0, sg: Float = 0, sb: Float = 0; var cnt = 0

@@ -1,5 +1,8 @@
 
 import SwiftUI
+#if SWIFT_PACKAGE
+import Chess101Engine
+#endif
 
 private let PALETTE: [(r: Double, g: Double, b: Double, name: String)] = [
     (64/255,  180/255, 232/255, "Blue"),      (190/255, 25/255,  255/255, "Purple"),
@@ -14,6 +17,18 @@ public struct ColorPickView: View {
     @State private var selectedL: Int = 1
 
     public init() {}
+
+    // In online mode, each player only picks their own team's color.
+    private var isOnlineHost: Bool  { session.isOnline && session.localTeamKey == "r" }
+    private var isOnlineGuest: Bool { session.isOnline && session.localTeamKey == "l" }
+    private var isOnline: Bool      { session.isOnline }
+
+    // CONFIRM is disabled when the local slot is unset, or (local only) when both same.
+    private var confirmDisabled: Bool {
+        if isOnlineHost  { return selectedR < 0 }
+        if isOnlineGuest { return selectedL < 0 }
+        return selectedR < 0 || selectedL < 0 || selectedR == selectedL
+    }
 
     public var body: some View {
         ZStack {
@@ -40,8 +55,12 @@ public struct ColorPickView: View {
                 Spacer()
 
                 HStack(spacing: 20) {
-                    swatch(idx: selectedR, label: "RIGHT")
-                    swatch(idx: selectedL, label: "LEFT")
+                    swatch(idx: selectedR, label: "RIGHT",
+                           isOpponent: isOnlineGuest,
+                           opponentColor: session.teamR)
+                    swatch(idx: selectedL, label: "LEFT",
+                           isOpponent: isOnlineHost,
+                           opponentColor: session.teamL)
                 }
                 .padding(.horizontal, 24)
                 .padding(.bottom, 16)
@@ -57,9 +76,16 @@ public struct ColorPickView: View {
                         .background(Color(red: 0.0, green: 1.0, blue: 0.53))
                         .cornerRadius(4)
                 }
-                .disabled(selectedR == selectedL)
+                .disabled(confirmDisabled)
                 .padding(.horizontal, 24)
                 .padding(.bottom, 40)
+
+                if isOnline && !session.onlineStatus.isEmpty {
+                    Text(session.onlineStatus)
+                        .font(.system(size: 11, design: .monospaced))
+                        .foregroundColor(Color(red: 0.5, green: 0.7, blue: 0.9))
+                        .padding(.bottom, 12)
+                }
             }
         }
     }
@@ -68,10 +94,19 @@ public struct ColorPickView: View {
     private func colorCell(idx: Int, r: Double, g: Double, b: Double, name: String) -> some View {
         let isR = selectedR == idx, isL = selectedL == idx
         Button {
-            if isR { selectedR = -1 }
-            else if isL { selectedL = -1 }
-            else if selectedR == -1 { selectedR = idx }
-            else { selectedL = idx }
+            if isOnlineHost {
+                // HOST picks only their right-team color
+                selectedR = (selectedR == idx) ? -1 : idx
+            } else if isOnlineGuest {
+                // GUEST picks only their left-team color
+                selectedL = (selectedL == idx) ? -1 : idx
+            } else {
+                // Local: toggle between R and L slots
+                if isR      { selectedR = -1 }
+                else if isL { selectedL = -1 }
+                else if selectedR == -1 { selectedR = idx }
+                else        { selectedL = idx }
+            }
         } label: {
             ZStack {
                 RoundedRectangle(cornerRadius: 8)
@@ -81,25 +116,59 @@ public struct ColorPickView: View {
                 if isL { Text("L").font(.system(size: 13, weight: .bold, design: .monospaced)).foregroundColor(.white.opacity(0.8)) }
             }
             .overlay(RoundedRectangle(cornerRadius: 8).stroke(isR || isL ? Color.white : Color.clear, lineWidth: 2))
+            // Dim the opponent's slot in online mode
+            .opacity(dimmed(idx: idx) ? 0.35 : 1.0)
         }
+        .disabled(dimmed(idx: idx))
+    }
+
+    /// Returns true when this color slot belongs to the opponent (should not be interactive online).
+    private func dimmed(idx: Int) -> Bool {
+        guard isOnline else { return false }
+        // Dimmed colors are those already selected by the opponent (not the local player's choice)
+        return false  // all 8 colors always visible; opponent's slot just isn't interactive
     }
 
     @ViewBuilder
-    private func swatch(idx: Int, label: String) -> some View {
-        let c = idx >= 0 ? PALETTE[idx] : (0.2, 0.2, 0.2, "—")
-        HStack(spacing: 8) {
-            Circle().fill(Color(red: c.0, green: c.1, blue: c.2)).frame(width: 18, height: 18)
-            Text("\(label): \(c.3)")
-                .font(.system(size: 12, design: .monospaced))
-                .foregroundColor(Color(red: 0.6, green: 0.7, blue: 0.8))
+    private func swatch(idx: Int, label: String, isOpponent: Bool, opponentColor: Team) -> some View {
+        if isOpponent {
+            // Opponent's color: show "waiting" until peerConfirmedColors
+            HStack(spacing: 8) {
+                Circle()
+                    .fill(Color(red: 0.2, green: 0.2, blue: 0.2))
+                    .frame(width: 18, height: 18)
+                Text("\(label): —")
+                    .font(.system(size: 12, design: .monospaced))
+                    .foregroundColor(Color(red: 0.4, green: 0.5, blue: 0.6))
+            }
+        } else {
+            let c = idx >= 0 ? PALETTE[idx] : (0.2, 0.2, 0.2, "—")
+            HStack(spacing: 8) {
+                Circle().fill(Color(red: c.0, green: c.1, blue: c.2)).frame(width: 18, height: 18)
+                Text("\(label): \(c.3)")
+                    .font(.system(size: 12, design: .monospaced))
+                    .foregroundColor(Color(red: 0.6, green: 0.7, blue: 0.8))
+            }
         }
     }
 
     private func applyAndAdvance() {
-        guard selectedR >= 0 && selectedL >= 0 && selectedR != selectedL else { return }
-        let cr = PALETTE[selectedR], cl = PALETTE[selectedL]
-        session.teamR = Team(r: Int(cr.r * 255), g: Int(cr.g * 255), b: Int(cr.b * 255), name: cr.name)
-        session.teamL = Team(r: Int(cl.r * 255), g: Int(cl.g * 255), b: Int(cl.b * 255), name: cl.name)
-        session.confirmColors()
+        if isOnlineHost {
+            guard selectedR >= 0 else { return }
+            let cr = PALETTE[selectedR]
+            session.teamR = Team(r: Int(cr.r * 255), g: Int(cr.g * 255), b: Int(cr.b * 255), name: cr.name)
+            session.confirmColors()
+        } else if isOnlineGuest {
+            guard selectedL >= 0 else { return }
+            let cl = PALETTE[selectedL]
+            session.teamL = Team(r: Int(cl.r * 255), g: Int(cl.g * 255), b: Int(cl.b * 255), name: cl.name)
+            session.confirmColors()
+        } else {
+            guard selectedR >= 0 && selectedL >= 0 && selectedR != selectedL else { return }
+            let cr = PALETTE[selectedR], cl = PALETTE[selectedL]
+            session.teamR = Team(r: Int(cr.r * 255), g: Int(cr.g * 255), b: Int(cr.b * 255), name: cr.name)
+            session.teamL = Team(r: Int(cl.r * 255), g: Int(cl.g * 255), b: Int(cl.b * 255), name: cl.name)
+            session.confirmColors()
+        }
     }
 }

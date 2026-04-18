@@ -1,5 +1,6 @@
 import XCTest
 @testable import Chess101iOS
+import Chess101Engine
 
 final class RSCodecTests: XCTestCase {
 

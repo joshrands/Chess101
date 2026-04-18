@@ -1,9 +1,12 @@
 import SwiftUI
+#if SWIFT_PACKAGE
+import Chess101Engine
+#endif
 
 /// Root view — switches between phases via the shared GameSession.
 public struct ContentView: View {
     @StateObject private var session = GameSession()
-    @State private var show3D = false
+    @State private var show3D = true
 
     public init() {}
 
@@ -60,6 +63,9 @@ public struct ContentView: View {
         .overlay {
             if session.phase == .gameOver { GameOverView() }
         }
+        .overlay {
+            if session.connectionLost { ConnectionLostView() }
+        }
     }
 
     @ViewBuilder
@@ -76,6 +82,10 @@ public struct ContentView: View {
                             trails: session.trails,
                             activeAnimation: session.activeAnimation,
                             aiThinking: session.aiThinking,
+                            theme: session.theme,
+                            phase: session.phase,
+                            winner: session.winner,
+                            isDraw: session.isDraw,
                             onCellTapped: session.cellTapped)
                 #endif
             } else {
@@ -83,6 +93,40 @@ public struct ContentView: View {
             }
         }
         .frame(width: size, height: size)
+    }
+}
+
+// MARK: - Connection lost overlay
+
+struct ConnectionLostView: View {
+    @EnvironmentObject var session: GameSession
+
+    var body: some View {
+        ZStack {
+            Color.black.opacity(0.75).ignoresSafeArea()
+            VStack(spacing: 20) {
+                Image(systemName: "wifi.slash")
+                    .font(.system(size: 40))
+                    .foregroundColor(Color.red)
+                Text("CONNECTION LOST")
+                    .font(.system(size: 20, weight: .bold, design: .monospaced))
+                    .foregroundColor(Color.red)
+                Text("The relay connection timed out.")
+                    .font(.system(size: 13, design: .monospaced))
+                    .foregroundColor(Color(red: 0.6, green: 0.6, blue: 0.7))
+                Button {
+                    session.newGame()
+                } label: {
+                    Text("QUIT TO LOBBY")
+                        .font(.system(size: 14, weight: .bold, design: .monospaced))
+                        .foregroundColor(.black)
+                        .padding(.horizontal, 40)
+                        .padding(.vertical, 12)
+                        .background(Color(red: 0.0, green: 1.0, blue: 0.53))
+                        .cornerRadius(4)
+                }
+            }
+        }
     }
 }
 

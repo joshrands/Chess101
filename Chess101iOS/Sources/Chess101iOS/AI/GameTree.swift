@@ -1,4 +1,8 @@
 
+#if SWIFT_PACKAGE
+import Chess101Engine
+#endif
+
 /// A node in the alpha-beta game tree.
 public final class GameTree {
     public var children: [GameTree] = []

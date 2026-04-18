@@ -1,5 +1,8 @@
 
 import Foundation
+#if SWIFT_PACKAGE
+import Chess101Engine
+#endif
 
 /// Tracks a single piece animation (arc from source to destination).
 public struct MoveAnimation {

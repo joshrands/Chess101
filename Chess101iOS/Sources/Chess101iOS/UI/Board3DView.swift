@@ -1,6 +1,9 @@
 #if canImport(UIKit)
 import SwiftUI
 import SceneKit
+#if SWIFT_PACKAGE
+import Chess101Engine
+#endif
 
 public struct Board3DView: UIViewRepresentable {
     public let board: Board?
@@ -12,17 +15,25 @@ public struct Board3DView: UIViewRepresentable {
     public let trails: [MoveTrail]
     public let activeAnimation: MoveAnimation?
     public let aiThinking: Bool
+    public let theme: BoardTheme
+    public let phase: GamePhase
+    public let winner: Team?
+    public let isDraw: Bool
     public let onCellTapped: ((Cell) -> Void)?
 
     public init(board: Board?, teamR: Team, teamL: Team, currentTeam: Team?,
                 selectedCell: Cell?, legalTargets: [Cell],
                 trails: [MoveTrail] = [], activeAnimation: MoveAnimation? = nil,
-                aiThinking: Bool = false, onCellTapped: ((Cell) -> Void)? = nil) {
+                aiThinking: Bool = false, theme: BoardTheme = BOARD_THEMES[0],
+                phase: GamePhase = .playing, winner: Team? = nil, isDraw: Bool = false,
+                onCellTapped: ((Cell) -> Void)? = nil) {
         self.board = board; self.teamR = teamR; self.teamL = teamL
         self.currentTeam = currentTeam
         self.selectedCell = selectedCell; self.legalTargets = legalTargets
         self.trails = trails; self.activeAnimation = activeAnimation
-        self.aiThinking = aiThinking; self.onCellTapped = onCellTapped
+        self.aiThinking = aiThinking; self.theme = theme
+        self.phase = phase; self.winner = winner; self.isDraw = isDraw
+        self.onCellTapped = onCellTapped
     }
 
     public func makeUIView(context: Context) -> SCNView {
@@ -45,7 +56,8 @@ public struct Board3DView: UIViewRepresentable {
                                     currentTeam: currentTeam,
                                     selected: selectedCell, targets: legalTargets,
                                     trails: trails, activeAnimation: activeAnimation,
-                                    aiThinking: aiThinking)
+                                    aiThinking: aiThinking, theme: theme,
+                                    phase: phase, winner: winner, isDraw: isDraw)
     }
 
     public func makeCoordinator() -> Coordinator { Coordinator() }
@@ -72,6 +84,16 @@ public struct Board3DView: UIViewRepresentable {
         private var tickAIThinking: Bool = false
         private var lastAnimStart: Date? = nil
         private var lastTeamR: Team? = nil
+        // Theme base colors
+        private var tickLightR: CGFloat = 0.038, tickLightG: CGFloat = 0.055, tickLightB: CGFloat = 0.095
+        private var tickDarkR:  CGFloat = 0.005, tickDarkG:  CGFloat = 0.005, tickDarkB:  CGFloat = 0.008
+        private var tickCheckR: CGFloat = 1.0,   tickCheckG: CGFloat = 1.0,   tickCheckB: CGFloat = 1.0
+        // Win / draw animation
+        private var tickPhase: GamePhase = .playing
+        private var tickWinner: Team? = nil
+        private var tickIsDraw: Bool = false
+        private var tickTeamR: Team? = nil
+        private var tickTeamL: Team? = nil
 
         // Display link
         private var displayLink: CADisplayLink?
@@ -96,6 +118,9 @@ public struct Board3DView: UIViewRepresentable {
         @objc private func tick() {
             let now = Date()
             let t = now.timeIntervalSince1970
+            let isGameOver = tickPhase == .gameOver
+            let isWin  = isGameOver && tickWinner != nil
+            let isDraw = isGameOver && tickIsDraw
 
             for r in 0..<8 {
                 for c in 0..<8 {
@@ -103,41 +128,77 @@ public struct Board3DView: UIViewRepresentable {
                     let cell = Cell(r, c)
                     let isLight = (r + c) % 2 == 0
 
+                    // ── Win animation ──────────────────────────────────────────
+                    if isWin {
+                        let isPerimeter = r == 0 || r == 7 || c == 0 || c == 7
+                        if isPerimeter, let w = tickWinner {
+                            let pulse = CGFloat(0.4 + 0.6 * (0.5 + 0.5 * sin(t * Double.pi * 2.0)))
+                            mat.emission.contents = UIColor(
+                                red:   CGFloat(w.r)/255 * pulse,
+                                green: CGFloat(w.g)/255 * pulse,
+                                blue:  CGFloat(w.b)/255 * pulse, alpha: 1)
+                        } else {
+                            // Random inner cells — deterministic per frame at 5 fps
+                            let frame = Int(t / 0.2)
+                            let seed = frame &* 1234 &+ r &* 8 &+ c
+                            let fr = CGFloat((seed &* 0x1A2B3C) & 0xFF) / 255
+                            let fg = CGFloat((seed &* 0x2B3C4D) & 0xFF) / 255
+                            let fb = CGFloat((seed &* 0x3C4D5E) & 0xFF) / 255
+                            mat.emission.contents = UIColor(red: fr * 0.9 + 0.1,
+                                                            green: fg * 0.9 + 0.1,
+                                                            blue:  fb * 0.9 + 0.1, alpha: 1)
+                        }
+                        continue
+                    }
+
+                    // ── Draw animation ─────────────────────────────────────────
+                    if isDraw {
+                        let team = r < 4 ? tickTeamR : tickTeamL
+                        if let team {
+                            mat.emission.contents = UIColor(
+                                red:   CGFloat(team.r)/255 * 0.55,
+                                green: CGFloat(team.g)/255 * 0.55,
+                                blue:  CGFloat(team.b)/255 * 0.55, alpha: 1)
+                        }
+                        continue
+                    }
+
+                    // HDR emission — values > bloomThreshold (0.65) produce visible glow/bloom.
+                    // Selected squares bloom hard (2.5×); targets bloom mildly (1.4×);
+                    // light squares sit just above threshold for soft diffuse LED glow.
                     if tickSelected == cell {
-                        // Full team-color LED — selected square
-                        mat.emission.contents = UIColor(red: tickActiveColor.r,
-                                                        green: tickActiveColor.g,
-                                                        blue:  tickActiveColor.b, alpha: 1)
+                        mat.emission.contents = UIColor(red: tickActiveColor.r * 2.5,
+                                                        green: tickActiveColor.g * 2.5,
+                                                        blue:  tickActiveColor.b * 2.5, alpha: 1)
                     } else if tickTargets.contains(cell) {
-                        // Dim team-color LED — legal move target
-                        mat.emission.contents = UIColor(red: tickActiveColor.r * 0.38,
-                                                        green: tickActiveColor.g * 0.38,
-                                                        blue:  tickActiveColor.b * 0.38, alpha: 1)
+                        mat.emission.contents = UIColor(red: tickActiveColor.r * 1.4,
+                                                        green: tickActiveColor.g * 1.4,
+                                                        blue:  tickActiveColor.b * 1.4, alpha: 1)
                     } else {
                         // Accumulate trail glow on top of base
                         var tr: CGFloat = 0, tg: CGFloat = 0, tb: CGFloat = 0
                         for trail in tickTrails where trail.cells.contains(cell) {
-                            let a = CGFloat(trail.alpha(at: now)) * 0.6
+                            let a = CGFloat(trail.alpha(at: now)) * 0.8
                             tr += CGFloat(trail.team.r) / 255 * a
                             tg += CGFloat(trail.team.g) / 255 * a
                             tb += CGFloat(trail.team.b) / 255 * a
                         }
 
                         if tickAIThinking {
-                            // Traveling wave pulse across the board
                             let phase = Double(r + c) * 0.45
-                            let pulse = CGFloat(0.45 + 0.55 * (sin(t * 3.2 + phase) * 0.5 + 0.5))
-                            let base: CGFloat = isLight ? 0.055 : 0.008
+                            let pulse = CGFloat(0.5 + 0.5 * (sin(t * 3.2 + phase) * 0.5 + 0.5))
+                            let base = isLight ? tickLightB : tickDarkB
                             mat.emission.contents = UIColor(
-                                red:   tickActiveColor.r * 0.18 * pulse + tr,
-                                green: tickActiveColor.g * 0.18 * pulse + tg,
-                                blue:  tickActiveColor.b * 0.18 * pulse + tb + base * pulse,
+                                red:   tickCheckR * 0.35 * pulse + tr,
+                                green: tickCheckG * 0.35 * pulse + tg,
+                                blue:  tickCheckB * 0.35 * pulse + tb + base * pulse,
                                 alpha: 1)
                         } else {
-                            // Checkerboard base glow — light squares emit cool blue, dark squares near-off
+                            // Light squares at 1.1× so they sit just above bloom threshold
+                            let scale: CGFloat = isLight ? 1.1 : 1.0
                             let (br, bg, bb): (CGFloat, CGFloat, CGFloat) = isLight
-                                ? (0.038, 0.055, 0.095)
-                                : (0.005, 0.005, 0.008)
+                                ? (tickLightR * scale, tickLightG * scale, tickLightB * scale)
+                                : (tickDarkR,  tickDarkG,  tickDarkB)
                             mat.emission.contents = UIColor(red: br + tr, green: bg + tg,
                                                             blue: bb + tb, alpha: 1)
                         }
@@ -241,6 +302,13 @@ public struct Board3DView: UIViewRepresentable {
             let cam = SCNNode(); cam.camera = SCNCamera()
             cam.position = SCNVector3(3.5, 9, 13)
             cam.look(at: SCNVector3(3.5, 0, 3.5))
+            // HDR + bloom so bright emission squares glow like LEDs hitting a diffuse cap
+            cam.camera?.wantsHDR          = true
+            cam.camera?.bloomIntensity    = 1.6
+            cam.camera?.bloomThreshold    = 0.65
+            cam.camera?.bloomBlurRadius   = 14
+            cam.camera?.exposureAdaptationBrighteningSpeedFactor = 0
+            cam.camera?.exposureAdaptationDarkeningSpeedFactor   = 0
             scene.rootNode.addChildNode(cam)
         }
 
@@ -248,7 +316,8 @@ public struct Board3DView: UIViewRepresentable {
 
         func update(board: Board?, teamR: Team, teamL: Team, currentTeam: Team?,
                     selected: Cell?, targets: [Cell], trails: [MoveTrail],
-                    activeAnimation anim: MoveAnimation?, aiThinking: Bool) {
+                    activeAnimation anim: MoveAnimation?, aiThinking: Bool,
+                    theme: BoardTheme, phase: GamePhase, winner: Team?, isDraw: Bool) {
 
             // Update point lights to team colors
             pointLightR?.light?.color = UIColor(red: CGFloat(teamR.r)/255,
@@ -265,6 +334,24 @@ public struct Board3DView: UIViewRepresentable {
             tickTargets    = targets
             tickTrails     = trails
             tickAIThinking = aiThinking
+            tickPhase  = phase
+            tickWinner = winner
+            tickIsDraw = isDraw
+            tickTeamR  = teamR
+            tickTeamL  = teamL
+
+            // Extract theme colors via UIColor for the tick loop
+            func rgb(_ c: Color) -> (CGFloat, CGFloat, CGFloat) {
+                var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
+                UIColor(c).getRed(&r, green: &g, blue: &b, alpha: &a)
+                return (r, g, b)
+            }
+            let (lr, lg, lb) = rgb(theme.lightSquare)
+            let (dr, dg, db) = rgb(theme.darkSquare)
+            let (cr, cg, cb) = rgb(theme.checkerColor)
+            tickLightR = lr; tickLightG = lg; tickLightB = lb
+            tickDarkR  = dr; tickDarkG  = dg; tickDarkB  = db
+            tickCheckR = cr; tickCheckG = cg; tickCheckB = cb
 
             // Move animation — launch SCNAction arc when a new animation appears
             if let anim, anim.startTime != lastAnimStart {
@@ -389,6 +476,12 @@ public struct Board3DView: UIViewRepresentable {
                 let h = SCNNode(geometry: SCNBox(width: 0.22, height: 0.08, length: 0.08, chamferRadius: 0))
                 h.position = SCNVector3(0, 0.90, 0); g.addChildNode(h)
             default: break
+            }
+            // Ensure every child geometry gets a default material so applyMaterial() always works
+            g.enumerateChildNodes { child, _ in
+                if child.geometry?.firstMaterial == nil {
+                    child.geometry?.firstMaterial = SCNMaterial()
+                }
             }
             return g
         }

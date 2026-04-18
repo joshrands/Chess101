@@ -1,6 +1,10 @@
 
 import Foundation
 import Combine
+import SwiftUI
+#if SWIFT_PACKAGE
+import Chess101Engine
+#endif
 
 /// Central game state owned by the SwiftUI view hierarchy.
 /// All mutations happen on the MainActor.
@@ -35,12 +39,26 @@ public final class GameSession: ObservableObject {
     @Published public var isOnline: Bool = false
     @Published public var isMyTurn: Bool = true
     @Published public var onlineStatus: String = ""
-    /// "r" for host, "l" for joiner
+    @Published public var connectionLost: Bool = false
+
+    /// "r" for host, "l" for joiner, "spectator" for watch-only
     public var localTeamKey: String = "r"
+    public private(set) var isSpectator: Bool = false
+
+    // Board theme
+    @Published public var themeIndex: Int = 0
+    public var theme: BoardTheme { BOARD_THEMES[themeIndex] }
+    public func cycleTheme() { themeIndex = (themeIndex + 1) % BOARD_THEMES.count }
 
     private let aiEngine = AlphaBeta(depth: 2)
     private var seq: Int = 0
     private var relayListenTask: Task<Void, Never>?
+
+    // Online setup protocol gates
+    private var localConfirmedColors = false
+    private var peerConfirmedColors  = false
+    private var localConfirmedWG     = false
+    private var peerConfirmedWG      = false
 
     // MARK: - Phase transitions
 
@@ -80,9 +98,8 @@ public final class GameSession: ObservableObject {
             do {
                 _ = try await relay.joinRoom(code: code, playerName: "Guest")
                 roomCode = code.uppercased()
-                onlineStatus = "Waiting for host to start game..."
+                onlineStatus = "Waiting for host to start..."
                 startRelayListener()
-                // Guest stays in lobby — host drives game_setup
             } catch {
                 onlineStatus = "Error: \(error.localizedDescription)"
                 isOnline = false
@@ -90,35 +107,98 @@ public final class GameSession: ObservableObject {
         }
     }
 
-    private func startRelayListener() {
-        guard let relay = relayClient else { return }
-        relayListenTask = Task { [weak self] in
-            for await msg in relay.messageStream {
-                guard let self else { return }
-                await MainActor.run {
-                    self.handleRelayMessage(msg)
-                }
+    public func startSpectateGame(code: String) {
+        reset()
+        isOnline = true
+        isSpectator = true
+        localTeamKey = "spectator"
+        isMyTurn = false
+        onlineStatus = "Connecting to game \(code.uppercased())..."
+        let relay = RelayClient()
+        relayClient = relay
+        Task {
+            do {
+                try await relay.spectate(code: code)
+                roomCode = code.uppercased()
+                onlineStatus = "Watching \(code.uppercased())"
+                startRelayListener()
+            } catch {
+                onlineStatus = "Error: \(error.localizedDescription)"
+                isOnline = false
+                isSpectator = false
             }
         }
     }
 
-    public func confirmColors() {
-        phase = .warGames
+    private func startRelayListener() {
+        guard let relay = relayClient else { return }
+        relay.onConnectionLost = { [weak self] in
+            Task { @MainActor [weak self] in
+                self?.connectionLost = true
+            }
+        }
+        relay.startKeepalive()
+        relayListenTask = Task { [weak self] in
+            for await msg in relay.messageStream {
+                guard let self else { return }
+                await MainActor.run { self.handleRelayMessage(msg) }
+            }
+        }
     }
 
-    public func confirmWarGames() {
-        if isOnline && localTeamKey == "r" {
-            // Host sends setup to guest before starting
-            let ptRStr = playerTypeR == .ai ? "ai" : "human"
-            let ptLStr = playerTypeL == .ai ? "ai" : "human"
+    // MARK: - Setup protocol
+
+    /// Called by ColorPickView after the local player confirms their color.
+    public func confirmColors() {
+        if isOnline {
+            let teamKey = localTeamKey
+            let team = localTeamKey == "r" ? teamR : teamL
             let msg: [String: Any] = [
-                "type": "game_setup",
-                "tRr": teamR.r, "tRg": teamR.g, "tRb": teamR.b, "tRname": teamR.name,
-                "tLr": teamL.r, "tLg": teamL.g, "tLb": teamL.b, "tLname": teamL.name,
-                "ptR": ptRStr, "ptL": ptLStr
+                "type": "color_chosen",
+                "team_key": teamKey,
+                "r": team.r, "g": team.g, "b": team.b, "name": team.name
             ]
             try? relayClient?.send(msg)
+            localConfirmedColors = true
+            onlineStatus = "Waiting for opponent's color..."
+            if peerConfirmedColors { phase = .warGames }
+        } else {
+            phase = .warGames
         }
+    }
+
+    /// Called by WarGamesView after the local player confirms their player-type choice.
+    public func confirmWarGames() {
+        if isOnline {
+            let teamKey = localTeamKey
+            let pt = localTeamKey == "r" ? playerTypeR : playerTypeL
+            let msg: [String: Any] = [
+                "type": "war_games_choice",
+                "team_key": teamKey,
+                "player_type": pt == .ai ? "ai" : "human"
+            ]
+            try? relayClient?.send(msg)
+            localConfirmedWG = true
+            onlineStatus = "Waiting for opponent..."
+            if peerConfirmedWG {
+                finishSetupAsHost()
+            }
+            // GUEST: startBoard() triggered by incoming game_start
+        } else {
+            startBoard()
+        }
+    }
+
+    private func finishSetupAsHost() {
+        guard localTeamKey == "r" else { return }
+        let startMsg: [String: Any] = [
+            "type": "game_start",
+            "tRr": teamR.r, "tRg": teamR.g, "tRb": teamR.b, "tRname": teamR.name,
+            "tLr": teamL.r, "tLg": teamL.g, "tLb": teamL.b, "tLname": teamL.name,
+            "ptR": playerTypeR == .ai ? "ai" : "human",
+            "ptL": playerTypeL == .ai ? "ai" : "human"
+        ]
+        try? relayClient?.send(startMsg)
         startBoard()
     }
 
@@ -147,6 +227,9 @@ public final class GameSession: ObservableObject {
         relayListenTask?.cancel(); relayListenTask = nil
         relayClient?.disconnect(); relayClient = nil
         roomCode = nil; isOnline = false; isMyTurn = true; onlineStatus = ""
+        isSpectator = false; connectionLost = false
+        localConfirmedColors = false; peerConfirmedColors = false
+        localConfirmedWG = false; peerConfirmedWG = false
     }
 
     // MARK: - Turn logic
@@ -154,7 +237,6 @@ public final class GameSession: ObservableObject {
     private func beginTurn() {
         guard let board, let team = currentTeam else { return }
 
-        // Compute legal moves for all pieces
         var king: King? = nil
         var check = false
         for p in board.pieces(for: team) {
@@ -171,11 +253,10 @@ public final class GameSession: ObservableObject {
         let hasMoves = board.pieces(for: team).contains { !$0.targets.isEmpty }
         if !hasMoves {
             if check { endGame(winner: opponent(of: team)) }
-            else      { endGame(winner: nil) }  // stalemate
+            else      { endGame(winner: nil) }
             return
         }
 
-        // Fifty-move / threefold
         if Rules.fiftyMoveRule(peaceTime: peaceTime) ||
            Rules.threefoldRepetition(history: board.positionHistory,
                                       current: Rules.positionKey(board: board)) {
@@ -183,7 +264,7 @@ public final class GameSession: ObservableObject {
             return
         }
 
-        if isAI(team: team) { triggerAI() }
+        if !isSpectator && isAI(team: team) { triggerAI() }
     }
 
     // MARK: - Human move
@@ -194,7 +275,6 @@ public final class GameSession: ObservableObject {
 
         if let sel = selectedCell {
             if legalTargets.contains(cell) {
-                // Execute the move
                 guard let piece = board.grid[sel.row][sel.col], piece.team == team else {
                     selectedCell = nil; legalTargets = []; return
                 }
@@ -222,12 +302,17 @@ public final class GameSession: ObservableObject {
         board.positionHistory.append(Rules.positionKey(board: board))
 
         addTrail(from: from, to: to, team: piece.team, piece: piece)
-        activeAnimation = MoveAnimation(piece: piece.typeName, team: piece.team,
-                                         fromRow: from.row, fromCol: from.col,
-                                         toRow: to.row, toCol: to.col)
+        let anim = MoveAnimation(piece: piece.typeName, team: piece.team,
+                                  fromRow: from.row, fromCol: from.col,
+                                  toRow: to.row, toCol: to.col)
+        activeAnimation = anim
+        // Clear after arc completes so the 3D view re-renders and shows the piece at destination.
+        DispatchQueue.main.asyncAfter(deadline: .now() + anim.duration + 0.05) { [weak self] in
+            self?.activeAnimation = nil
+        }
         logMove(piece: piece, from: from, to: to, captured: captured)
 
-        if isOnline { sendMove(piece: piece, from: from, to: to, captured: captured) }
+        if isOnline && !isSpectator { sendMove(piece: piece, from: from, to: to, captured: captured) }
 
         selectedCell = nil; legalTargets = []
         swapTurns()
@@ -287,7 +372,6 @@ public final class GameSession: ObservableObject {
 
     private func addTrail(from: Cell, to: Cell, team: Team, piece: Piece) {
         var cells = [from]
-        // Add intermediate squares for sliding pieces
         if piece is Rook || piece is Bishop || piece is Queen {
             let dr = to.row == from.row ? 0 : (to.row > from.row ? 1 : -1)
             let dc = to.col == from.col ? 0 : (to.col > from.col ? 1 : -1)
@@ -298,7 +382,7 @@ public final class GameSession: ObservableObject {
         trails = trails.filter { !$0.isExpired }
     }
 
-    // MARK: - Online
+    // MARK: - Online send
 
     private func sendMove(piece: Piece, from: Cell, to: Cell, captured: Piece?) {
         guard let relay = relayClient, let board, let team = currentTeam else { return }
@@ -312,24 +396,62 @@ public final class GameSession: ObservableObject {
         try? relay.send(msg)
     }
 
+    // MARK: - Online receive
+
     public func handleRelayMessage(_ msg: [String: Any]) {
         guard let type = msg["type"] as? String else { return }
         switch type {
+
         case "move":
             applyRemoteMove(msg)
+
         case "relay_peer_connected":
             onlineStatus = "Opponent connected!"
             moveLog.append("Opponent connected")
-            // Host advances to color pick when peer joins
+            // HOST advances to color pick and signals guest to do the same
             if localTeamKey == "r" && phase == .lobby {
                 phase = .colorPick
+                try? relayClient?.send(["type": "start_setup"])
             }
+
         case "relay_peer_disconnected":
             onlineStatus = "Opponent disconnected"
             moveLog.append("Opponent disconnected")
-        case "game_setup":
-            // Guest receives host's chosen teams and player types, then starts game
-            guard localTeamKey == "l" else { return }
+
+        case "start_setup":
+            // Guest advances to color pick
+            guard localTeamKey == "l" && phase == .lobby else { return }
+            phase = .colorPick
+            onlineStatus = "Choose your color"
+
+        case "color_chosen":
+            guard let teamKey = msg["team_key"] as? String,
+                  let r = msg["r"] as? Int, let g = msg["g"] as? Int,
+                  let b = msg["b"] as? Int, let name = msg["name"] as? String else { return }
+            guard teamKey != localTeamKey else { return }  // ignore own echo
+            let team = Team(r: r, g: g, b: b, name: name)
+            if teamKey == "r" { teamR = team } else { teamL = team }
+            peerConfirmedColors = true
+            if localConfirmedColors {
+                onlineStatus = "Colors set — choose human or AI"
+                phase = .warGames
+            }
+
+        case "war_games_choice":
+            guard let teamKey = msg["team_key"] as? String,
+                  let ptStr = msg["player_type"] as? String else { return }
+            guard teamKey != localTeamKey else { return }  // ignore own echo
+            let pt: PlayerType = ptStr == "ai" ? .ai : .human
+            if teamKey == "r" { playerTypeR = pt } else { playerTypeL = pt }
+            peerConfirmedWG = true
+            if localConfirmedWG {
+                finishSetupAsHost()
+            }
+
+        case "game_start":
+            // Guest and spectators start the board when host is ready
+            guard localTeamKey == "l" || isSpectator else { return }
+            // Apply full team info (needed for spectators joining after setup)
             if let r = msg["tRr"] as? Int, let g = msg["tRg"] as? Int,
                let b = msg["tRb"] as? Int, let name = msg["tRname"] as? String {
                 teamR = Team(r: r, g: g, b: b, name: name)
@@ -338,18 +460,32 @@ public final class GameSession: ObservableObject {
                let b = msg["tLb"] as? Int, let name = msg["tLname"] as? String {
                 teamL = Team(r: r, g: g, b: b, name: name)
             }
-            playerTypeR = (msg["ptR"] as? String) == "ai" ? .ai : .human
-            playerTypeL = (msg["ptL"] as? String) == "ai" ? .ai : .human
-            onlineStatus = "Game starting..."
+            if let ptR = msg["ptR"] as? String { playerTypeR = ptR == "ai" ? .ai : .human }
+            if let ptL = msg["ptL"] as? String { playerTypeL = ptL == "ai" ? .ai : .human }
             startBoard()
+
+        case "pong":
+            break  // Handled by RelayClient keepalive
+
         default: break
         }
     }
 
     private func applyRemoteMove(_ msg: [String: Any]) {
-        guard let board, let fr = msg["from_row"] as? Int, let fc = msg["from_col"] as? Int,
-              let tr = msg["to_row"] as? Int, let tc = msg["to_col"] as? Int else { return }
+        guard let board,
+              let fr = msg["from_row"] as? Int, let fc = msg["from_col"] as? Int,
+              let tr = msg["to_row"] as? Int,   let tc = msg["to_col"] as? Int else { return }
         guard let piece = board.grid[fr][fc] else { return }
+        if !isSpectator {
+            // Validate the piece belongs to the opponent
+            let remoteTeam = localTeamKey == "r" ? teamL : teamR
+            guard piece.team == remoteTeam else { return }
+            // Validate legality using already-computed targets from beginTurn()
+            guard piece.targets.contains(Cell(tr, tc)) else {
+                moveLog.append("Invalid move from opponent — ignored")
+                return
+            }
+        }
         executeMove(piece: piece, to: Cell(tr, tc))
     }
 }

@@ -1,5 +1,8 @@
 
 import SwiftUI
+#if SWIFT_PACKAGE
+import Chess101Engine
+#endif
 
 /// Material balance bar — wider teamR segment means teamR is ahead.
 public struct EvalBarView: View {

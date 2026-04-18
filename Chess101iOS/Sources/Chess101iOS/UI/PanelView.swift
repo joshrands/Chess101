@@ -1,5 +1,8 @@
 
 import SwiftUI
+#if SWIFT_PACKAGE
+import Chess101Engine
+#endif
 
 public struct PanelView: View {
     @EnvironmentObject var session: GameSession
@@ -66,6 +69,29 @@ public struct PanelView: View {
                 if let code = session.roomCode {
                     alertBadge("ROOM: \(code)", color: Color(red: 0.0, green: 1.0, blue: 0.53))
                 }
+
+                // Board theme
+                HStack(spacing: 0) {
+                    Text("THEME")
+                        .font(.system(size: 10, design: .monospaced))
+                        .foregroundColor(Color(red: 0.23, green: 0.29, blue: 0.38))
+                    Spacer()
+                    Button {
+                        session.cycleTheme()
+                    } label: {
+                        HStack(spacing: 4) {
+                            Text(BOARD_THEMES[session.themeIndex].name.uppercased())
+                                .font(.system(size: 10, design: .monospaced))
+                                .foregroundColor(Color(red: 0.50, green: 0.56, blue: 0.63))
+                            Text("[T]")
+                                .font(.system(size: 9, design: .monospaced))
+                                .foregroundColor(Color(red: 0.30, green: 0.36, blue: 0.44))
+                        }
+                    }
+                    .buttonStyle(.plain)
+                }
+                .padding(.top, 4)
+                .padding(.bottom, 6)
             }
         }
     }
