@@ -129,7 +129,15 @@ class NetworkedBoard(Board):
     # ── Network message handling ───────────────────────────────────────────────
 
     def _on_network_message(self, msg: dict) -> None:
-        """Called from network daemon thread — queue for main-thread processing."""
+        """Called from network daemon thread — queue for main-thread processing.
+
+        Pings are answered immediately (from the network thread) so the sim's
+        keepalive never times out even when the main thread is blocked waiting
+        for physical piece movement.
+        """
+        if msg.get("type") == "ping":
+            self._net_send({"type": "pong", "seq": msg.get("seq", 0)})
+            return
         with self._net_lock:
             self._incoming.append(msg)
 
