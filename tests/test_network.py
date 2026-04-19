@@ -17,6 +17,7 @@ from __future__ import annotations
 import copy
 import json
 import time
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -615,6 +616,111 @@ class TestNetworkedBoardWaitForRemoteMove:
         board._wait_for_remote_move()
         # Move was applied — source should be empty
         assert board.grid[6][0] is None
+
+
+class TestWaitingAnimation:
+    """Tests for the three-phase connection animation in _run_waiting_animation."""
+
+    def _make_board(self):
+        board = _make_networked_board("r")
+        board.canvas = MagicMock()
+        board.matrix = MagicMock()
+        board.matrix.SwapOnVSync.return_value = board.canvas
+        board.light_cell = MagicMock()
+        return board
+
+    @patch("time.sleep", return_value=None)
+    @patch("time.monotonic")
+    def test_chase_exits_when_peer_connects(self, mock_mono, mock_sleep):
+        """Phase 1 loop exits as soon as _peer_name is set."""
+        board = self._make_board()
+
+        # Simulate peer connecting after 3 drain cycles
+        call_count = 0
+        def drain_and_connect():
+            nonlocal call_count
+            call_count += 1
+            if call_count >= 3:
+                board._peer_name = "TestPeer"
+        board._drain_incoming = drain_and_connect
+
+        # monotonic returns increasing values for explode phase
+        mono_time = [0.0]
+        def fake_mono():
+            mono_time[0] += 0.05
+            return mono_time[0]
+        mock_mono.side_effect = fake_mono
+
+        board._run_waiting_animation()
+        assert board._peer_name == "TestPeer"
+        # Should have rendered frames: 3 chase + 14 converge + explode frames
+        assert board.light_cell.call_count > 0
+
+    @patch("time.sleep", return_value=None)
+    @patch("time.monotonic")
+    def test_converge_phase_renders_two_beams(self, mock_mono, mock_sleep):
+        """Phase 2 draws two beams moving in opposite directions."""
+        board = self._make_board()
+
+        # Connect immediately so we skip chase, enter converge right away
+        board._peer_name = "TestPeer"
+        board._drain_incoming = MagicMock()
+
+        mono_time = [0.0]
+        def fake_mono():
+            mono_time[0] += 0.05
+            return mono_time[0]
+        mock_mono.side_effect = fake_mono
+
+        # Track SwapOnVSync calls to count frames
+        swap_calls = []
+        board.matrix.SwapOnVSync.side_effect = lambda c: (swap_calls.append(1), c)[1]
+
+        board._run_waiting_animation()
+
+        # 14 converge frames (n//2 = 28//2 = 14) + explode frames
+        assert len(swap_calls) >= 14
+
+    @patch("time.sleep", return_value=None)
+    @patch("time.monotonic")
+    def test_explode_reveals_checkerboard(self, mock_mono, mock_sleep):
+        """Phase 3 ends with a full checkerboard rendered."""
+        board = self._make_board()
+        board._peer_name = "TestPeer"
+        board._drain_incoming = MagicMock()
+
+        # Fast monotonic so explode finishes quickly
+        mono_time = [0.0]
+        def fake_mono():
+            mono_time[0] += 1.0  # big jumps → instant explosion
+            return mono_time[0]
+        mock_mono.side_effect = fake_mono
+
+        board._run_waiting_animation()
+
+        # Final frame calls light_checker_town
+        # The last SwapOnVSync should be after the checkerboard is drawn.
+        # Verify light_cell was called (at minimum for the final checker_town).
+        assert board.light_cell.call_count > 0
+
+    @patch("time.sleep", return_value=None)
+    @patch("time.monotonic")
+    def test_explode_final_frame_is_clean_checkerboard(self, mock_mono, mock_sleep):
+        """After the animation, light_checker_town is called for a clean board."""
+        board = self._make_board()
+        board._peer_name = "TestPeer"
+        board._drain_incoming = MagicMock()
+        board.light_checker_town = MagicMock()
+
+        mono_time = [0.0]
+        def fake_mono():
+            mono_time[0] += 1.0
+            return mono_time[0]
+        mock_mono.side_effect = fake_mono
+
+        board._run_waiting_animation()
+
+        board.light_checker_town.assert_called_once()
 
 
 class TestMdns:

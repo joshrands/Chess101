@@ -240,34 +240,40 @@ class Board(SampleBase):
         Returns:
             True once both teams' physical positions match the software state.
         """
-        self.master.read_data()
         bg_color = (255, 0, 0)    # red checkerboard
         piece_color = (255, 255, 0)  # yellow mismatched pieces
         pr, pg, pb = piece_color
         team_r_pieces = self.get_team_pieces(self.team_r)
         team_l_pieces = self.get_team_pieces(self.team_l)
-        mismatch = True
-        self.canvas.Clear()
-        self.light_checker_town(self.canvas, color=bg_color)
-        self.canvas = self.matrix.SwapOnVSync(self.canvas)
+        went_red = False
 
-        while mismatch:
-            mismatch = False
+        while True:
             self.master.read_data()
-            time.sleep(0.2)
+            mismatch = False
+            for piece in team_r_pieces + team_l_pieces:
+                state = self.master.get_cell_state(piece.row, piece.col)
+                if state == CellOccupancy.EMPTY:
+                    mismatch = True
+                    break
+
+            if not mismatch:
+                if went_red:
+                    # Restore normal white checkerboard
+                    self.canvas.Clear()
+                    self.light_checker_town(self.canvas)
+                    self.canvas = self.matrix.SwapOnVSync(self.canvas)
+                return True
+
+            # Show red checkerboard with yellow highlights on missing pieces
+            went_red = True
             self.canvas.Clear()
             self.light_checker_town(self.canvas, color=bg_color)
             for piece in team_r_pieces + team_l_pieces:
                 state = self.master.get_cell_state(piece.row, piece.col)
                 if state == CellOccupancy.EMPTY:
-                    mismatch = True
                     self.light_cell(self.canvas, piece.row, piece.col, pr, pg, pb)
             self.canvas = self.matrix.SwapOnVSync(self.canvas)
-        # Restore normal white checkerboard after mismatch is resolved
-        self.canvas.Clear()
-        self.light_checker_town(self.canvas)
-        self.canvas = self.matrix.SwapOnVSync(self.canvas)
-        return True
+            time.sleep(0.2)
 
     def detect_pawns(self, team, row):
         """Wait for all eight pawns to be placed on the given row.
