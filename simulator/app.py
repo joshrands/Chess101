@@ -628,7 +628,9 @@ class GameRunner:
             team: The team whose turn is beginning.
         """
         b = self._b
+        logger.info("_begin_turn: team=%s (r=%d), phase=%s", team.name, team.r, self.phase.name)
         if _rules.bob_ross(self, team, b.grid):
+            logger.info("_begin_turn: bob_ross returned True (fifty-move/threefold)")
             return
 
         check = False
@@ -676,7 +678,8 @@ class GameRunner:
         self._do_kibitz(check)
         if check:
             logger.debug("KING IS IN CHECK")
-        logger.info("Player: %s's move.", team.name)
+        logger.info("_begin_turn: %s's move. pieces_with_moves=%d, check=%s",
+                     team.name, pieces_with_moves, check)
 
         is_ai = (
             (team.r == b.team_r.r and b.computer_player_r) or
@@ -714,8 +717,12 @@ class GameRunner:
         self._king_check_pos = None
         self._ai_thinking = False
         assert self._current_team is not None, "_current_team not set before _next_turn"
+        prev_name = self._current_team.name
         self._current_team = (
             b.team_l if self._current_team.r == b.team_r.r else b.team_r)
+        logger.info("_next_turn: %s → %s (team_r.r=%d, team_l.r=%d, current.r=%d)",
+                     prev_name, self._current_team.name,
+                     b.team_r.r, b.team_l.r, self._current_team.r)
         self._begin_turn(self._current_team)
 
     # ── Rendering ──────────────────────────────────────────────────────────────

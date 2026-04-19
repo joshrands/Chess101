@@ -1110,6 +1110,9 @@ class NetworkedGameRunner(GameRunner):
         fc = msg["from_col"]
         tr = msg["to_row"]
         tc = msg["to_col"]
+        logger.info("_apply_remote_move: %d%d→%d%d, is_my_turn=%s, current_team=%s",
+                     fr, fc, tr, tc, self._is_my_turn(),
+                     getattr(self._current_team, 'name', None))
 
         # Validate turn
         if self._is_my_turn():
@@ -1133,6 +1136,8 @@ class NetworkedGameRunner(GameRunner):
         b.grid[tr][tc] = moving_piece
         self._apply_move(fr, fc, tr, tc)
         self._move_count += 1
+        logger.info("_apply_remote_move: grid[%d][%d]=%s after _apply_move",
+                     tr, tc, type(b.grid[tr][tc]).__name__ if b.grid[tr][tc] else "None")
 
         # If the remote player promoted a pawn, apply their chosen piece directly
         # and suppress the local promotion picker (_promoting_pawn set by _apply_move).
@@ -1160,10 +1165,11 @@ class NetworkedGameRunner(GameRunner):
 
         if local_hash == remote_hash:
             status = "ok"
+            logger.info("_apply_remote_move: hash OK")
         else:
             status = "desync"
-            logger.warning("Hash mismatch after remote move seq=%d — requesting board_sync",
-                           msg.get("seq", -1))
+            logger.warning("Hash mismatch after remote move seq=%d local=%s remote=%s — requesting board_sync",
+                           msg.get("seq", -1), local_hash[:12], remote_hash[:12])
 
         self._net_send({
             "type": "move_ack",
@@ -1185,6 +1191,9 @@ class NetworkedGameRunner(GameRunner):
         self._remote_last_move = (fr, fc, tr, tc)
 
         # Animate the remote move then advance turn
+        logger.info("_apply_remote_move: starting anim, moving_piece=%s, peer_disconnected=%s",
+                     type(moving_piece).__name__ if moving_piece else "None",
+                     self._peer_disconnected)
         if moving_piece is not None:
             self._start_anim(moving_piece, fr, fc, tr, tc, self._next_turn)
         else:
