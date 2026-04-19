@@ -632,6 +632,12 @@ class NetworkedBoard(Board):
 
         flags = MoveFlags.from_dict(msg.get("flags", {}))
         piece = self.grid[fr][fc]
+
+        # Clear en_passantable for the remote team's pawns (mirrors do_turn)
+        for row in self.grid:
+            for p in row:
+                if isinstance(p, Pawn) and p.team.r == piece.team.r:
+                    p.en_passantable = False
         if flags.is_capture or isinstance(piece, Pawn):
             self.peace_time = 0
         else:
