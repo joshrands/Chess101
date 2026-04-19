@@ -59,15 +59,15 @@ def _build_board(args) -> Board:
         if args.host:
             net = GameServer(port=args.port)
             board = NetworkedBoard(net=net, local_team_key="r")
-            net.on_connected    = board.on_connected
-            net.on_disconnected = board.on_disconnected
+            net._on_connected    = board.on_connected
+            net._on_disconnected = board.on_disconnected
             net.start()
             logger.info("Hosting on port %d — waiting for opponent...", args.port)
         else:
             net = GameClient(host_ip=args.join, port=args.port)
             board = NetworkedBoard(net=net, local_team_key="l")
-            net.on_connected    = board.on_connected
-            net.on_disconnected = board.on_disconnected
+            net._on_connected    = board.on_connected
+            net._on_disconnected = board.on_disconnected
             connected = net.connect(timeout=15.0)
             if not connected:
                 logger.error("Could not connect to %s:%d", args.join, args.port)
