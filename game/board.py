@@ -234,46 +234,52 @@ class Board(SampleBase):
         """Block until the physical board matches the logical grid for both teams.
 
         Polls the reed-switch sensors and highlights in red any cell where the
-        software expects a piece but the sensor reads EMPTY. Loops separately
-        for team_r and team_l until both pass without a discrepancy.
+        software expects a piece but the sensor reads EMPTY. Checks each team
+        separately and always swaps the canvas, maintaining the double-buffer
+        state that do_turn expects.
 
         Returns:
             True once both teams' physical positions match the software state.
         """
-        bg_color = (255, 0, 0)    # red checkerboard
-        piece_color = (255, 255, 0)  # yellow mismatched pieces
-        pr, pg, pb = piece_color
+        self.master.read_data()
+        r, g, b = (255, 0, 0)
         team_r_pieces = self.get_team_pieces(self.team_r)
         team_l_pieces = self.get_team_pieces(self.team_l)
-        went_red = False
+        mismatch = True
+        self.canvas.Clear()
+        self.light_checker_town(self.canvas)
+        self.canvas = self.matrix.SwapOnVSync(self.canvas)
 
-        while True:
-            self.master.read_data()
+        while mismatch:
             mismatch = False
-            for piece in team_r_pieces + team_l_pieces:
+            self.master.read_data()
+            time.sleep(0.2)
+            self.canvas.Clear()
+            self.light_checker_town(self.canvas)
+            for piece in team_r_pieces:
                 state = self.master.get_cell_state(piece.row, piece.col)
                 if state == CellOccupancy.EMPTY:
                     mismatch = True
-                    break
+                    self.light_cell(self.canvas, piece.row, piece.col, r, g, b)
+            self.canvas = self.matrix.SwapOnVSync(self.canvas)
 
-            if not mismatch:
-                if went_red:
-                    # Restore normal white checkerboard
-                    self.canvas.Clear()
-                    self.light_checker_town(self.canvas)
-                    self.canvas = self.matrix.SwapOnVSync(self.canvas)
-                return True
+        mismatch = True
+        self.canvas.Clear()
+        self.light_checker_town(self.canvas)
+        self.canvas = self.matrix.SwapOnVSync(self.canvas)
 
-            # Show red checkerboard with yellow highlights on missing pieces
-            went_red = True
+        while mismatch:
+            mismatch = False
+            self.master.read_data()
             self.canvas.Clear()
-            self.light_checker_town(self.canvas, color=bg_color)
-            for piece in team_r_pieces + team_l_pieces:
+            self.light_checker_town(self.canvas)
+            for piece in team_l_pieces:
                 state = self.master.get_cell_state(piece.row, piece.col)
                 if state == CellOccupancy.EMPTY:
-                    self.light_cell(self.canvas, piece.row, piece.col, pr, pg, pb)
+                    mismatch = True
+                    self.light_cell(self.canvas, piece.row, piece.col, r, g, b)
+                    time.sleep(0.01)
             self.canvas = self.matrix.SwapOnVSync(self.canvas)
-            time.sleep(0.2)
 
     def detect_pawns(self, team, row):
         """Wait for all eight pawns to be placed on the given row.
@@ -288,6 +294,10 @@ class Board(SampleBase):
         """
         for col in range(8):
             self.light_cell(self.canvas, row, col, 255, 255, 255)
+        self.canvas = self.matrix.SwapOnVSync(self.canvas)
+        # Sync back buffer
+        for col in range(8):
+            self.light_cell(self.canvas, row, col, 255, 255, 255)
         placed = False
         while not placed:
             placed = True
@@ -295,6 +305,13 @@ class Board(SampleBase):
             for col in range(8):
                 if self.master.get_cell_state(row, col) == CellOccupancy.EMPTY:
                     placed = False
+                    self.light_cell(self.canvas, row, col, 255, 255, 255)
+                else:
+                    self.light_cell(self.canvas, row, col, team.r, team.g, team.b)
+            self.canvas = self.matrix.SwapOnVSync(self.canvas)
+            # Sync back buffer with same pawn state
+            for col in range(8):
+                if self.master.get_cell_state(row, col) == CellOccupancy.EMPTY:
                     self.light_cell(self.canvas, row, col, 255, 255, 255)
                 else:
                     self.light_cell(self.canvas, row, col, team.r, team.g, team.b)
@@ -313,12 +330,18 @@ class Board(SampleBase):
             col: Board column index of the expected cell.
         """
         self.light_cell(self.canvas, row, col, 255, 255, 255)
+        self.canvas = self.matrix.SwapOnVSync(self.canvas)
+        # Sync the new back buffer so both buffers match
+        self.light_cell(self.canvas, row, col, 255, 255, 255)
         placed = False
         while not placed:
             self.master.read_data()
             if self.master.get_cell_state(row, col) == CellOccupancy.OCCUPIED:
                 placed = True
             time.sleep(0.01)
+        self.light_cell(self.canvas, row, col, team.r, team.g, team.b)
+        self.canvas = self.matrix.SwapOnVSync(self.canvas)
+        # Sync the new back buffer
         self.light_cell(self.canvas, row, col, team.r, team.g, team.b)
 
     def detect_lift_off(self, team):

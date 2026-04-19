@@ -28,6 +28,7 @@ from __future__ import annotations
 import json
 import logging
 import queue
+import ssl
 import threading
 from typing import Callable, Optional
 
@@ -39,6 +40,17 @@ try:
 except ImportError:  # pragma: no cover
     _ws_connect = None   # type: ignore[assignment]
     _ws_exc     = None   # type: ignore[assignment]
+
+
+def _make_ssl_context() -> ssl.SSLContext:
+    """Build an SSL context that works on Pi (uses certifi if available)."""
+    ctx = ssl.create_default_context()
+    try:
+        import certifi
+        ctx.load_verify_locations(certifi.where())
+    except ImportError:
+        pass  # fall back to system certs
+    return ctx
 
 _DEFAULT_RELAY_URL = "wss://relay.chess101.net"
 
@@ -202,7 +214,8 @@ class RelayClient:
                 self._room_ready.set()
                 return
             try:
-                ws = _ws_connect(self._relay_url, open_timeout=15.0)
+                ssl_ctx = _make_ssl_context() if self._relay_url.startswith("wss") else None
+                ws = _ws_connect(self._relay_url, open_timeout=15.0, ssl=ssl_ctx)
                 break
             except Exception as exc:
                 if attempt < _MAX_ATTEMPTS - 1:
@@ -377,7 +390,8 @@ class RelayClient:
                 self._room_ready.set()
                 return
             try:
-                ws = _ws_connect(self._relay_url, open_timeout=15.0)
+                ssl_ctx = _make_ssl_context() if self._relay_url.startswith("wss") else None
+                ws = _ws_connect(self._relay_url, open_timeout=15.0, ssl=ssl_ctx)
             except Exception as exc:
                 logger.error("Relay reconnect to %s failed: %s", self._relay_url, exc)
                 self._room_ready.set()
