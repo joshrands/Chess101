@@ -77,10 +77,13 @@ class HilSensor(BoardSensor):
                     )
 
     def get_grid_snapshot(self) -> list[list[int]]:
-        """Return a copy of the current grid state.
+        """Return a copy of the current grid state in logical (row, col) order.
+
+        Internal storage is transposed (col, row) to match get_cell_state.
+        This method un-transposes for external API consumption.
 
         Returns:
-            8x8 list of occupancy values (0=piece, 1=empty).
+            8x8 list of occupancy values (0=piece, 1=empty), indexed [row][col].
         """
         with self._lock:
-            return [row[:] for row in self._grid]
+            return [[self._grid[c][r] for c in range(8)] for r in range(8)]

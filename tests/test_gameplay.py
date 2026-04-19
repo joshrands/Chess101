@@ -273,8 +273,9 @@ class TestGameRunnerMoves:
 
     def test_opening_grid_has_pieces(self, runner):
         b = runner._board
-        assert b.grid[0][4] is not None, "King should be at (0,4)"
-        assert isinstance(b.grid[0][4], King)
+        # After transpose fix: King at col 3, Queen at col 4
+        assert b.grid[0][3] is not None, "King should be at (0,3)"
+        assert isinstance(b.grid[0][3], King)
         assert b.grid[1][0] is not None, "team_r pawn should be at (1,0)"
         assert isinstance(b.grid[1][0], Pawn)
 

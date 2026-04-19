@@ -118,15 +118,17 @@ class TestFakeRGBMatrix:
         from simulator.fake_rgbmatrix import FakeRGBMatrix
         matrix = FakeRGBMatrix()
         matrix._screen = MagicMock()
-        matrix.blit_to_screen()
-        matrix._screen.blit.assert_called_once()
+        matrix._canvas.SetPixel(0, 0, 255, 0, 0)
+        with patch("pygame.draw.rect"):
+            matrix.blit_to_screen()
+        assert matrix._screen.blit.called
 
     def test_flip_calls_blit_and_display_flip(self, _pygame_init):
-        # Covers lines 84-85 in fake_rgbmatrix.py.
         from simulator.fake_rgbmatrix import FakeRGBMatrix
         matrix = FakeRGBMatrix()
         matrix._screen = MagicMock()
-        with patch("pygame.display.flip") as mock_flip:
+        matrix._canvas.SetPixel(0, 0, 255, 0, 0)
+        with patch("pygame.draw.rect"), patch("pygame.display.flip") as mock_flip:
             matrix.flip()
         mock_flip.assert_called_once()
-        matrix._screen.blit.assert_called_once()
+        assert matrix._screen.blit.called

@@ -804,14 +804,16 @@ class TestEvalBar:
         """Removing teamL's queen (+9) should give teamR a +9 lead."""
         gr = playing_hh
         b = gr._b
-        b.grid[7][3] = None  # remove teamL queen
+        # After transpose fix: queen is at col 4
+        b.grid[7][4] = None  # remove teamL queen
         assert gr._calc_eval() == 9
 
     def test_eval_negative_when_teamR_loses_queen(self, playing_hh):
         """Removing teamR's queen should give teamL a +9 lead (eval = -9)."""
         gr = playing_hh
         b = gr._b
-        b.grid[0][3] = None  # remove teamR queen
+        # After transpose fix: queen is at col 4
+        b.grid[0][4] = None  # remove teamR queen
         assert gr._calc_eval() == -9
 
     def test_eval_rook_diff(self, playing_hh):
