@@ -234,6 +234,8 @@ class NetworkedBoard(Board):
 
     def _check_config_complete(self) -> None:
         """Signal _config_received once all four setup messages have arrived."""
+        if self._config_received.is_set():
+            return
         if (
             self._remote_team_r_color_idx is not None
             and self._remote_team_l_color_idx is not None
@@ -312,9 +314,15 @@ class NetworkedBoard(Board):
     # ── Waiting animation ──────────────────────────────────────────────────────
 
     def _run_waiting_animation(self) -> None:
-        """Chase a light around the board edges until a peer connects."""
+        """Chase a light around the board edges until a peer connects.
+
+        Three phases:
+        1. CHASE  — single cyan beam circles the perimeter until connection.
+        2. CONVERGE — counter-beam spawns and both race to collide opposite.
+        3. EXPLODE — shockwave expands from collision, revealing checkerboard.
+        """
         # Build the edge path: top row L→R, right col T→B, bottom row R→L, left col B→T
-        edge_cells = []
+        edge_cells: list[tuple[int, int]] = []
         for c in range(8):
             edge_cells.append((0, c))       # top edge
         for r in range(1, 8):
@@ -324,30 +332,125 @@ class NetworkedBoard(Board):
         for r in range(6, 0, -1):
             edge_cells.append((r, 0))       # left edge
 
+        n = len(edge_cells)
         TAIL_LEN = 6
-        step = 0
-        while self._peer_name is None:
-            self._drain_incoming()
-            self.canvas.Clear()
-            # Draw dim checkerboard background
+
+        def _draw_dim_checker() -> None:
             for r in range(8):
                 for c in range(8):
                     shade = 12 if (r + c) % 2 == 0 else 6
                     self.light_cell(self.canvas, r, c, shade, shade, shade)
 
-            # Draw the chasing light with a fading tail
-            n = len(edge_cells)
+        def _draw_beam(pos: int, direction: int) -> None:
+            """Draw a beam head + fading tail at *pos* moving in *direction*."""
             for i in range(TAIL_LEN):
-                idx = (step - i) % n
+                idx = (pos - i * direction) % n
                 r, c = edge_cells[idx]
                 brightness = int(255 * ((TAIL_LEN - i) / TAIL_LEN) ** 2)
-                # Cyan-ish color
                 self.light_cell(self.canvas, r, c,
                                 brightness // 4, brightness, brightness)
 
+        # ── Phase 1: CHASE ────────────────────────────────────────────────
+        step = 0
+        while self._peer_name is None:
+            self._drain_incoming()
+            self.canvas.Clear()
+            _draw_dim_checker()
+            _draw_beam(step, 1)
             self.canvas = self.matrix.SwapOnVSync(self.canvas)
             step = (step + 1) % n
             time.sleep(0.06)
+
+        # ── Phase 2: CONVERGE ─────────────────────────────────────────────
+        # Spawn counter-beam at current position; both race to collision.
+        spawn_pos = step
+        collision_pos = (spawn_pos + n // 2) % n
+        steps_to_collision = n // 2
+
+        for s in range(steps_to_collision):
+            self._drain_incoming()
+            self.canvas.Clear()
+            _draw_dim_checker()
+            fwd_pos = (spawn_pos + s + 1) % n
+            rev_pos = (spawn_pos - s - 1) % n
+            _draw_beam(fwd_pos, 1)
+            _draw_beam(rev_pos, -1)
+            self.canvas = self.matrix.SwapOnVSync(self.canvas)
+            time.sleep(0.04)
+
+        # ── Phase 3: EXPLODE ──────────────────────────────────────────────
+        # Shockwave expands from collision point revealing the checkerboard.
+        collision_r, collision_c = edge_cells[collision_pos]
+
+        # Precompute Chebyshev distance from collision for every cell
+        distances: list[list[float]] = []
+        max_dist = 0.0
+        for r in range(8):
+            row_dists: list[float] = []
+            for c in range(8):
+                d = float(max(abs(r - collision_r), abs(c - collision_c)))
+                row_dists.append(d)
+                if d > max_dist:
+                    max_dist = d
+            distances.append(row_dists)
+
+        # Precompute which cells are lit in the standard checkerboard
+        checker_lit: list[list[bool]] = [[False] * 8 for _ in range(8)]
+        for x in range(4):
+            for y in range(4):
+                checker_lit[1 + 2 * x][2 * y] = True
+        for x in range(4):
+            for y in range(4):
+                checker_lit[2 * x][1 + 2 * y] = True
+
+        checker_color = getattr(self, "theme_checker_color", (255, 255, 255))
+
+        EXPAND_SPEED = 18.0   # cells per second
+        WAVEFRONT_WIDTH = 1.2  # cells wide
+        start_time = time.monotonic()
+
+        while True:
+            elapsed = time.monotonic() - start_time
+            radius = elapsed * EXPAND_SPEED
+
+            if radius > max_dist + WAVEFRONT_WIDTH:
+                break  # fully revealed
+
+            self.canvas.Clear()
+            for r in range(8):
+                for c in range(8):
+                    d = distances[r][c]
+                    if d < radius - WAVEFRONT_WIDTH / 2:
+                        # Behind wavefront: revealed checkerboard
+                        if checker_lit[r][c]:
+                            self.light_cell(self.canvas, r, c, *checker_color)
+                        # else: black (LED off) — canvas already cleared
+                    elif d < radius + WAVEFRONT_WIDTH / 2:
+                        # Wavefront band: bright cyan-white glow
+                        t = 1.0 - (d - (radius - WAVEFRONT_WIDTH / 2)) / WAVEFRONT_WIDTH
+                        glow_r, glow_g, glow_b = int(200 * t), int(255 * t), int(255 * t)
+                        if checker_lit[r][c]:
+                            cr, cg, cb = checker_color
+                            blended = (
+                                int(glow_r + (cr - glow_r) * (1 - t)),
+                                int(glow_g + (cg - glow_g) * (1 - t)),
+                                int(glow_b + (cb - glow_b) * (1 - t)),
+                            )
+                            self.light_cell(self.canvas, r, c, *blended)
+                        else:
+                            self.light_cell(self.canvas, r, c, glow_r, glow_g, glow_b)
+                    else:
+                        # Ahead of wavefront: dim checker background
+                        shade = 12 if (r + c) % 2 == 0 else 6
+                        self.light_cell(self.canvas, r, c, shade, shade, shade)
+
+            self.canvas = self.matrix.SwapOnVSync(self.canvas)
+            time.sleep(0.03)
+
+        # Final frame: clean checkerboard
+        self.canvas.Clear()
+        self.light_checker_town(self.canvas, checker_color)
+        self.canvas = self.matrix.SwapOnVSync(self.canvas)
 
     # ── _on_local_move hook (called by Board.do_turn after each physical move) ─
 

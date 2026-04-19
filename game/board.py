@@ -263,6 +263,10 @@ class Board(SampleBase):
                     mismatch = True
                     self.light_cell(self.canvas, piece.row, piece.col, pr, pg, pb)
             self.canvas = self.matrix.SwapOnVSync(self.canvas)
+        # Restore normal white checkerboard after mismatch is resolved
+        self.canvas.Clear()
+        self.light_checker_town(self.canvas)
+        self.canvas = self.matrix.SwapOnVSync(self.canvas)
         return True
 
     def detect_pawns(self, team, row):
