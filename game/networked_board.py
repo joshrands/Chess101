@@ -107,6 +107,10 @@ class NetworkedBoard(Board):
         # Peer info
         self._peer_name: Optional[str] = None
 
+        # Keepalive
+        self._keepalive_stop = threading.Event()
+        self._ping_seq = 0
+
         super().__init__(*args, **kwargs)
         self._net.set_message_handler(self._on_network_message)
 
@@ -270,6 +274,19 @@ class NetworkedBoard(Board):
 
     def _on_ping(self, msg: dict) -> None:
         self._net_send({"type": "pong", "seq": msg.get("seq", 0)})
+
+    def _start_keepalive(self) -> None:
+        """Start a daemon thread that sends ping every 10s."""
+        def _keepalive_loop():
+            while not self._keepalive_stop.is_set():
+                self._ping_seq += 1
+                self._net_send({"type": "ping", "seq": self._ping_seq})
+                self._keepalive_stop.wait(10.0)
+        t = threading.Thread(target=_keepalive_loop, daemon=True, name="Keepalive")
+        t.start()
+
+    def _stop_keepalive(self) -> None:
+        self._keepalive_stop.set()
 
     def _on_board_sync_request(self, msg: dict) -> None:
         logger.warning("Board sync requested by peer")
@@ -664,6 +681,7 @@ class NetworkedBoard(Board):
         Waits for configuration from the Sim, runs ``interactive_setup``,
         then enters the alternating turn loop.
         """
+        self._start_keepalive()
         self.canvas = self.matrix.CreateFrameCanvas()
 
         # ── Relay online play preamble ─────────────────────────────
@@ -689,6 +707,10 @@ class NetworkedBoard(Board):
                 logger.info("Joined relay room: %s", room_code)
             # Wire up message handler now that peer is connected
             self._relay.set_message_handler(self._on_network_message)
+
+        # ── Waiting animation — light chases board edges until peer connects ──
+        if self._peer_name is None:
+            self._run_waiting_animation()
 
         logger.info("NetworkedBoard: waiting for configuration from Sim...")
 
