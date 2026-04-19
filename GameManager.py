@@ -58,14 +58,14 @@ def _build_board(args) -> Board:
 
         if args.host:
             net = GameServer(port=args.port)
-            board = NetworkedBoard(net=net, local_team_key="r")
+            board = NetworkedBoard(net=net, local_team_key="r", rotation=args.board_rotation)
             net._on_connected    = board.on_connected
             net._on_disconnected = board.on_disconnected
             net.start()
             logger.info("Hosting on port %d — waiting for opponent...", args.port)
         else:
             net = GameClient(host_ip=args.join, port=args.port)
-            board = NetworkedBoard(net=net, local_team_key="l")
+            board = NetworkedBoard(net=net, local_team_key="l", rotation=args.board_rotation)
             net._on_connected    = board.on_connected
             net._on_disconnected = board.on_disconnected
             connected = net.connect(timeout=15.0)
@@ -83,14 +83,14 @@ def _build_board(args) -> Board:
         relay_url = args.relay_url
         if args.host_online:
             relay = RelayClient(relay_url=relay_url, role="host", player_name="Pi")
-            board = NetworkedBoard(net=relay, local_team_key="r", relay=relay)
+            board = NetworkedBoard(net=relay, local_team_key="r", relay=relay, rotation=args.board_rotation)
             relay.set_message_handler(board._on_network_message)
             relay.on_connected    = board.on_connected     # type: ignore[attr-defined]
             relay.on_disconnected = board.on_disconnected  # type: ignore[attr-defined]
             logger.info("Online host mode — relay: %s", relay_url)
         else:
             relay = RelayClient(relay_url=relay_url, role="guest", player_name="Pi")
-            board = NetworkedBoard(net=relay, local_team_key="l", relay=relay)
+            board = NetworkedBoard(net=relay, local_team_key="l", relay=relay, rotation=args.board_rotation)
             relay.set_message_handler(board._on_network_message)
             relay.on_connected    = board.on_connected     # type: ignore[attr-defined]
             relay.on_disconnected = board.on_disconnected  # type: ignore[attr-defined]
@@ -98,7 +98,7 @@ def _build_board(args) -> Board:
 
         return board
 
-    return Board()
+    return Board(rotation=args.board_rotation)
 
 
 def main():
@@ -116,6 +116,8 @@ def main():
     from network.relay_client import _DEFAULT_RELAY_URL
     parser.add_argument("--relay-url", default=_DEFAULT_RELAY_URL,
                         help="Relay server WebSocket URL")
+    parser.add_argument("--board-rotation", type=int, default=0, choices=[0, 90, 180, 270],
+                        help="Rotate board for physical mounting (0, 90, 180, or 270 degrees CW)")
     # Pass remaining unknown args through to samplebase / LED matrix flags
     args, _unknown = parser.parse_known_args()
 

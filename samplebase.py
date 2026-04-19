@@ -45,6 +45,7 @@ class SampleBase(object):
         self.parser.add_argument("--led-rgb-sequence", action="store", help="Switch if your matrix has led colors swapped. Default: RGB", default="RGB", type=str)
         self.parser.add_argument("--led-row-addr-type", action="store", help="0 = default; 1=AB-addressed panels", default=0, type=int, choices=[0,1])
         self.parser.add_argument("--led-multiplexing", action="store", help="Multiplexing type: 0=direct; 1=strip; 2=checker; 3=spiral (Default: 0)", default=0, type=int, choices=[0,1,2,3])
+        self.parser.add_argument("--board-rotation", action="store", help="Rotate board for physical mounting. 0, 90, 180, or 270 degrees CW. Default: 0", default=0, type=int, choices=[0, 90, 180, 270])
 
     def usleep(self, value):
         """Sleep for the given number of microseconds.

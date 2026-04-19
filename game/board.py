@@ -22,6 +22,7 @@ from pieces.piece import BoardGrid
 import random
 from hardware.master import Master
 from hardware.sensor import BoardSensor
+from hardware.rotation import RotatingCanvas
 from core.constants import CellOccupancy
 from game import rules as _rules
 from ui.renderer import light_cell as _light_cell
@@ -56,13 +57,14 @@ class Board(SampleBase):
         team_array: Palette of 8 Team colour options shown during colour selection.
     """
 
-    def __init__(self, *args, sensor: BoardSensor | None = None, **kwargs):
+    def __init__(self, *args, sensor: BoardSensor | None = None, rotation: int = 0, **kwargs):
         super(Board, self).__init__(*args, **kwargs)
 
+        self._rotation = rotation
         self.team_r = Team(64, 180, 232)
         self.team_l = Team(255, 140, 0)
         self.grid: BoardGrid = []
-        self.master: BoardSensor = sensor if sensor is not None else Master()
+        self.master: BoardSensor = sensor if sensor is not None else Master(rotation=rotation)
         self.computer_player_r: Optional[bool] = False
         self.computer_player_l: Optional[bool] = False
 
@@ -107,7 +109,8 @@ class Board(SampleBase):
                 position; ``"2"`` / ``"3"`` select alternate test positions.
         """
         logger.info("Running game...")
-        self.canvas = self.matrix.CreateFrameCanvas()
+        raw_canvas = self.matrix.CreateFrameCanvas()
+        self.canvas = RotatingCanvas(raw_canvas, rotation=self._rotation)
 
         if not skip_setup:
             self.color_picker()

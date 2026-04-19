@@ -46,6 +46,7 @@ def _make_ssl_context() -> ssl.SSLContext:
     """Build an SSL context that works on Pi (uses certifi if available)."""
     ctx = ssl.create_default_context()
     try:
+        # gazelle:ignore certifi
         import certifi
         ctx.load_verify_locations(certifi.where())
     except ImportError:

@@ -875,6 +875,7 @@ class GameRunner:
     def _load_piece_images(self) -> None:
         """Load cburnett SVG piece images into pygame surfaces via cairosvg."""
         try:
+            # gazelle:ignore cairosvg
             import cairosvg  # type: ignore[import]
         except ImportError:
             logger.warning("cairosvg not installed — piece images unavailable; using glyph fallback")

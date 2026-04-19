@@ -365,3 +365,12 @@ py_test(
         "@pip//pytest",
     ],
 )
+
+py_test(
+    name = "test_rotation",
+    srcs = ["test_rotation.py"],
+    deps = [
+        "//hardware",
+        "@pip//pytest",
+    ],
+)

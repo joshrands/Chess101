@@ -61,6 +61,19 @@ load("@rules_python//python:defs.bzl", "py_binary", "py_library")
 # gazelle:resolve py python_bridge.JsBridge //harness:python_bridge
 # gazelle:resolve py chess_helpers //harness:chess_helpers
 # gazelle:resolve py corpus //harness:corpus
+# gazelle:resolve py replay //harness:replay
+# gazelle:resolve py replay.ReplayEngine //harness:replay
+
+# ── HIL resolves (Hardware-In-Loop testing) ──────────────────────────────────
+# gazelle:resolve py hil //hil
+# gazelle:resolve py hil.sensor //hil
+# gazelle:resolve py hil.sensor.HilSensor //hil
+# gazelle:resolve py hil.rgbmatrix //hil
+# gazelle:resolve py hil.rgbmatrix.HilRGBMatrix //hil
+# gazelle:resolve py hil.rgbmatrix.HilFrameCanvas //hil
+# gazelle:resolve py hil.rgbmatrix.HilRGBMatrixOptions //hil
+# gazelle:resolve py hil.control_server //hil
+# gazelle:resolve py hil.control_server.ControlServer //hil
 
 # ── Internal cross-package resolves ──────────────────────────────────────────
 # gazelle:resolve py hardware //hardware
@@ -69,6 +82,9 @@ load("@rules_python//python:defs.bzl", "py_binary", "py_library")
 # gazelle:resolve py hardware.sensor //hardware
 # gazelle:resolve py hardware.sensor.BoardSensor //hardware
 # gazelle:resolve py hardware.led_matrix //hardware
+# gazelle:resolve py hardware.rotation //hardware
+# gazelle:resolve py hardware.rotation.rotate_cell //hardware
+# gazelle:resolve py hardware.rotation.RotatingCanvas //hardware
 # gazelle:resolve py samplebase //:Chess101
 # gazelle:resolve py samplebase.SampleBase //:Chess101
 # gazelle:resolve py rgbmatrix //rgbmatrix

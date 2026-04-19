@@ -5,6 +5,7 @@ import smbus
 import time
 
 from hardware.sensor import BoardSensor
+from hardware.rotation import rotate_cell
 
 logger = logging.getLogger(__name__)
 
@@ -21,8 +22,13 @@ class Master(BoardSensor):
     ROW_ADDRESSES = [0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b]
     WRITE_TRIGGER = 42
 
-    def __init__(self) -> None:
-        """Open I2C bus 1, zero-initialise the grid cache, and poll all rows."""
+    def __init__(self, rotation: int = 0) -> None:
+        """Open I2C bus 1, zero-initialise the grid cache, and poll all rows.
+
+        Args:
+            rotation: Board rotation in degrees CW (0, 90, 180, or 270).
+        """
+        self._rotation = rotation
         self.bus = smbus.SMBus(1)
         self.grid_states: list[list[int]] = [[0] * 8 for _ in range(8)]
         self.initialize()
@@ -48,8 +54,8 @@ class Master(BoardSensor):
     def get_cell_state(self, row: int, col: int) -> int:
         """Return the cached sensor value for a single cell.
 
-        Transposes the lookup (col, row) to align physical reed switch layout
-        with the corrected visual rendering.
+        Applies board rotation then transposes the lookup (col, row) to align
+        physical reed switch layout with the corrected visual rendering.
 
         Args:
             row: Zero-based board row (0 = teamR back rank).
@@ -58,7 +64,8 @@ class Master(BoardSensor):
         Returns:
             0 if a piece is present, 1 if the cell is empty.
         """
-        return self.grid_states[col][row]
+        rr, rc = rotate_cell(row, col, self._rotation)
+        return self.grid_states[rc][rr]
 
     def print_board_states(self) -> None:
         """Log the full 8x8 grid cache at DEBUG level."""
