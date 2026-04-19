@@ -1033,11 +1033,11 @@ class NetworkedBoard(Board):
             logger.info("Sent game_start — starting physical setup")
 
         # ── Physical piece placement ───────────────────────────────
-        # Clear both buffers so the waiting animation is fully gone
+        # Clear and swap so self.canvas is the *displayed* buffer.
+        # interactive_setup draws directly to the displayed buffer
+        # (changes appear immediately, no SwapOnVSync needed per cell).
         self.canvas.Clear()
-        self.canvas = self.matrix.SwapOnVSync(self.canvas)
-        self.canvas.Clear()
-        self.canvas = self.matrix.SwapOnVSync(self.canvas)
+        self.matrix.SwapOnVSync(self.canvas)
 
         self.interactive_setup(self.team_r)
         self._net_send({"type": "setup_status", "team_key": "r", "status": "complete"})

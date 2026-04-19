@@ -313,7 +313,6 @@ class Board(SampleBase):
             col: Board column index of the expected cell.
         """
         self.light_cell(self.canvas, row, col, 255, 255, 255)
-        self.canvas = self.matrix.SwapOnVSync(self.canvas)
         placed = False
         while not placed:
             self.master.read_data()
@@ -321,7 +320,6 @@ class Board(SampleBase):
                 placed = True
             time.sleep(0.01)
         self.light_cell(self.canvas, row, col, team.r, team.g, team.b)
-        self.canvas = self.matrix.SwapOnVSync(self.canvas)
 
     def detect_lift_off(self, team):
         """Check whether a team's piece has been lifted from the board.
