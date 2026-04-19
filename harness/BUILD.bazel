@@ -150,6 +150,21 @@ py_binary(
     ],
 )
 
+py_library(
+    name = "hil_scenarios",
+    srcs = ["hil_scenarios.py"],
+    visibility = ["//:__subpackages__"],
+)
+
+py_binary(
+    name = "fuzz_hil",
+    srcs = ["fuzz_hil.py"],
+    deps = [
+        ":hil_scenarios",
+        "//hil",
+    ],
+)
+
 filegroup(
     name = "js_bridge",
     srcs = ["js_bridge.js"],

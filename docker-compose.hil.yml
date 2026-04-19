@@ -1,0 +1,53 @@
+# HIL (Hardware-In-The-Loop) Docker Compose configuration
+#
+# Runs the Chess101 game in a Debian Jessie ARM64 container, approximating the
+# Raspberry Pi 3+ environment (Pi 3+ has an ARMv8/ARM64 CPU).
+# WebSocket control interface on port 8766 for test integration.
+#
+# Usage:
+#   # No special setup needed on Apple Silicon Macs - ARM64 runs natively
+#
+#   # Build and start the HIL container
+#   docker-compose -f docker-compose.hil.yml up --build
+#
+#   # Run in background
+#   docker-compose -f docker-compose.hil.yml up -d
+#
+#   # View logs
+#   docker-compose -f docker-compose.hil.yml logs -f
+#
+#   # Stop
+#   docker-compose -f docker-compose.hil.yml down
+
+version: "3.8"
+
+services:
+  hil:
+    build:
+      context: .
+      dockerfile: hil/Dockerfile
+      platforms:
+        - linux/arm64
+    platform: linux/arm64
+    ports:
+      - "8766:8766"
+    environment:
+      - HIL_PORT=8766
+      - HIL_FAST_MODE=${HIL_FAST_MODE:-0}
+      - HIL_REAL_PI_MODE=${HIL_REAL_PI_MODE:-1}
+    volumes:
+      # Optional: mount code for live reload during development
+      # Uncomment these lines for faster iteration without rebuilding
+      # - ./game:/app/game:ro
+      # - ./hil:/app/hil:ro
+      # - ./pieces:/app/pieces:ro
+      # - ./core:/app/core:ro
+      # - ./network:/app/network:ro
+      []
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import socket; s=socket.socket(); s.settimeout(2); s.connect(('127.0.0.1', 8766)); s.close()"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    restart: unless-stopped

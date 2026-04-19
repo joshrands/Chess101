@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chess101 HIL Visualizer</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        body {
+            background: #0a0e1a;
+            color: #e0e0e0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+        }
+        h1 {
+            font-size: 24px;
+            margin-bottom: 20px;
+            color: #40b0ff;
+        }
+        .container {
+            display: flex;
+            gap: 30px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        .board-container {
+            background: #151a2e;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+        }
+        #led-canvas {
+            display: block;
+            border-radius: 8px;
+        }
+        .panel {
+            background: #151a2e;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+            width: 280px;
+        }
+        .panel h2 {
+            font-size: 16px;
+            color: #40b0ff;
+            margin-bottom: 15px;
+            border-bottom: 1px solid #2a3050;
+            padding-bottom: 8px;
+        }
+        .status {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+        .status-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #ff4040;
+        }
+        .status-dot.connected {
+            background: #40ff60;
+        }
+        .stat {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid #2a3050;
+        }
+        .stat:last-child {
+            border-bottom: none;
+        }
+        .stat-label {
+            color: #808090;
+        }
+        .stat-value {
+            color: #e0e0e0;
+            font-family: 'SF Mono', Monaco, monospace;
+        }
+        .controls {
+            margin-top: 15px;
+        }
+        .btn {
+            background: #2a3050;
+            border: none;
+            color: #e0e0e0;
+            padding: 10px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            margin-right: 8px;
+            margin-bottom: 8px;
+            transition: background 0.2s;
+        }
+        .btn:hover {
+            background: #3a4070;
+        }
+        .btn:active {
+            background: #4a5090;
+        }
+        .input-group {
+            margin-bottom: 12px;
+        }
+        .input-group label {
+            display: block;
+            color: #808090;
+            font-size: 12px;
+            margin-bottom: 4px;
+        }
+        .input-group input {
+            background: #0a0e1a;
+            border: 1px solid #2a3050;
+            color: #e0e0e0;
+            padding: 8px 12px;
+            border-radius: 6px;
+            width: 100%;
+            font-family: 'SF Mono', Monaco, monospace;
+        }
+        .sensor-grid {
+            display: grid;
+            grid-template-columns: repeat(8, 24px);
+            gap: 2px;
+            margin-top: 15px;
+        }
+        .sensor-cell {
+            width: 24px;
+            height: 24px;
+            background: #1a2040;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background 0.1s;
+        }
+        .sensor-cell.occupied {
+            background: #40b0ff;
+        }
+        .sensor-cell:hover {
+            outline: 2px solid #40b0ff;
+        }
+    </style>
+</head>
+<body>
+    <h1>Chess101 HIL Visualizer</h1>
+    <div class="container">
+        <div class="board-container">
+            <canvas id="led-canvas" width="480" height="480"></canvas>
+        </div>
+        <div class="panel">
+            <h2>Connection</h2>
+            <div class="status">
+                <div class="status-dot" id="status-dot"></div>
+                <span id="status-text">Disconnected</span>
+            </div>
+            <div class="input-group">
+                <label>HIL Container URL</label>
+                <input type="text" id="url-input" value="ws://localhost:8766">
+            </div>
+            <div class="controls">
+                <button class="btn" id="connect-btn">Connect</button>
+                <button class="btn" id="subscribe-btn" disabled>Subscribe</button>
+            </div>
+
+            <h2 style="margin-top: 20px;">Stats</h2>
+            <div class="stat">
+                <span class="stat-label">Frames</span>
+                <span class="stat-value" id="frame-count">0</span>
+            </div>
+            <div class="stat">
+                <span class="stat-label">FPS</span>
+                <span class="stat-value" id="fps">0</span>
+            </div>
+            <div class="stat">
+                <span class="stat-label">Last Update</span>
+                <span class="stat-value" id="last-update">-</span>
+            </div>
+        </div>
+        <div class="panel">
+            <h2>Reed Switches</h2>
+            <p style="font-size: 12px; color: #606070; margin-bottom: 10px;">
+                Click to toggle piece presence
+            </p>
+            <div class="sensor-grid" id="sensor-grid"></div>
+            <div class="controls" style="margin-top: 15px;">
+                <button class="btn" id="starting-pos-btn" disabled>Set Starting Position</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const LED_SIZE = 15;
+        const SCALE = 15;
+        const canvas = document.getElementById('led-canvas');
+        const ctx = canvas.getContext('2d');
+
+        let ws = null;
+        let frameCount = 0;
+        let lastFrameTime = 0;
+        let fpsHistory = [];
+        let sensorState = Array(8).fill(null).map(() => Array(8).fill(1)); // 1 = empty
+
+        // Build sensor grid UI
+        const sensorGrid = document.getElementById('sensor-grid');
+        for (let row = 0; row < 8; row++) {
+            for (let col = 0; col < 8; col++) {
+                const cell = document.createElement('div');
+                cell.className = 'sensor-cell';
+                cell.dataset.row = row;
+                cell.dataset.col = col;
+                cell.addEventListener('click', () => toggleSensor(row, col));
+                sensorGrid.appendChild(cell);
+            }
+        }
+
+        function updateSensorUI() {
+            const cells = sensorGrid.querySelectorAll('.sensor-cell');
+            cells.forEach(cell => {
+                const row = parseInt(cell.dataset.row);
+                const col = parseInt(cell.dataset.col);
+                cell.classList.toggle('occupied', sensorState[row][col] === 0);
+            });
+        }
+
+        function toggleSensor(row, col) {
+            if (!ws || ws.readyState !== WebSocket.OPEN) return;
+            const newState = sensorState[row][col] === 0 ? 'lifted' : 'placed';
+            ws.send(JSON.stringify({
+                method: 'reed_switch',
+                params: { row, col, state: newState },
+                id: Date.now()
+            }));
+            sensorState[row][col] = newState === 'placed' ? 0 : 1;
+            updateSensorUI();
+        }
+
+        function renderFrame(pixels) {
+            ctx.fillStyle = '#050810';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Draw grid lines for chess cells (8x8, each cell = 4x4 LEDs)
+            ctx.strokeStyle = 'rgba(60, 80, 120, 0.3)';
+            ctx.lineWidth = 1;
+            for (let i = 0; i <= 8; i++) {
+                const pos = i * 4 * LED_SIZE;
+                ctx.beginPath();
+                ctx.moveTo(pos, 0);
+                ctx.lineTo(pos, 480);
+                ctx.moveTo(0, pos);
+                ctx.lineTo(480, pos);
+                ctx.stroke();
+            }
+
+            // Draw row/col labels
+            ctx.font = '10px monospace';
+            ctx.fillStyle = 'rgba(100, 150, 200, 0.7)';
+            for (let i = 0; i < 8; i++) {
+                // Column labels at top
+                ctx.fillText(`c${i}`, i * 4 * LED_SIZE + 20, 12);
+                // Row labels at left
+                ctx.fillText(`r${i}`, 2, i * 4 * LED_SIZE + 32);
+            }
+
+            // Mark expected Q/K positions (if correct orientation)
+            ctx.fillStyle = 'rgba(255, 200, 100, 0.5)';
+            ctx.font = '14px monospace';
+            // Row 0: Q at col 3, K at col 4
+            ctx.fillText('Q?', 3 * 4 * LED_SIZE + 18, 0 * 4 * LED_SIZE + 35);
+            ctx.fillText('K?', 4 * 4 * LED_SIZE + 18, 0 * 4 * LED_SIZE + 35);
+            // Row 7: Q at col 3, K at col 4
+            ctx.fillText('Q?', 3 * 4 * LED_SIZE + 18, 7 * 4 * LED_SIZE + 35);
+            ctx.fillText('K?', 4 * 4 * LED_SIZE + 18, 7 * 4 * LED_SIZE + 35);
+
+            for (let y = 0; y < 32; y++) {
+                for (let x = 0; x < 32; x++) {
+                    const [r, g, b] = pixels[y][x];
+                    if (r === 0 && g === 0 && b === 0) continue;
+
+                    const cx = x * LED_SIZE + LED_SIZE / 2;
+                    const cy = y * LED_SIZE + LED_SIZE / 2;
+
+                    // Outer glow
+                    const gradient = ctx.createRadialGradient(cx, cy, 0, cx, cy, LED_SIZE * 0.6);
+                    gradient.addColorStop(0, `rgba(${r}, ${g}, ${b}, 0.8)`);
+                    gradient.addColorStop(0.5, `rgba(${r}, ${g}, ${b}, 0.3)`);
+                    gradient.addColorStop(1, `rgba(${r}, ${g}, ${b}, 0)`);
+                    ctx.fillStyle = gradient;
+                    ctx.beginPath();
+                    ctx.arc(cx, cy, LED_SIZE * 0.6, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    // Core
+                    ctx.fillStyle = `rgb(${r}, ${g}, ${b})`;
+                    ctx.beginPath();
+                    ctx.arc(cx, cy, LED_SIZE * 0.35, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            }
+
+            frameCount++;
+            document.getElementById('frame-count').textContent = frameCount;
+
+            const now = performance.now();
+            if (lastFrameTime > 0) {
+                const dt = now - lastFrameTime;
+                fpsHistory.push(1000 / dt);
+                if (fpsHistory.length > 30) fpsHistory.shift();
+                const avgFps = fpsHistory.reduce((a, b) => a + b, 0) / fpsHistory.length;
+                document.getElementById('fps').textContent = avgFps.toFixed(1);
+            }
+            lastFrameTime = now;
+            document.getElementById('last-update').textContent = new Date().toLocaleTimeString();
+        }
+
+        function connect() {
+            const url = document.getElementById('url-input').value;
+            ws = new WebSocket(url);
+
+            ws.onopen = () => {
+                document.getElementById('status-dot').classList.add('connected');
+                document.getElementById('status-text').textContent = 'Connected';
+                document.getElementById('connect-btn').textContent = 'Disconnect';
+                document.getElementById('subscribe-btn').disabled = false;
+                document.getElementById('starting-pos-btn').disabled = false;
+
+                // Get initial sensor state
+                ws.send(JSON.stringify({ method: 'get_sensor_state', id: 1 }));
+            };
+
+            ws.onclose = () => {
+                document.getElementById('status-dot').classList.remove('connected');
+                document.getElementById('status-text').textContent = 'Disconnected';
+                document.getElementById('connect-btn').textContent = 'Connect';
+                document.getElementById('subscribe-btn').disabled = true;
+                document.getElementById('starting-pos-btn').disabled = true;
+            };
+
+            ws.onmessage = (event) => {
+                const data = JSON.parse(event.data);
+
+                if (data.event === 'frame') {
+                    renderFrame(data.pixels);
+                } else if (data.result && data.result.pixels) {
+                    renderFrame(data.result.pixels);
+                } else if (data.result && data.result.grid) {
+                    sensorState = data.result.grid;
+                    updateSensorUI();
+                }
+            };
+
+            ws.onerror = (err) => {
+                console.error('WebSocket error:', err);
+            };
+        }
+
+        document.getElementById('connect-btn').addEventListener('click', () => {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.close();
+            } else {
+                connect();
+            }
+        });
+
+        document.getElementById('subscribe-btn').addEventListener('click', () => {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.dumps({ method: 'subscribe_frames', params: { fps: 30 }, id: 2 }));
+            }
+        });
+
+        document.getElementById('starting-pos-btn').addEventListener('click', () => {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({ method: 'set_starting_position', id: 3 }));
+                // Update local state
+                for (let row = 0; row < 8; row++) {
+                    for (let col = 0; col < 8; col++) {
+                        sensorState[row][col] = (row < 2 || row > 5) ? 0 : 1;
+                    }
+                }
+                updateSensorUI();
+            }
+        });
+
+        // Fix typo in subscribe button handler
+        document.getElementById('subscribe-btn').onclick = () => {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({ method: 'subscribe_frames', params: { fps: 30 }, id: 2 }));
+            }
+        };
+    </script>
+</body>
+</html>

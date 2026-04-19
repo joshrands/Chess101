@@ -104,6 +104,12 @@ def pytest_addoption(parser):
         default=False,
         help="Run relay tests against a locally-built Docker container.",
     )
+    parser.addoption(
+        "--hil-docker",
+        action="store_true",
+        default=False,
+        help="Run HIL tests against the ARM64 Docker container (requires QEMU).",
+    )
 
 
 @pytest.fixture(scope="session")
@@ -225,3 +231,125 @@ def relay_url(request, monkeypatch):
 
     if stop_holder:
         loop.call_soon_threadsafe(stop_holder[0].set)
+
+
+# ── HIL Docker fixtures ──────────────────────────────────────────────────────
+
+
+@pytest.fixture(scope="session")
+def hil_docker_url(request):
+    """Build chess101-hil Docker image, run container for the session.
+
+    Only used when --hil-docker is passed. Requires QEMU for ARM64 emulation.
+    The container takes several minutes to build on first run due to
+    Python 3.9 compilation.
+
+    Skips if:
+      - Docker is not available
+      - QEMU is not set up for ARM64
+      - The build fails
+    """
+    if not request.config.getoption("--hil-docker", default=False):
+        pytest.skip("HIL Docker tests require --hil-docker flag")
+
+    import socket
+    import subprocess
+    import time
+
+    # Find a free port
+    sock = socket.socket()
+    sock.bind(("", 0))
+    port = sock.getsockname()[1]
+    sock.close()
+
+    # Check Docker is available
+    result = subprocess.run(["docker", "version"], capture_output=True)
+    if result.returncode != 0:
+        pytest.skip("Docker not available")
+
+    # Enable QEMU for ARM64 (idempotent)
+    subprocess.run(
+        ["docker", "run", "--rm", "--privileged",
+         "multiarch/qemu-user-static", "--reset", "-p", "yes"],
+        capture_output=True,
+    )
+
+    # Build the HIL image (may take 15-20 minutes on first run due to OpenSSL + Python)
+    print("\nBuilding HIL Docker image (this may take a while on first run)...")
+    result = subprocess.run(
+        ["docker", "buildx", "build",
+         "--platform", "linux/arm64",
+         "-f", "hil/Dockerfile",
+         "-t", "chess101-hil-test",
+         "--load",
+         "."],
+        capture_output=True,
+        timeout=2400,  # 40 minute timeout for build (OpenSSL + Python compilation)
+    )
+    if result.returncode != 0:
+        pytest.skip(f"HIL Docker build failed:\n{result.stderr.decode()[:500]}")
+
+    # Run the container
+    container_name = f"chess101-hil-test-{port}"
+    proc = subprocess.Popen(
+        [
+            "docker", "run", "--rm",
+            "--platform", "linux/arm64",
+            "--name", container_name,
+            "-p", f"{port}:8766",
+            "-e", "HIL_PORT=8766",
+            "-e", "HIL_FAST_MODE=1",
+            "chess101-hil-test",
+        ],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
+
+    # Wait for container to be ready (WebSocket accepting connections)
+    deadline = time.time() + 60.0  # ARM64 emulation is slow
+    url = f"ws://127.0.0.1:{port}"
+    while time.time() < deadline:
+        try:
+            import asyncio
+            import websockets
+
+            async def _check():
+                async with websockets.connect(url, open_timeout=2):
+                    pass
+
+            asyncio.get_event_loop().run_until_complete(_check())
+            break
+        except Exception:
+            if proc.poll() is not None:
+                stderr = proc.stderr.read().decode() if proc.stderr else ""
+                pytest.skip(f"HIL container exited early:\n{stderr[:500]}")
+            time.sleep(1.0)
+    else:
+        proc.terminate()
+        pytest.skip("HIL container failed to start within 60s")
+
+    yield url
+
+    # Cleanup
+    proc.terminate()
+    try:
+        proc.wait(timeout=10)
+    except subprocess.TimeoutExpired:
+        subprocess.run(["docker", "kill", container_name], capture_output=True)
+
+
+@pytest.fixture
+def hil_bridge(request):
+    """HilBridge connected to the HIL Docker container.
+
+    Requires --hil-docker flag. Uses the session-scoped hil_docker_url fixture.
+    """
+    from hil.client import HilBridge
+
+    url = request.getfixturevalue("hil_docker_url")
+    bridge = HilBridge(url=url, timeout=30.0)
+    bridge.connect(retries=3, delay=2.0)
+
+    yield bridge
+
+    bridge.close()

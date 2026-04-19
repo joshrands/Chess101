@@ -1121,14 +1121,22 @@ class NetworkedBoard(Board):
             self.canvas = self.matrix.SwapOnVSync(self.canvas)
 
         # ── End-game animation ────────────────────────────────────
-        self._drain_incoming()
+        # Drain any remaining messages (e.g. game_event from sim)
+        deadline = time.time() + 5.0
+        while self._pending_game_event is None and time.time() < deadline:
+            self._drain_incoming()
+            time.sleep(0.05)
+
         if self._pending_game_event is not None:
             event, losing_team = self._pending_game_event
             self._pending_game_event = None
+            logger.info("Playing end-game animation: %s", event)
             if event == "checkmate" and losing_team is not None:
                 self.seth_victory(losing_team)
             elif event == "stalemate":
                 self.stale_mate()
+        else:
+            logger.warning("Game over but no pending game_event received")
 
     def _do_turn_networked(self, team) -> None:
         """Route to local physical turn or remote wait based on team ownership."""
