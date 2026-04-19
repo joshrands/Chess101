@@ -371,22 +371,33 @@ class NetworkedBoard(Board):
             time.sleep(0.06)
 
         # ── Phase 2: CONVERGE ─────────────────────────────────────────────
-        # Both beams ease-in (quadratic) toward the collision point.
+        # Both beams carry the chase beam's initial speed and accelerate
+        # into the collision point.
         spawn_pos = step
         collision_pos = (spawn_pos + n // 2) % n
         half_n = n // 2  # distance each beam must travel
 
-        CONVERGE_DURATION = 0.9  # seconds for the full converge
+        # The chase beam moves 1 cell / 0.06s.  Express initial velocity as
+        # a fraction of half_n per second so the motion is continuous:
+        #   v0 = (1 / 0.06) / half_n  ≈  16.7 / 14  ≈  1.19  (in normalised units/s)
+        # We want progress(T) = v0*T + a*T² = 1.0, solving for T with a chosen
+        # acceleration.  Using T = 0.9 s:
+        #   a = (1 - v0*T) / T²
+        CONVERGE_DURATION = 0.9
+        chase_speed = 1.0 / 0.06            # cells per second
+        v0 = chase_speed / half_n            # normalised velocity (fraction of half_n per s)
+        accel = (1.0 - v0 * CONVERGE_DURATION) / (CONVERGE_DURATION ** 2)
+
         FRAME_DT = 0.02
         start_time = time.monotonic()
 
         while True:
             self._drain_incoming()
             elapsed = time.monotonic() - start_time
-            t = min(elapsed / CONVERGE_DURATION, 1.0)
+            t = min(elapsed, CONVERGE_DURATION)
 
-            # Quadratic ease-in: progress = t^2 (starts slow, accelerates)
-            progress = t * t
+            # progress = v0*t + a*t²  (carries initial speed, then accelerates)
+            progress = min(v0 * t + accel * t * t, 1.0)
             fwd_cells = int(progress * half_n)
             rev_cells = int(progress * half_n)
 
@@ -441,13 +452,15 @@ class NetworkedBoard(Board):
         EXPAND_SPEED = 14.0    # cells per second
         WAVEFRONT_WIDTH = 2.5  # cells wide — fat, energetic ring
         AFTERGLOW_WIDTH = 1.5  # secondary trailing glow behind the front
+        GAP_WIDTH = 1.0        # dark gap between afterglow and checkerboard
         start_time = time.monotonic()
 
         while True:
             elapsed = time.monotonic() - start_time
             radius = elapsed * EXPAND_SPEED
 
-            if radius > max_dist + WAVEFRONT_WIDTH + AFTERGLOW_WIDTH:
+            total_trail = WAVEFRONT_WIDTH + AFTERGLOW_WIDTH + GAP_WIDTH
+            if radius > max_dist + total_trail:
                 break  # fully revealed
 
             self.canvas.Clear()
@@ -457,6 +470,7 @@ class NetworkedBoard(Board):
                     front_edge = radius + WAVEFRONT_WIDTH / 2
                     back_edge = radius - WAVEFRONT_WIDTH / 2
                     afterglow_edge = back_edge - AFTERGLOW_WIDTH
+                    gap_edge = afterglow_edge - GAP_WIDTH
 
                     if d > front_edge:
                         # Ahead of wavefront: dim checker background
@@ -477,7 +491,7 @@ class NetworkedBoard(Board):
                         else:
                             self.light_cell(self.canvas, r, c, gr, gg, gb)
                     elif d > afterglow_edge:
-                        # Afterglow: warm orange-cyan fade trailing the front
+                        # Afterglow: warm orange fade trailing the front
                         t = (d - afterglow_edge) / AFTERGLOW_WIDTH
                         glow_r = int(180 * t)
                         glow_g = int(100 * t)
@@ -490,6 +504,9 @@ class NetworkedBoard(Board):
                         else:
                             self.light_cell(self.canvas, r, c,
                                             glow_r, glow_g, glow_b)
+                    elif d > gap_edge:
+                        # Dark gap: black space between shockwave and board
+                        pass  # canvas already cleared to black
                     else:
                         # Behind everything: revealed checkerboard
                         if checker_lit[r][c]:
