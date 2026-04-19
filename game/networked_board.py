@@ -445,7 +445,10 @@ class NetworkedBoard(Board):
             self.game_over = True
 
     def _apply_remote_move(self, msg: dict) -> None:
-        """Apply an incoming move message to the local grid and LED matrix."""
+        """Apply an incoming move message by guiding the human to physically
+        move the piece on the board — same UX as computer_move."""
+        from core.constants import CellOccupancy
+
         fr = msg["from_row"]
         fc = msg["from_col"]
         tr = msg["to_row"]
@@ -462,11 +465,13 @@ class NetworkedBoard(Board):
         else:
             self.peace_time += 1
 
+        is_capture = self.grid[tr][tc] is not None
+
+        # Guide the human through the physical move on the board
+        self._guide_physical_move(fr, fc, tr, tc, piece, is_capture)
+
         self.grid[tr][tc] = self.grid[fr][fc]
         self._apply_move(fr, fc, tr, tc)
-
-        # Briefly highlight the opponent's move
-        self._show_remote_move(fr, fc, tr, tc, piece)
 
         # Verify hash
         team_key   = "r" if piece.team.r == self.team_r.r else "l"
@@ -478,18 +483,86 @@ class NetworkedBoard(Board):
             self._net_send({"type": "board_sync_request"})
             logger.warning("Hash mismatch after remote move — requested board_sync")
 
-    def _show_remote_move(self, fr, fc, tr, tc, piece) -> None:
-        """Flash the source and destination cells on the LED matrix."""
+    def _guide_physical_move(self, fr, fc, tr, tc, piece, is_capture) -> None:
+        """Guide the human to physically execute a remote move on the board.
+
+        Lights up the source square until the piece is lifted, then lights up
+        the destination square until the piece is placed there. For captures,
+        first waits for the captured piece to be removed.
+        """
+        from core.constants import CellOccupancy
+
         if not hasattr(self, "canvas"):
             return
-        import time as _time
-        for _ in range(15):
-            self.canvas.Clear()
-            self.light_checker_town(self.canvas)
-            self.light_cell(self.canvas, fr, fc, 80, 80, 80)
-            self.light_cell(self.canvas, tr, tc, piece.team.r, piece.team.g, piece.team.b)
-            self.canvas = self.matrix.SwapOnVSync(self.canvas)
-            _time.sleep(0.12)
+
+        team = piece.team
+
+        if is_capture:
+            # Step 1: highlight source piece — wait for it to be lifted
+            logger.info("Remote move: lift %s at %d,%d (capture)", type(piece).__name__, fr, fc)
+            state = CellOccupancy.OCCUPIED
+            while state == CellOccupancy.OCCUPIED:
+                self.master.read_data()
+                self.canvas.Clear()
+                self.light_checker_town(self.canvas)
+                self.light_cell(self.canvas, fr, fc, team.r, team.g, team.b)
+                self.canvas = self.matrix.SwapOnVSync(self.canvas)
+                state = self.master.get_cell_state(fr, fc)
+
+            # Step 2: highlight captured piece — wait for it to be removed
+            logger.info("Remote move: remove captured piece at %d,%d", tr, tc)
+            state = CellOccupancy.OCCUPIED
+            while state == CellOccupancy.OCCUPIED:
+                self.master.read_data()
+                self.canvas.Clear()
+                self.light_checker_town(self.canvas)
+                self.light_cell(self.canvas, tr, tc, team.r, team.g, team.b)
+                self.canvas = self.matrix.SwapOnVSync(self.canvas)
+                state = self.master.get_cell_state(tr, tc)
+            time.sleep(0.1)
+
+            # Step 3: blink destination — wait for piece to be placed
+            logger.info("Remote move: place piece at %d,%d", tr, tc)
+            state = CellOccupancy.EMPTY
+            while state == CellOccupancy.EMPTY:
+                self.master.read_data()
+                self.canvas.Clear()
+                self.light_checker_town(self.canvas)
+                self.light_cell(self.canvas, tr, tc, team.r, team.g, team.b)
+                self.canvas = self.matrix.SwapOnVSync(self.canvas)
+                time.sleep(0.1)
+                self.canvas.Clear()
+                self.light_checker_town(self.canvas)
+                self.canvas = self.matrix.SwapOnVSync(self.canvas)
+                state = self.master.get_cell_state(tr, tc)
+        else:
+            # Non-capture: highlight source — wait for lift
+            logger.info("Remote move: lift %s at %d,%d", type(piece).__name__, fr, fc)
+            state = CellOccupancy.OCCUPIED
+            while state == CellOccupancy.OCCUPIED:
+                self.master.read_data()
+                self.canvas.Clear()
+                self.light_checker_town(self.canvas)
+                self.light_cell(self.canvas, fr, fc, team.r, team.g, team.b)
+                self.canvas = self.matrix.SwapOnVSync(self.canvas)
+                state = self.master.get_cell_state(fr, fc)
+
+            # Blink destination — wait for piece to be placed
+            logger.info("Remote move: place piece at %d,%d", tr, tc)
+            state = CellOccupancy.EMPTY
+            while state == CellOccupancy.EMPTY:
+                self.master.read_data()
+                self.canvas.Clear()
+                self.light_checker_town(self.canvas)
+                self.light_cell(self.canvas, tr, tc, team.r, team.g, team.b)
+                self.canvas = self.matrix.SwapOnVSync(self.canvas)
+                time.sleep(0.1)
+                self.canvas.Clear()
+                self.light_checker_town(self.canvas)
+                self.canvas = self.matrix.SwapOnVSync(self.canvas)
+                state = self.master.get_cell_state(tr, tc)
+
+        logger.info("Remote move: physical move complete %d,%d→%d,%d", fr, fc, tr, tc)
 
     # ── Online play helpers ────────────────────────────────────────────────────
 
