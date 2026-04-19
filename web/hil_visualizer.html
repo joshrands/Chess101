@@ -309,10 +309,13 @@
             const now = performance.now();
             if (lastFrameTime > 0) {
                 const dt = now - lastFrameTime;
-                fpsHistory.push(1000 / dt);
-                if (fpsHistory.length > 30) fpsHistory.shift();
-                const avgFps = fpsHistory.reduce((a, b) => a + b, 0) / fpsHistory.length;
-                document.getElementById('fps').textContent = avgFps.toFixed(1);
+                if (dt > 1) {  // Ignore if < 1ms (avoids Infinity)
+                    const fps = Math.min(1000 / dt, 999);  // Cap at 999
+                    fpsHistory.push(fps);
+                    if (fpsHistory.length > 30) fpsHistory.shift();
+                    const avgFps = fpsHistory.reduce((a, b) => a + b, 0) / fpsHistory.length;
+                    document.getElementById('fps').textContent = avgFps.toFixed(1);
+                }
             }
             lastFrameTime = now;
             document.getElementById('last-update').textContent = new Date().toLocaleTimeString();
@@ -386,10 +389,10 @@
             }
         });
 
-        // Fix typo in subscribe button handler
+        // Subscribe at 10 FPS to reduce load (LED board doesn't need 30+)
         document.getElementById('subscribe-btn').onclick = () => {
             if (ws && ws.readyState === WebSocket.OPEN) {
-                ws.send(JSON.stringify({ method: 'subscribe_frames', params: { fps: 30 }, id: 2 }));
+                ws.send(JSON.stringify({ method: 'subscribe_frames', params: { fps: 10 }, id: 2 }));
             }
         };
     </script>

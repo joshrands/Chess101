@@ -78,6 +78,7 @@ class ControlServer:
         self._port = port
         self._clients: set[WebSocketServerProtocol] = set()
         self._frame_subscribers: dict[WebSocketServerProtocol, float] = {}
+        self._frame_tasks: dict[WebSocketServerProtocol, asyncio.Task] = {}
         self._running = False
         self._loop: asyncio.AbstractEventLoop | None = None
 
@@ -110,6 +111,9 @@ class ControlServer:
         finally:
             self._clients.discard(ws)
             self._frame_subscribers.pop(ws, None)
+            if ws in self._frame_tasks:
+                self._frame_tasks[ws].cancel()
+                self._frame_tasks.pop(ws, None)
             logger.info("HIL client disconnected: %s", ws.remote_address)
 
     async def _handle_request(
@@ -143,12 +147,19 @@ class ControlServer:
 
         elif method == "subscribe_frames":
             fps = params.get("fps", 30)
+            # Cancel existing task if re-subscribing
+            if ws in self._frame_tasks:
+                self._frame_tasks[ws].cancel()
             self._frame_subscribers[ws] = 1.0 / max(1, fps)
-            asyncio.create_task(self._stream_frames(ws))
+            task = asyncio.create_task(self._stream_frames(ws))
+            self._frame_tasks[ws] = task
             return {"result": "subscribed", "id": req_id}
 
         elif method == "unsubscribe_frames":
             self._frame_subscribers.pop(ws, None)
+            if ws in self._frame_tasks:
+                self._frame_tasks[ws].cancel()
+                self._frame_tasks.pop(ws, None)
             return {"result": "unsubscribed", "id": req_id}
 
         elif method == "get_sensor_state":

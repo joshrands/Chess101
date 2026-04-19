@@ -94,19 +94,27 @@ RUN echo "/usr/local/ssl/lib" > /etc/ld.so.conf.d/openssl.conf && ldconfig
 RUN echo "deb http://archive.debian.org/debian jessie main" > /etc/apt/sources.list && \
     echo 'Acquire::Check-Valid-Until "false";' > /etc/apt/apt.conf.d/99no-check-valid
 
-# Install runtime dependencies
+# Install runtime dependencies (ca-certificates needed for SSL to relay)
 RUN apt-get update && apt-get install -y --force-yes --allow-unauthenticated \
     libffi6 \
     zlib1g \
     libsqlite3-0 \
     libreadline6 \
-    && rm -rf /var/lib/apt/lists/*
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/* \
+    && update-ca-certificates
 
-# Upgrade pip and install Python packages
+# Upgrade pip and install Python packages (certifi for modern CA bundle)
 RUN /usr/local/bin/pip3 install --no-cache-dir --upgrade pip && \
     /usr/local/bin/pip3 install --no-cache-dir \
     websockets>=12.0 \
-    numpy
+    numpy \
+    certifi \
+    chessmatrix
+
+# Use certifi's CA bundle for SSL (Jessie's ca-certificates too old for modern certs)
+ENV SSL_CERT_FILE=/usr/local/lib/python3.9/site-packages/certifi/cacert.pem
+ENV REQUESTS_CA_BUNDLE=/usr/local/lib/python3.9/site-packages/certifi/cacert.pem
 
 WORKDIR /app
 

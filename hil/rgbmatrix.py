@@ -94,6 +94,8 @@ class HilRGBMatrix:
     can verify LED output without a display.
     """
 
+    _TARGET_FPS = 60  # Simulate vsync at 60 Hz
+
     def __init__(self, options: object = None) -> None:
         """Initialize the matrix with no subscribers.
 
@@ -106,6 +108,8 @@ class HilRGBMatrix:
         self._last_frame: list[list[Tuple[int, int, int]]] | None = None
         self._last_frame_time: float = 0.0
         self._frame_count: int = 0
+        self._last_swap_time: float = 0.0
+        self._frame_interval: float = 1.0 / self._TARGET_FPS
 
     def CreateFrameCanvas(self) -> HilFrameCanvas:
         """Return the single shared HilFrameCanvas.
