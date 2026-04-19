@@ -695,12 +695,20 @@ class NetworkedBoard(Board):
         # ── Wait for Sim-as-UI to send color + war_games choices ──
         if self._local_team_key == "r":
             # Pi is HOST: wait for Sim to send all 4 config messages
-            if not self._config_received.wait(timeout=_SETUP_TIMEOUT_S):
+            deadline = time.time() + _SETUP_TIMEOUT_S
+            while not self._config_received.is_set() and time.time() < deadline:
+                self._drain_incoming()
+                time.sleep(0.05)
+            if not self._config_received.is_set():
                 logger.error("Timed out waiting for config from Sim")
                 return
         else:
             # Pi is GUEST: wait for game_start from HOST Sim
-            if not self._game_start_evt.wait(timeout=_SETUP_TIMEOUT_S):
+            deadline = time.time() + _SETUP_TIMEOUT_S
+            while not self._game_start_evt.is_set() and time.time() < deadline:
+                self._drain_incoming()
+                time.sleep(0.05)
+            if not self._game_start_evt.is_set():
                 logger.error("Timed out waiting for game_start")
                 return
 

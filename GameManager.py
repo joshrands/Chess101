@@ -18,31 +18,12 @@ Networked play
 """
 import argparse
 import logging
-import signal
 import sys
 
 from game.board import Board
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-
-_running = True
-
-
-def _handle_signal(signum, frame):
-    """Set the global stop flag on SIGINT or SIGTERM.
-
-    Args:
-        signum: Signal number received.
-        frame: Current stack frame (unused).
-    """
-    global _running
-    logger.info("Signal %s received — shutting down after current game.", signum)
-    _running = False
-
-
-signal.signal(signal.SIGINT, _handle_signal)
-signal.signal(signal.SIGTERM, _handle_signal)
 
 
 def _stub_smbus() -> None:
@@ -138,13 +119,9 @@ def main():
     # Pass remaining unknown args through to samplebase / LED matrix flags
     args, _unknown = parser.parse_known_args()
 
-    global _running
-    while _running:
+    while True:
         board = _build_board(args)
         board.process()
-
-    logger.info("GameManager exited cleanly.")
-    sys.exit(0)
 
 
 if __name__ == "__main__":
