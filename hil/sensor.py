@@ -32,6 +32,9 @@ class HilSensor(BoardSensor):
     def get_cell_state(self, row: int, col: int) -> int:
         """Return the occupancy value for a single cell.
 
+        Transposes the lookup (col, row) to align physical reed switch layout
+        with the corrected visual rendering.
+
         Args:
             row: Board row (0-7).
             col: Board column (0-7).
@@ -40,12 +43,13 @@ class HilSensor(BoardSensor):
             0 if piece present, 1 if empty.
         """
         with self._lock:
-            return self._grid[row][col]
+            return self._grid[col][row]
 
     def inject_state(self, row: int, col: int, occupied: bool) -> None:
         """External control point - set a cell's occupancy.
 
         Called by ControlServer to simulate piece lift/place events.
+        Transposes (col, row) to match get_cell_state() transposition.
 
         Args:
             row: Board row (0-7).
@@ -53,7 +57,7 @@ class HilSensor(BoardSensor):
             occupied: True if piece present, False if empty.
         """
         with self._lock:
-            self._grid[row][col] = (
+            self._grid[col][row] = (
                 CellOccupancy.OCCUPIED if occupied else CellOccupancy.EMPTY
             )
 
@@ -61,11 +65,13 @@ class HilSensor(BoardSensor):
         """Set reed switches to standard chess starting position.
 
         Pieces on rows 0-1 (team_r) and 6-7 (team_l), empty middle.
+        Stores transposed to match get_cell_state() transposition.
         """
         with self._lock:
             for r in range(8):
                 for c in range(8):
-                    self._grid[r][c] = (
+                    # Store at [col][row] to match transposition
+                    self._grid[c][r] = (
                         CellOccupancy.OCCUPIED if r in (0, 1, 6, 7)
                         else CellOccupancy.EMPTY
                     )

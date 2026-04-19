@@ -48,6 +48,9 @@ class Master(BoardSensor):
     def get_cell_state(self, row: int, col: int) -> int:
         """Return the cached sensor value for a single cell.
 
+        Transposes the lookup (col, row) to align physical reed switch layout
+        with the corrected visual rendering.
+
         Args:
             row: Zero-based board row (0 = teamR back rank).
             col: Zero-based board column.
@@ -55,7 +58,7 @@ class Master(BoardSensor):
         Returns:
             0 if a piece is present, 1 if the cell is empty.
         """
-        return self.grid_states[row][col]
+        return self.grid_states[col][row]
 
     def print_board_states(self) -> None:
         """Log the full 8x8 grid cache at DEBUG level."""

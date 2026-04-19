@@ -681,8 +681,8 @@ class Board(SampleBase):
         self.grid[0][7] = Rook(0, 7, self.team_r)
         self.grid[0][1] = Knight(0, 1, self.team_r)
         self.grid[0][6] = Knight(0, 6, self.team_r)
-        self.grid[0][3] = Queen(0, 3, self.team_r)
-        self.grid[0][4] = King(0, 4, self.team_r)
+        self.grid[0][4] = Queen(0, 4, self.team_r)
+        self.grid[0][3] = King(0, 3, self.team_r)
 
         for col in range(8):
             self.grid[6][col] = Pawn(6, col, self.team_l)
@@ -692,8 +692,8 @@ class Board(SampleBase):
         self.grid[7][7] = Rook(7, 7, self.team_l)
         self.grid[7][1] = Knight(7, 1, self.team_l)
         self.grid[7][6] = Knight(7, 6, self.team_l)
-        self.grid[7][3] = Queen(7, 3, self.team_l)
-        self.grid[7][4] = King(7, 4, self.team_l)
+        self.grid[7][4] = Queen(7, 4, self.team_l)
+        self.grid[7][3] = King(7, 3, self.team_l)
 
     def initialize_game_board2(self):
         """Populate self.grid with a custom mid-game test position (scenario 2).
