@@ -405,19 +405,13 @@ class NetworkedBoard(Board):
         # ── Phase 3: FLASH + EXPLODE ──────────────────────────────────────
         collision_r, collision_c = edge_cells[collision_pos]
 
-        # --- bright white flash across the entire board ---
-        FLASH_DURATION = 0.15  # seconds
-        FLASH_FRAMES = 5
-        for f in range(FLASH_FRAMES):
-            frac = 1.0 - (f / FLASH_FRAMES)  # 1.0 → 0.0
-            brightness = int(255 * frac * frac)  # quadratic falloff
-            self.canvas.Clear()
-            for r in range(8):
-                for c in range(8):
-                    self.light_cell(self.canvas, r, c,
-                                    brightness, brightness, brightness)
-            self.canvas = self.matrix.SwapOnVSync(self.canvas)
-            time.sleep(FLASH_DURATION / FLASH_FRAMES)
+        # --- single-frame white flash across the entire board ---
+        self.canvas.Clear()
+        for r in range(8):
+            for c in range(8):
+                self.light_cell(self.canvas, r, c, 255, 255, 255)
+        self.canvas = self.matrix.SwapOnVSync(self.canvas)
+        time.sleep(0.06)
 
         # --- shockwave explosion ---
         # Precompute Euclidean distance from collision for every cell
