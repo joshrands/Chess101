@@ -1,7 +1,8 @@
 """WebSocket JSON-RPC control server for HIL testing.
 
 Provides external control of the HIL container via JSON-RPC over WebSocket.
-Clients can inject reed switch events, read LED frames, and query game state.
+Clients can inject reed switch events, read LED frames, query game state,
+and run lockstep chess engine commands for fuzzing.
 """
 from __future__ import annotations
 
@@ -9,7 +10,7 @@ import asyncio
 import json
 import logging
 import time
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Optional
 
 if TYPE_CHECKING:
     from hil.sensor import HilSensor
@@ -20,6 +21,22 @@ try:
     from websockets.server import serve, WebSocketServerProtocol
 except ImportError:
     websockets = None  # type: ignore
+
+from core.team import Team
+from network.protocol import board_hash
+
+# Chess helpers are optional - only available when harness module is present
+try:
+    from harness.chess_helpers import (
+        py_init_board,
+        py_grid_to_json,
+        py_legal_moves,
+        py_apply_move,
+        clear_en_passant,
+    )
+    _HAS_CHESS_HELPERS = True
+except ImportError:
+    _HAS_CHESS_HELPERS = False
 
 logger = logging.getLogger(__name__)
 
@@ -32,7 +49,15 @@ class ControlServer:
         - get_frame() - poll current LED state
         - subscribe_frames(fps) - stream frames at given FPS
         - get_sensor_state() - get 8x8 reed switch grid
+        - set_starting_position() - reset reed switches to starting position
         - ping() - keepalive
+
+    Lockstep fuzzing methods:
+        - chess_init(team_r_rgb, team_l_rgb) - initialize board for lockstep testing
+        - chess_legal_moves(team_key) - get legal moves for a team
+        - chess_apply_move(fr, fc, tr, tc, team_key, next_key, peace_time) - apply move
+        - chess_board_state() - get current grid as JSON
+        - chess_board_hash(peace_time, current_key) - get board hash
     """
 
     def __init__(
@@ -55,6 +80,11 @@ class ControlServer:
         self._frame_subscribers: dict[WebSocketServerProtocol, float] = {}
         self._running = False
         self._loop: asyncio.AbstractEventLoop | None = None
+
+        # Lockstep fuzzing state
+        self._lockstep_grid: Optional[list] = None
+        self._lockstep_team_r: Optional[Team] = None
+        self._lockstep_team_l: Optional[Team] = None
 
     async def _handle_client(self, ws: WebSocketServerProtocol) -> None:
         """Handle a single WebSocket client connection."""
@@ -131,6 +161,73 @@ class ControlServer:
 
         elif method == "ping":
             return {"result": "pong", "id": req_id}
+
+        # ── Lockstep chess engine methods (requires harness module) ────────────
+
+        elif method == "chess_init":
+            if not _HAS_CHESS_HELPERS:
+                return {"error": "Lockstep methods require harness module", "id": req_id}
+            team_r_rgb = tuple(params.get("team_r_rgb", [64, 180, 232]))
+            team_l_rgb = tuple(params.get("team_l_rgb", [255, 140, 0]))
+            self._lockstep_team_r = Team(*team_r_rgb)
+            self._lockstep_team_l = Team(*team_l_rgb)
+            self._lockstep_grid = py_init_board(
+                self._lockstep_team_r, self._lockstep_team_l
+            )
+            return {"result": "ok", "id": req_id}
+
+        elif method == "chess_legal_moves":
+            if self._lockstep_grid is None:
+                return {"error": "No game initialized. Call chess_init first.", "id": req_id}
+            team_key = params.get("team_key", "r")
+            team = self._lockstep_team_r if team_key == "r" else self._lockstep_team_l
+            clear_en_passant(self._lockstep_grid, team)
+            moves = py_legal_moves(self._lockstep_grid, team)
+            return {"result": [list(m) for m in sorted(moves)], "id": req_id}
+
+        elif method == "chess_apply_move":
+            if self._lockstep_grid is None:
+                return {"error": "No game initialized. Call chess_init first.", "id": req_id}
+            fr = params.get("fr", 0)
+            fc = params.get("fc", 0)
+            tr = params.get("tr", 0)
+            tc = params.get("tc", 0)
+            team_key = params.get("team_key", "r")
+            next_key = params.get("next_key", "l")
+            peace_time = params.get("peace_time", 0)
+
+            team = self._lockstep_team_r if team_key == "r" else self._lockstep_team_l
+            clear_en_passant(self._lockstep_grid, team)
+
+            flags = py_apply_move(self._lockstep_grid, fr, fc, tr, tc)
+            grid_json = py_grid_to_json(self._lockstep_grid, self._lockstep_team_r)
+            hash_val = board_hash(
+                self._lockstep_grid, peace_time, next_key, self._lockstep_team_r
+            )
+            return {
+                "result": {
+                    "flags": flags,
+                    "grid": grid_json,
+                    "board_hash": hash_val,
+                },
+                "id": req_id,
+            }
+
+        elif method == "chess_board_state":
+            if self._lockstep_grid is None:
+                return {"error": "No game initialized. Call chess_init first.", "id": req_id}
+            grid_json = py_grid_to_json(self._lockstep_grid, self._lockstep_team_r)
+            return {"result": {"grid": grid_json}, "id": req_id}
+
+        elif method == "chess_board_hash":
+            if self._lockstep_grid is None:
+                return {"error": "No game initialized. Call chess_init first.", "id": req_id}
+            peace_time = params.get("peace_time", 0)
+            current_key = params.get("current_key", "r")
+            hash_val = board_hash(
+                self._lockstep_grid, peace_time, current_key, self._lockstep_team_r
+            )
+            return {"result": hash_val, "id": req_id}
 
         else:
             return {"error": f"Unknown method: {method}", "id": req_id}

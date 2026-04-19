@@ -20,15 +20,14 @@ class FakeFrameCanvas:
         """Set one LED pixel on the surface.
 
         Args:
-            x: Row index (0–31).
-            y: Column index (0–31).
+            x: Column index (0–31), horizontal position.
+            y: Row index (0–31), vertical position.
             r: Red channel (0–255).
             g: Green channel (0–255).
             b: Blue channel (0–255).
         """
         if 0 <= x < 32 and 0 <= y < 32:
-            # pygame uses (col, row) — swap x/y
-            self._surface.set_at((y, x), (r, g, b))
+            self._surface.set_at((x, y), (r, g, b))
 
     def Clear(self) -> None:
         """Fill the entire surface with black (all LEDs off)."""

@@ -155,6 +155,81 @@ class HilBridge:
         except Exception:
             return False
 
+    # ── Lockstep chess engine methods ────────────────────────────────────────
+
+    def chess_init(
+        self,
+        team_r_rgb: tuple[int, int, int] = (64, 180, 232),
+        team_l_rgb: tuple[int, int, int] = (255, 140, 0),
+    ) -> None:
+        """Initialize a new chess game for lockstep testing.
+
+        Args:
+            team_r_rgb: RGB color for team R (right/white side).
+            team_l_rgb: RGB color for team L (left/black side).
+        """
+        self._call("chess_init", {
+            "team_r_rgb": list(team_r_rgb),
+            "team_l_rgb": list(team_l_rgb),
+        })
+
+    def chess_legal_moves(self, team_key: str) -> list[list[int]]:
+        """Get legal moves for the specified team.
+
+        Args:
+            team_key: "r" for team R, "l" for team L.
+
+        Returns:
+            List of [fr, fc, tr, tc] moves.
+        """
+        return self._call("chess_legal_moves", {"team_key": team_key})
+
+    def chess_apply_move(
+        self,
+        fr: int, fc: int, tr: int, tc: int,
+        team_key: str, next_key: str, peace_time: int,
+    ) -> dict:
+        """Apply a move and get the result.
+
+        Args:
+            fr, fc: From row/col.
+            tr, tc: To row/col.
+            team_key: Current team ("r" or "l").
+            next_key: Next team to move.
+            peace_time: Current peace time counter.
+
+        Returns:
+            Dict with 'flags', 'grid', and 'board_hash'.
+        """
+        return self._call("chess_apply_move", {
+            "fr": fr, "fc": fc, "tr": tr, "tc": tc,
+            "team_key": team_key, "next_key": next_key,
+            "peace_time": peace_time,
+        })
+
+    def chess_board_state(self) -> dict:
+        """Get the current board state as JSON.
+
+        Returns:
+            Dict with 'grid' key containing 8x8 piece array.
+        """
+        return self._call("chess_board_state")
+
+    def chess_board_hash(self, peace_time: int, current_key: str) -> str:
+        """Get the board hash for the current state.
+
+        Args:
+            peace_time: Current peace time counter.
+            current_key: Current team to move ("r" or "l").
+
+        Returns:
+            SHA-256 hash string.
+        """
+        return self._call("chess_board_hash", {
+            "peace_time": peace_time,
+            "current_key": current_key,
+        })
+
     def __enter__(self) -> "HilBridge":
         """Context manager entry - connect to container."""
         self.connect()

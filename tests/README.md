@@ -44,24 +44,20 @@ node tests/test_chessmatrix_js.js --verbose
 
 ## Relay test modes
 
-`test_relay.py` and `test_online_flow.py` need a relay server. Three modes are available:
+`test_relay.py` and `test_online_flow.py` need a relay server. Docker is used by default:
 
 ```bash
-# Default — in-process relay, no Docker, fastest:
+# Default — Docker container (builds image on first run):
 .venv/bin/python -m pytest tests/test_relay.py -v
 
-# Docker — builds chess101-relay image, runs a container for the session:
-.venv/bin/python -m pytest tests/test_relay.py -v --relay-docker
-
 # External relay — point at any running relay (local Docker or live):
-docker run -d -p 8765:8765 -e RELAY_PORT=8765 chess101-relay
 RELAY_URL=ws://127.0.0.1:8765 .venv/bin/python -m pytest tests/test_relay.py -v
 
 # Smoke test against the live relay:
 RELAY_URL=wss://relay.chess101.net .venv/bin/python -m pytest tests/test_relay.py -v
 ```
 
-The `relay_url` fixture (in `conftest.py`) selects the mode automatically: `RELAY_URL` env var → `--relay-docker` flag → in-process default. The in-process relay resets its `_rooms` dict between tests so each test starts with a clean state.
+The `relay_url` fixture (in `conftest.py`) selects the mode: `RELAY_URL` env var → Docker container (default).
 
 ---
 
@@ -118,8 +114,8 @@ Fixtures:
 | `empty_board` | function | 8×8 `[[None]*8 …]` |
 | `make_board` | function | Factory: `make_board({(row,col): piece, …})` → populated 8×8 grid |
 | `board_instance` | function | `Board()` with `canvas`, `matrix`, and `master` replaced by MagicMocks |
-| `relay_url` | function | Relay WebSocket URL (mode auto-selected; see Relay test modes above) |
-| `relay_docker_url` | session | Session-scoped Docker relay container (used by `relay_url` with `--relay-docker`) |
+| `relay_url` | function | Relay WebSocket URL (uses Docker by default; see Relay test modes above) |
+| `relay_docker_url` | session | Session-scoped Docker relay container (default mode for `relay_url`) |
 
 **Note for simulator tests**: files that test `GameRunner` or `NetworkedGameRunner` override the conftest MagicMock stub with the real `FakeRGBMatrix` at the top of the file, so rendering code actually executes:
 

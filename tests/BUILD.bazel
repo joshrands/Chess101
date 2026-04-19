@@ -374,3 +374,14 @@ py_test(
         "@pip//pytest",
     ],
 )
+
+py_test(
+    name = "test_hil",
+    srcs = ["test_hil.py"],
+    deps = [
+        ":conftest",
+        "//core",
+        "//hil",
+        "@pip//pytest",
+    ],
+)

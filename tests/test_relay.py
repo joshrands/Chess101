@@ -2,14 +2,10 @@
 
 Run modes
 ---------
-    # Default: in-process relay, fast, no Docker needed
+    # Default: Docker container (builds image on first run)
     .venv/bin/python -m pytest tests/test_relay.py -v
 
-    # Docker: builds chess101-relay image, runs it for the session
-    .venv/bin/python -m pytest tests/test_relay.py -v --relay-docker
-
     # External relay (pre-built Docker or live):
-    docker run -d -p 8765:8765 -e RELAY_PORT=8765 chess101-relay
     RELAY_URL=ws://127.0.0.1:8765 .venv/bin/python -m pytest tests/test_relay.py -v
 
     # Live smoke test:
@@ -109,10 +105,8 @@ def _game(seq: int = 0, origin: str = "test") -> dict:
 
 
 def _is_external(request) -> bool:
-    """True when tests run against an external relay (Docker or live URL)."""
-    return bool(os.environ.get("RELAY_URL")) or request.config.getoption(
-        "--relay-docker", default=False
-    )
+    """True when tests run against an external relay (live URL, not test-managed Docker)."""
+    return bool(os.environ.get("RELAY_URL"))
 
 
 # ── TestRoomLifecycle ──────────────────────────────────────────────────────────

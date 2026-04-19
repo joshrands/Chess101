@@ -139,19 +139,15 @@ cd Chess101iOS && swift test && cd ..
 
 The canonical test documentation lives in **`tests/README.md`**. Keep it up to date whenever tests change (see "Keeping test documentation current" below).
 
-### Relay tests — three run modes
+### Relay tests — two run modes
 
-`test_relay.py` spins up an in-process relay by default (no Docker required):
+`test_relay.py` uses Docker by default (builds and runs chess101-relay container):
 
 ```bash
-# Default — fast, in-process relay, no external dependencies:
+# Default — Docker container (builds image on first run):
 .venv/bin/python -m pytest tests/test_relay.py -v
 
-# Docker — builds chess101-relay image, runs a container for the session:
-.venv/bin/python -m pytest tests/test_relay.py -v --relay-docker
-
 # External relay — point at any running relay (local Docker or live):
-docker run -d -p 8765:8765 -e RELAY_PORT=8765 chess101-relay
 RELAY_URL=ws://127.0.0.1:8765 .venv/bin/python -m pytest tests/test_relay.py -v
 
 # Post-deploy smoke test against the live relay:
@@ -358,7 +354,7 @@ Chess101/
     ├── test_board.py                # Board-level tests (runs on Mac via conftest stubs)
     ├── test_network.py              # Network protocol, beacon, and transport tests
     ├── test_networked_runner.py     # NetworkedGameRunner online-play bug fixes
-    ├── test_online_flow.py          # E2E online flow over in-process relay (handshake → playing)
+    ├── test_online_flow.py          # E2E online flow over relay (handshake → playing)
     ├── test_relay.py                # Relay server protocol, reconnect, and anti-cheat tests
     ├── test_chessmatrix_scanning.py # ChessMatrix scanning pipeline (Python) + board-entry helpers
     ├── test_lockstep_chessmatrix.py # Python↔JS ChessMatrix lockstep parity

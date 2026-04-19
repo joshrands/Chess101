@@ -99,12 +99,6 @@ def board_instance():
 
 def pytest_addoption(parser):
     parser.addoption(
-        "--relay-docker",
-        action="store_true",
-        default=False,
-        help="Run relay tests against a locally-built Docker container.",
-    )
-    parser.addoption(
         "--hil-docker",
         action="store_true",
         default=False,
@@ -116,8 +110,7 @@ def pytest_addoption(parser):
 def relay_docker_url():
     """Build chess101-relay Docker image once, run a container for the session.
 
-    Only used when --relay-docker is passed.  Skips automatically if Docker
-    is not available or the build fails.
+    Skips automatically if Docker is not available or the build fails.
     """
     import socket
     import subprocess
@@ -136,10 +129,11 @@ def relay_docker_url():
     if result.returncode != 0:
         pytest.skip(f"Docker build failed:\n{result.stderr.decode()}")
 
+    container_name = f"chess101-relay-test-{port}"
     proc = subprocess.Popen(
         [
             "docker", "run", "--rm",
-            "--name", f"chess101-relay-test-{port}",
+            "--name", container_name,
             "-p", f"{port}:8765",
             "-e", "RELAY_PORT=8765",
             "-e", "RELAY_MAX_ROOMS=50",
@@ -158,79 +152,33 @@ def relay_docker_url():
         except Exception:
             time.sleep(0.3)
     else:
-        proc.terminate()
+        subprocess.run(["docker", "kill", container_name], capture_output=True)
         pytest.skip("Docker relay failed to start within 20s")
 
     yield f"ws://127.0.0.1:{port}"
 
-    proc.terminate()
-    proc.wait(timeout=10)
+    subprocess.run(["docker", "kill", container_name], capture_output=True)
 
 
 @pytest.fixture
-def relay_url(request, monkeypatch):
+def relay_url(request):
     """Relay WebSocket URL for relay protocol tests.
 
     Modes (checked in order):
       1. RELAY_URL env var  — point at any running relay (live or Docker)
-      2. --relay-docker      — use the session-scoped Docker container
-      3. default             — spin up an in-process relay on a random port
+      2. default            — build and use session-scoped Docker container
 
-    In in-process mode the module-level ``_rooms`` dict is reset between
-    tests so each test starts with a clean relay state.
+    No in-process fallback. Tests require Docker or an external relay.
     """
-    import asyncio
     import os
-    import socket
-    import threading
-
-    import websockets
 
     live = os.environ.get("RELAY_URL")
     if live:
         yield live
         return
 
-    if request.config.getoption("--relay-docker", default=False):
-        yield request.getfixturevalue("relay_docker_url")
-        return
-
-    # ── In-process relay ────────────────────────────────────────────────────
-    import network.relay as relay_mod
-
-    monkeypatch.setattr(relay_mod, "_rooms", {})
-
-    sock = socket.socket()
-    sock.bind(("", 0))
-    port = sock.getsockname()[1]
-    sock.close()
-
-    ready = threading.Event()
-    loop = asyncio.new_event_loop()
-    stop_holder: list = []
-
-    async def _serve() -> None:
-        stop_event = asyncio.Event()
-        stop_holder.append(stop_event)
-        async with websockets.serve(
-            relay_mod._handle,
-            "127.0.0.1",
-            port,
-            process_request=relay_mod._process_request,
-        ):
-            ready.set()
-            await stop_event.wait()
-
-    threading.Thread(
-        target=lambda: loop.run_until_complete(_serve()),
-        daemon=True,
-    ).start()
-    assert ready.wait(timeout=5.0), "In-process relay failed to start"
-
-    yield f"ws://127.0.0.1:{port}"
-
-    if stop_holder:
-        loop.call_soon_threadsafe(stop_holder[0].set)
+    # Default: use Docker container
+    yield request.getfixturevalue("relay_docker_url")
 
 
 # ── HIL Docker fixtures ──────────────────────────────────────────────────────

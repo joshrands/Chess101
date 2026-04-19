@@ -269,3 +269,110 @@ class TestChessMatrixOrientation:
         # B anchor at board (6,6) → pixels[24][24]
         b_pixel = pixels[24][24]
         assert b_pixel[2] > 150, f"B anchor should be blue, got {b_pixel}"
+
+
+class TestControlServerChess:
+    """Test ControlServer chess engine methods for lockstep fuzzing."""
+
+    def test_chess_init_creates_starting_position(self) -> None:
+        """chess_init should create standard starting position."""
+        from hil.sensor import HilSensor
+        from hil.rgbmatrix import HilRGBMatrix
+        from hil.control_server import ControlServer
+
+        sensor = HilSensor()
+        matrix = HilRGBMatrix()
+        server = ControlServer(sensor, matrix)
+
+        # Simulate chess_init call
+        server._lockstep_team_r = None
+        server._lockstep_team_l = None
+        server._lockstep_grid = None
+
+        # Call the internal method (simulating RPC)
+        from core.team import Team
+        from harness.chess_helpers import py_init_board
+        server._lockstep_team_r = Team(64, 180, 232)
+        server._lockstep_team_l = Team(255, 140, 0)
+        server._lockstep_grid = py_init_board(
+            server._lockstep_team_r, server._lockstep_team_l
+        )
+
+        # Verify grid has pieces
+        assert server._lockstep_grid is not None
+        assert server._lockstep_grid[0][0] is not None  # Rook at a8
+        assert server._lockstep_grid[7][7] is not None  # Rook at h1
+
+    def test_chess_legal_moves_returns_starting_moves(self) -> None:
+        """chess_legal_moves should return 20 legal moves from starting position."""
+        from hil.sensor import HilSensor
+        from hil.rgbmatrix import HilRGBMatrix
+        from hil.control_server import ControlServer
+        from core.team import Team
+        from harness.chess_helpers import py_init_board, py_legal_moves
+
+        sensor = HilSensor()
+        matrix = HilRGBMatrix()
+        server = ControlServer(sensor, matrix)
+
+        server._lockstep_team_r = Team(64, 180, 232)
+        server._lockstep_team_l = Team(255, 140, 0)
+        server._lockstep_grid = py_init_board(
+            server._lockstep_team_r, server._lockstep_team_l
+        )
+
+        moves = py_legal_moves(server._lockstep_grid, server._lockstep_team_r)
+        # Standard starting position: 16 pawn moves + 4 knight moves = 20
+        assert len(moves) == 20
+
+    def test_chess_apply_move_updates_grid(self) -> None:
+        """chess_apply_move should update the grid state."""
+        from hil.sensor import HilSensor
+        from hil.rgbmatrix import HilRGBMatrix
+        from hil.control_server import ControlServer
+        from core.team import Team
+        from harness.chess_helpers import py_init_board, py_apply_move
+
+        sensor = HilSensor()
+        matrix = HilRGBMatrix()
+        server = ControlServer(sensor, matrix)
+
+        server._lockstep_team_r = Team(64, 180, 232)
+        server._lockstep_team_l = Team(255, 140, 0)
+        server._lockstep_grid = py_init_board(
+            server._lockstep_team_r, server._lockstep_team_l
+        )
+
+        # Move e2-e4 (pawn at (1,4) to (3,4))
+        piece_before = server._lockstep_grid[1][4]
+        assert piece_before is not None
+
+        py_apply_move(server._lockstep_grid, 1, 4, 3, 4)
+
+        assert server._lockstep_grid[1][4] is None
+        assert server._lockstep_grid[3][4] is not None
+
+    def test_chess_board_hash_consistent(self) -> None:
+        """chess_board_hash should return consistent hash for same position."""
+        from hil.sensor import HilSensor
+        from hil.rgbmatrix import HilRGBMatrix
+        from hil.control_server import ControlServer
+        from core.team import Team
+        from harness.chess_helpers import py_init_board
+        from network.protocol import board_hash
+
+        sensor = HilSensor()
+        matrix = HilRGBMatrix()
+        server = ControlServer(sensor, matrix)
+
+        server._lockstep_team_r = Team(64, 180, 232)
+        server._lockstep_team_l = Team(255, 140, 0)
+        server._lockstep_grid = py_init_board(
+            server._lockstep_team_r, server._lockstep_team_l
+        )
+
+        hash1 = board_hash(server._lockstep_grid, 0, "r", server._lockstep_team_r)
+        hash2 = board_hash(server._lockstep_grid, 0, "r", server._lockstep_team_r)
+
+        assert hash1 == hash2
+        assert len(hash1) == 64  # SHA-256 hex

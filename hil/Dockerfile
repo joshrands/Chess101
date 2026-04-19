@@ -119,6 +119,7 @@ COPY ui/ ./ui/
 COPY network/ ./network/
 COPY game/ ./game/
 COPY hil/ ./hil/
+COPY harness/ ./harness/
 COPY GameManager.py samplebase.py ./
 
 # Environment variables

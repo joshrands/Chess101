@@ -2,15 +2,19 @@
 """Chess gameplay lockstep fuzzer.
 
 Plays random games from the starting position, comparing legal move sets
-and board hashes at each step between Python and JS. Disagreements are
-saved with full move history for replay, plus a ``.corpus.json`` file
-that can be replayed as a regression test or in the interactive simulator.
+and board hashes at each step between Python, JS, and optionally HIL.
+Disagreements are saved with full move history for replay, plus a
+``.corpus.json`` file that can be replayed as a regression test or in the
+interactive simulator.
 
 Usage::
 
     bazel run //harness:fuzz_chess -- --iterations 100
     .venv/bin/python harness/fuzz_chess.py --iterations 100
     .venv/bin/python harness/fuzz_chess.py --iterations 0  # run forever
+
+    # With HIL container (three-way comparison):
+    .venv/bin/python harness/fuzz_chess.py --iterations 100 --hil-url ws://localhost:8766
 """
 
 from __future__ import annotations
@@ -42,14 +46,36 @@ from chess_helpers import (  # noqa: E402
 )
 from corpus import save_corpus  # noqa: E402
 
+try:
+    from hil.client import HilBridge
+except ImportError:
+    HilBridge = None  # type: ignore
 
-def run_fuzzer(iterations: int, seed: int, max_ply: int) -> None:
+
+def run_fuzzer(
+    iterations: int, seed: int, max_ply: int, hil_url: str | None = None
+) -> None:
     rng = random.Random(seed)
     crashes_dir = ROOT / "harness" / "crashes" / "chess"
     crashes_dir.mkdir(parents=True, exist_ok=True)
 
     bridge = JsBridge()
     assert bridge.ping() == "pong"
+
+    # Optional HIL bridge for three-way comparison
+    hil: HilBridge | None = None
+    if hil_url and HilBridge:
+        try:
+            hil = HilBridge(url=hil_url, timeout=10.0)
+            hil.connect(retries=3, delay=1.0)
+            if not hil.ping():
+                print(f"[WARN] HIL at {hil_url} not responding, continuing without HIL")
+                hil = None
+            else:
+                print(f"[INFO] HIL connected at {hil_url}")
+        except Exception as e:
+            print(f"[WARN] HIL connection failed ({e}), continuing without HIL")
+            hil = None
 
     total = 0
     games_ok = 0
@@ -72,6 +98,13 @@ def run_fuzzer(iterations: int, seed: int, max_ply: int) -> None:
             corpus_moves = []
             game_ok = True
 
+            # Initialize HIL board at start of each game
+            if hil:
+                try:
+                    hil.chess_init(TEAM_R_RGB, TEAM_L_RGB)
+                except Exception as e:
+                    print(f"[WARN] HIL init failed ({e}), skipping HIL for this game")
+
             for ply in range(max_ply):
                 team = team_r if current_key == "r" else team_l
 
@@ -86,12 +119,19 @@ def run_fuzzer(iterations: int, seed: int, max_ply: int) -> None:
                         grid_json, TEAM_R_RGB, TEAM_L_RGB, current_key,
                     )
                     js_moves = {tuple(m) for m in js_moves_raw}
+
+                    # HIL legal moves (optional)
+                    hil_moves: set | None = None
+                    if hil:
+                        hil_moves_raw = hil.chess_legal_moves(current_key)
+                        hil_moves = {tuple(m) for m in hil_moves_raw}
                 except Exception as e:
                     errors += 1
                     print(f"[ERROR] game={total} ply={ply}: {e}")
                     game_ok = False
                     break
 
+                # Check Python vs JS
                 if py_moves != js_moves:
                     disagree += 1
                     fname = f"moves_game{total:06d}_ply{ply}.json"
@@ -116,6 +156,23 @@ def run_fuzzer(iterations: int, seed: int, max_ply: int) -> None:
                     game_ok = False
                     break
 
+                # Check Python vs HIL (if available)
+                if hil_moves is not None and py_moves != hil_moves:
+                    disagree += 1
+                    fname = f"moves_hil_game{total:06d}_ply{ply}.json"
+                    crash = {
+                        "seed": game_seed, "ply": ply,
+                        "move_history": move_history,
+                        "only_python": sorted(py_moves - hil_moves),
+                        "only_hil": sorted(hil_moves - py_moves),
+                    }
+                    (crashes_dir / fname).write_text(json.dumps(crash, indent=2))
+                    print(f"[DISAGREE-HIL] game={total} ply={ply} "
+                          f"py_extra={len(py_moves - hil_moves)} "
+                          f"hil_extra={len(hil_moves - py_moves)} → {fname}")
+                    game_ok = False
+                    break
+
                 if not py_moves:
                     break
 
@@ -134,6 +191,14 @@ def run_fuzzer(iterations: int, seed: int, max_ply: int) -> None:
                         grid_json, TEAM_R_RGB, TEAM_L_RGB,
                         fr, fc, tr, tc, current_key, next_key, peace_time,
                     )
+
+                    # HIL apply move (optional)
+                    hil_hash: str | None = None
+                    if hil:
+                        hil_result = hil.chess_apply_move(
+                            fr, fc, tr, tc, current_key, next_key, peace_time
+                        )
+                        hil_hash = hil_result["board_hash"]
                 except Exception as e:
                     errors += 1
                     print(f"[ERROR] game={total} ply={ply} apply: {e}")
@@ -172,6 +237,21 @@ def run_fuzzer(iterations: int, seed: int, max_ply: int) -> None:
                     game_ok = False
                     break
 
+                # Check Python vs HIL hash (if available)
+                if hil_hash is not None and py_hash != hil_hash:
+                    disagree += 1
+                    fname = f"hash_hil_game{total:06d}_ply{ply}.json"
+                    crash = {
+                        "seed": game_seed, "ply": ply,
+                        "move": move, "move_history": move_history,
+                        "py_hash": py_hash, "hil_hash": hil_hash,
+                    }
+                    (crashes_dir / fname).write_text(json.dumps(crash, indent=2))
+                    print(f"[DISAGREE-HIL] game={total} ply={ply} hash mismatch "
+                          f"py={py_hash[:16]} hil={hil_hash[:16]} → {fname}")
+                    game_ok = False
+                    break
+
                 move_history.append(move)
                 current_key = next_key
                 total_plies += 1
@@ -195,24 +275,30 @@ def run_fuzzer(iterations: int, seed: int, max_ply: int) -> None:
         print("\nInterrupted.")
     finally:
         bridge.close()
+        if hil:
+            hil.close()
 
     elapsed = time.time() - t0
     print(f"\nDone. {total} games in {elapsed:.1f}s "
           f"({total_plies} total plies)")
     print(f"  ok={games_ok}  disagree={disagree}  errors={errors}")
+    if hil_url:
+        print(f"  HIL: {'connected' if hil else 'not available'}")
     if disagree > 0:
         print(f"  Crash files in {crashes_dir}")
 
 
 def main():
     parser = argparse.ArgumentParser(description="Chess gameplay lockstep fuzzer")
+    parser.add_argument("--hil-url", type=str, default=None,
+                        help="HIL container WebSocket URL for three-way comparison")
     parser.add_argument("--iterations", type=int, default=100,
                         help="Number of games (0 = infinite)")
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--max-ply", type=int, default=120,
                         help="Max half-moves per game")
     args = parser.parse_args()
-    run_fuzzer(args.iterations, args.seed, args.max_ply)
+    run_fuzzer(args.iterations, args.seed, args.max_ply, args.hil_url)
 
 
 if __name__ == "__main__":

@@ -7,7 +7,9 @@ py_library(
     visibility = ["//visibility:public"],
     deps = [
         "//core:core",
+        "//harness:chess_helpers",
         "//hardware:hardware",
+        "//network",
         "@pip//websockets",
     ],
 )
