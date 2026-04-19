@@ -1076,14 +1076,12 @@ class NetworkedBoard(Board):
 
         # ── Start game ────────────────────────────────────────────
         # Transition from direct-draw (interactive_setup) back to
-        # double-buffered rendering (do_turn).  Paint checkerboard
-        # on both buffers so the first swap in do_turn won't flicker.
+        # double-buffered rendering.  Match the pattern from Board.run().
         self.canvas.Clear()
-        self.light_checker_town(self.canvas)
-        back = self.matrix.SwapOnVSync(self.canvas)
-        back.Clear()
-        self.light_checker_town(back)
-        self.canvas = self.matrix.SwapOnVSync(back)
+        temp = self.matrix.SwapOnVSync(self.canvas)
+        temp.Clear()
+        self.light_checker_town(temp)
+        self.canvas = self.matrix.SwapOnVSync(temp)
 
         self.initialize_game_board()
 
