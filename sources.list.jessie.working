@@ -1,0 +1,8 @@
+# Raspbian Jessie snapshot (try different dates if one fails)
+deb http://snapshot.debian.org/archive/debian/20160501/ jessie main contrib non-free
+deb http://snapshot.debian.org/archive/raspbian/20160501/ jessie main contrib non-free rpi
+deb http://archive.raspberrypi.org/debian/ jessie main ui
+
+# Fallback lines (uncomment if needed)
+# deb http://archive.debian.org/debian/ jessie main contrib non-free
+# deb http://archive.raspbian.org/raspbian/ jessie main contrib non-free rpi

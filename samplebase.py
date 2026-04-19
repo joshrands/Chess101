@@ -68,7 +68,7 @@ class SampleBase(object):
         Returns:
             True after run() returns normally.
         """
-        self.args = self.parser.parse_args()
+        self.args, _ = self.parser.parse_known_args()
 
         self.options = RGBMatrixOptions()
 

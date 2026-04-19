@@ -1,0 +1,25 @@
+# Pi-specific dependencies — Python 3.9 on Raspbian Jessie (armv7l)
+#
+# Install notes:
+#   - numpy must be built from source (piwheels wheels need glibc 2.29+):
+#       pip install "numpy==1.19.5" --no-binary=numpy
+#   - Pillow must be pinned <10 (latest needs C99, GCC 4.9 defaults to C89):
+#       pip install "Pillow==9.5.0"
+#   - rgbmatrix is built from /home/pi/rpi-rgb-led-matrix (not pip):
+#       cd /home/pi/rpi-rgb-led-matrix/bindings/python
+#       sudo make build-python PYTHON=/home/pi/Documents/Chess101/.venv/bin/python3.9
+#       sudo make install-python PYTHON=/home/pi/Documents/Chess101/.venv/bin/python3.9
+#   - setuptools must be <60 for numpy to build (distutils compat):
+#       pip install "setuptools<60"
+
+certifi==2026.2.25
+cffi==2.0.0
+ifaddr==0.2.0
+numpy==1.19.5
+Pillow==9.5.0
+pycparser==2.23
+RPi.GPIO==0.7.1
+smbus-cffi==0.5.1
+smbus2==0.6.1
+websockets==15.0.1
+zeroconf==0.148.0
