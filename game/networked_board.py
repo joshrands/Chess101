@@ -107,6 +107,9 @@ class NetworkedBoard(Board):
         # Peer info
         self._peer_name: Optional[str] = None
 
+        # Pending end-game animation from remote game_event
+        self._pending_game_event: Optional[tuple] = None
+
         # Keepalive
         self._keepalive_stop = threading.Event()
         self._ping_seq = 0
@@ -278,9 +281,15 @@ class NetworkedBoard(Board):
 
     def _on_game_event(self, msg: dict) -> None:
         event = msg.get("event")
-        logger.info("Remote game_event: %s", event)
-        if event in ("checkmate", "stalemate"):
+        losing_key = msg.get("losing_team_key", "")
+        logger.info("Remote game_event: %s (losing=%s)", event, losing_key)
+        if event == "checkmate":
             self.game_over = True
+            losing_team = self.team_r if losing_key == "r" else self.team_l
+            self._pending_game_event = ("checkmate", losing_team)
+        elif event == "stalemate":
+            self.game_over = True
+            self._pending_game_event = ("stalemate", None)
 
     def _on_ping(self, msg: dict) -> None:
         self._net_send({"type": "pong", "seq": msg.get("seq", 0)})
@@ -1111,6 +1120,16 @@ class NetworkedBoard(Board):
             # team_l turn
             self._do_turn_networked(self.team_l)
             self.canvas = self.matrix.SwapOnVSync(self.canvas)
+
+        # ── End-game animation ────────────────────────────────────
+        self._drain_incoming()
+        if self._pending_game_event is not None:
+            event, losing_team = self._pending_game_event
+            self._pending_game_event = None
+            if event == "checkmate" and losing_team is not None:
+                self.seth_victory(losing_team)
+            elif event == "stalemate":
+                self.stale_mate()
 
     def _do_turn_networked(self, team) -> None:
         """Route to local physical turn or remote wait based on team ownership."""
