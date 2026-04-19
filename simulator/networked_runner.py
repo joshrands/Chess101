@@ -896,7 +896,9 @@ class NetworkedGameRunner(GameRunner):
                 b.checker_brightness = 255
             b.choose_light_checker_town()
             b.matrix.blit_to_screen()
+            self._update_anim()
             self._draw_piece_overlay()
+            self._draw_anim_piece()
             return
 
         # Normal rendering (my turn, or peer disconnected)
