@@ -1016,6 +1016,9 @@ class NetworkedBoard(Board):
             logger.info("Sent game_start — starting physical setup")
 
         # ── Physical piece placement ───────────────────────────────
+        # Clear both buffers so the waiting animation is fully gone
+        self.canvas.Clear()
+        self.canvas = self.matrix.SwapOnVSync(self.canvas)
         self.canvas.Clear()
         self.canvas = self.matrix.SwapOnVSync(self.canvas)
 
