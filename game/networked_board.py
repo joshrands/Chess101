@@ -1057,16 +1057,24 @@ class NetworkedBoard(Board):
             return
 
         # ── Start game ────────────────────────────────────────────
+        # Transition from direct-draw (interactive_setup) back to
+        # double-buffered rendering (do_turn).  Paint checkerboard
+        # on both buffers so the first swap in do_turn won't flicker.
         self.canvas.Clear()
-        temp = self.matrix.SwapOnVSync(self.canvas)
-        temp.Clear()
-        self.light_checker_town(temp)
-        self.canvas = self.matrix.SwapOnVSync(temp)
+        self.light_checker_town(self.canvas)
+        back = self.matrix.SwapOnVSync(self.canvas)
+        back.Clear()
+        self.light_checker_town(back)
+        self.canvas = self.matrix.SwapOnVSync(back)
 
         self.initialize_game_board()
 
         local_team  = self._local_team()
         remote_team = self._remote_team()
+
+        logger.info("team_r.r=%d team_l.r=%d local=%s remote=%s",
+                     self.team_r.r, self.team_l.r,
+                     local_team.name, remote_team.name)
 
         logger.info(
             "Game started — local=%s (%s)  remote=%s",

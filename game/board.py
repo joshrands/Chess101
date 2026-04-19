@@ -258,10 +258,13 @@ class Board(SampleBase):
 
             if not mismatch:
                 if went_red:
-                    # Restore normal white checkerboard
+                    # Restore normal white checkerboard on both buffers
                     self.canvas.Clear()
                     self.light_checker_town(self.canvas)
-                    self.canvas = self.matrix.SwapOnVSync(self.canvas)
+                    back = self.matrix.SwapOnVSync(self.canvas)
+                    back.Clear()
+                    self.light_checker_town(back)
+                    self.canvas = self.matrix.SwapOnVSync(back)
                 return True
 
             # Show red checkerboard with yellow highlights on missing pieces
