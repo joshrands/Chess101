@@ -301,6 +301,46 @@ class NetworkedBoard(Board):
             "current_team_key": team_key,
         })
 
+    # ── Waiting animation ──────────────────────────────────────────────────────
+
+    def _run_waiting_animation(self) -> None:
+        """Chase a light around the board edges until a peer connects."""
+        # Build the edge path: top row L→R, right col T→B, bottom row R→L, left col B→T
+        edge_cells = []
+        for c in range(8):
+            edge_cells.append((0, c))       # top edge
+        for r in range(1, 8):
+            edge_cells.append((r, 7))       # right edge
+        for c in range(6, -1, -1):
+            edge_cells.append((7, c))       # bottom edge
+        for r in range(6, 0, -1):
+            edge_cells.append((r, 0))       # left edge
+
+        TAIL_LEN = 6
+        step = 0
+        while self._peer_name is None:
+            self._drain_incoming()
+            self.canvas.Clear()
+            # Draw dim checkerboard background
+            for r in range(8):
+                for c in range(8):
+                    shade = 12 if (r + c) % 2 == 0 else 6
+                    self.light_cell(self.canvas, r, c, shade, shade, shade)
+
+            # Draw the chasing light with a fading tail
+            n = len(edge_cells)
+            for i in range(TAIL_LEN):
+                idx = (step - i) % n
+                r, c = edge_cells[idx]
+                brightness = int(255 * ((TAIL_LEN - i) / TAIL_LEN) ** 2)
+                # Cyan-ish color
+                self.light_cell(self.canvas, r, c,
+                                brightness // 4, brightness, brightness)
+
+            self.canvas = self.matrix.SwapOnVSync(self.canvas)
+            step = (step + 1) % n
+            time.sleep(0.06)
+
     # ── _on_local_move hook (called by Board.do_turn after each physical move) ─
 
     def _on_local_move(self, fr: int, fc: int, tr: int, tc: int, pre_capture) -> None:
