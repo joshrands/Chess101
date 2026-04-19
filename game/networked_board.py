@@ -653,7 +653,19 @@ class NetworkedBoard(Board):
         self._net_send({"type": "move_ack", "seq": msg.get("seq", 0), "status": status})
         if status == "desync":
             self._net_send({"type": "board_sync_request"})
-            logger.warning("Hash mismatch after remote move — requested board_sync")
+            # Log moved pieces and en_passant state for debugging
+            ep_pieces = []
+            touched_pieces = []
+            for row in self.grid:
+                for p in row:
+                    if p is not None and isinstance(p, Pawn) and p.en_passantable:
+                        ep_pieces.append(f"{p.row},{p.col}")
+                    if p is not None and getattr(p, 'touched', False):
+                        touched_pieces.append(f"{type(p).__name__}@{p.row},{p.col}")
+            logger.warning("Hash mismatch seq=%d local=%s remote=%s peace=%d turn=%s ep=[%s] touched=[%s]",
+                           msg.get("seq", -1), h[:12], remote_h[:12],
+                           self.peace_time, team_key,
+                           ",".join(ep_pieces), ",".join(touched_pieces))
 
     def _guide_physical_move(self, fr, fc, tr, tc, piece, is_capture) -> None:
         """Guide the human to physically execute a remote move on the board.

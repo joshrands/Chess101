@@ -978,6 +978,14 @@ class NetworkedGameRunner(GameRunner):
             # In LOCAL mode there is no peer — skip network send and ack wait
             if self._local_team_key != "both":
                 h = board_hash(b.grid, self.peace_time, team_key, b.team_r)
+                # Debug: log en_passant and touched state
+                from pieces.pawn import Pawn as _dbg_Pawn
+                _ep = [f"{p.row},{p.col}" for row in b.grid for p in row
+                       if p is not None and isinstance(p, _dbg_Pawn) and p.en_passantable]
+                _td = [f"{type(p).__name__}@{p.row},{p.col}" for row in b.grid for p in row
+                       if p is not None and getattr(p, 'touched', False)]
+                logger.info("Sending move hash=%s peace=%d turn=%s ep=[%s] touched=[%s]",
+                            h[:12], self.peace_time, team_key, ",".join(_ep), ",".join(_td))
                 self._net_seq += 1
                 msg = build_move_msg(
                     self._net_seq,
