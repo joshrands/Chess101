@@ -59,6 +59,28 @@ class RotatingCanvas:
         return getattr(self._canvas, name)
 
 
+class RotatingMatrix:
+    """Wraps an RGBMatrix so SwapOnVSync works transparently with RotatingCanvas.
+
+    Intercepts CreateFrameCanvas (returns a RotatingCanvas) and SwapOnVSync
+    (unwraps, swaps the raw canvas, rewraps) so board.py needs no changes.
+    """
+
+    def __init__(self, matrix, rotation: int = 0) -> None:
+        self._matrix = matrix
+        self._rotation = rotation
+
+    def CreateFrameCanvas(self) -> RotatingCanvas:
+        return RotatingCanvas(self._matrix.CreateFrameCanvas(), self._rotation)
+
+    def SwapOnVSync(self, canvas: RotatingCanvas) -> RotatingCanvas:
+        canvas._canvas = self._matrix.SwapOnVSync(canvas._canvas)
+        return canvas
+
+    def __getattr__(self, name: str):
+        return getattr(self._matrix, name)
+
+
 def rotate_cell(row: int, col: int, rotation: int) -> tuple[int, int]:
     """Transform a board cell coordinate by the given rotation.
 

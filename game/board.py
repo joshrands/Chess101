@@ -22,7 +22,7 @@ from pieces.piece import BoardGrid
 import random
 from hardware.master import Master
 from hardware.sensor import BoardSensor
-from hardware.rotation import RotatingCanvas
+from hardware.rotation import RotatingMatrix
 from core.constants import CellOccupancy
 from game import rules as _rules
 from ui.renderer import light_cell as _light_cell
@@ -109,8 +109,8 @@ class Board(SampleBase):
                 position; ``"2"`` / ``"3"`` select alternate test positions.
         """
         logger.info("Running game...")
-        raw_canvas = self.matrix.CreateFrameCanvas()
-        self.canvas = RotatingCanvas(raw_canvas, rotation=self._rotation)
+        self.matrix = RotatingMatrix(self.matrix, rotation=self._rotation)
+        self.canvas = self.matrix.CreateFrameCanvas()
 
         if not skip_setup:
             self.color_picker()
