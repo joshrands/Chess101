@@ -184,9 +184,7 @@ def render_to_led(grid: list[list[tuple[int, int, int]]], canvas: object) -> Non
             r, g, b = grid[row][col]
             for di in range(4):
                 for dj in range(4):
-                    # Codebase convention: SetPixel(x=row_pixel, y=col_pixel)
-                    # matches light_cell() in ui/renderer.py and FakeFrameCanvas.
-                    canvas.SetPixel(row * 4 + di, col * 4 + dj, r, g, b)  # type: ignore[attr-defined]
+                    canvas.SetPixel(col * 4 + dj, row * 4 + di, r, g, b)  # type: ignore[attr-defined]
 
 
 # ── Board-entry helpers ─────────────────────────────────────────────────────
@@ -208,7 +206,7 @@ def _set_cell(canvas: object, row: int, col: int, r: int, g: int, b: int) -> Non
     """Paint a single 4×4 LED block for board cell (row, col)."""
     for di in range(4):
         for dj in range(4):
-            canvas.SetPixel(row * 4 + di, col * 4 + dj, r, g, b)  # type: ignore[attr-defined]
+            canvas.SetPixel(col * 4 + dj, row * 4 + di, r, g, b)  # type: ignore[attr-defined]
 
 
 def render_border_only(canvas: object) -> None:
