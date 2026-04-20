@@ -119,6 +119,7 @@ class Board(SampleBase):
 
             self.canvas.Clear()
             temp_canvas = self.matrix.SwapOnVSync(self.canvas)
+            temp_canvas.Clear()
 
             self.interactive_setup(self.team_r)
             self.interactive_setup(self.team_l)
@@ -181,10 +182,10 @@ class Board(SampleBase):
         r, g, b = color
         for x in range(4):
             for y in range(4):
-                self.light_cell(canvas, 1 + 2 * x, 2 * y, r, g, b)
+                self.light_cell(canvas, 2 * x, 2 * y, r, g, b)
         for x in range(4):
             for y in range(4):
-                self.light_cell(canvas, 2 * x, 1 + 2 * y, r, g, b)
+                self.light_cell(canvas, 1 + 2 * x, 1 + 2 * y, r, g, b)
 
     def choose_light_checker_town(self, color: tuple[int, int, int] | None = None) -> None:
         """Paint the checker pattern at the current pulsing brightness level.
