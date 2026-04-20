@@ -65,10 +65,13 @@ class Master(BoardSensor):
             0 if a piece is present, 1 if the cell is empty.
         """
         rr, rc = rotate_cell(row, col, self._rotation)
-        result = self.grid_states[rc][rr]
+        # Arduinos 4-7 are wired from the opposite end of the board (bottom half
+        # faces the other player, so their bit-0 is on the display's right side).
+        effective_rr = (7 - rr) if rc >= 4 else rr
+        result = self.grid_states[rc][effective_rr]
         logger.debug(
-            "get_cell_state(%d,%d) -> rotate->(%d,%d) -> grid_states[%d][%d] = %d",
-            row, col, rr, rc, rc, rr, result,
+            "get_cell_state(%d,%d) -> rotate->(%d,%d) effective_col=%d -> grid_states[%d][%d] = %d",
+            row, col, rr, rc, effective_rr, rc, effective_rr, result,
         )
         return result
 
