@@ -1243,21 +1243,13 @@ class Board(SampleBase):
             restart_key1 = False
             restart_key2 = False
             self.master.read_data()
-            row2 = [self.master.get_cell_state(2, i) for i in range(8)]
-            row5 = [self.master.get_cell_state(5, i) for i in range(8)]
-            logger.info("color_picker row2 states: %s", row2)
-            logger.info("color_picker row5 states: %s", row5)
             for i in range(8):
-                if row2[i] == CellOccupancy.OCCUPIED:
-                    logger.info("color_picker: piece on display row=2 col=%d -> team_r gets color index %d %s",
-                                i, i, self.team_array[i])
+                if self.master.get_cell_state(2, i) == CellOccupancy.OCCUPIED:
                     team1_found = True
                     self.team_r.r = self.team_array[i].r
                     self.team_r.g = self.team_array[i].g
                     self.team_r.b = self.team_array[i].b
-                if row5[i] == CellOccupancy.OCCUPIED:
-                    logger.info("color_picker: piece on display row=5 col=%d -> team_l gets color index %d %s",
-                                i, i, self.team_array[i])
+                if self.master.get_cell_state(5, i) == CellOccupancy.OCCUPIED:
                     team2_found = True
                     self.team_l.r = self.team_array[i].r
                     self.team_l.g = self.team_array[i].g
@@ -1359,27 +1351,19 @@ class Board(SampleBase):
             team2_decided = False
             self.master.read_data()
 
-            row3 = [self.master.get_cell_state(3, i) for i in range(8)]
-            row4 = [self.master.get_cell_state(4, i) for i in range(8)]
-            logger.info("war_games row3 states: %s", row3)
-            logger.info("war_games row4 states: %s", row4)
             for i in range(8):
                 if i < 4:
-                    if row3[i] == CellOccupancy.OCCUPIED and not team1_decided:
-                        logger.info("war_games: piece on display row=3 col=%d (col<4) -> team_r=HUMAN", i)
+                    if self.master.get_cell_state(3, i) == CellOccupancy.OCCUPIED and not team1_decided:
                         team1_decided = True
                         self.computer_player_r = False
-                    if row4[i] == CellOccupancy.OCCUPIED and not team2_decided:
-                        logger.info("war_games: piece on display row=4 col=%d (col<4) -> team_l=COMPUTER", i)
+                    if self.master.get_cell_state(4, i) == CellOccupancy.OCCUPIED and not team2_decided:
                         team2_decided = True
                         self.computer_player_l = True
                 else:
-                    if row3[i] == CellOccupancy.OCCUPIED and not team1_decided:
-                        logger.info("war_games: piece on display row=3 col=%d (col>=4) -> team_r=COMPUTER", i)
+                    if self.master.get_cell_state(3, i) == CellOccupancy.OCCUPIED and not team1_decided:
                         team1_decided = True
                         self.computer_player_r = True
-                    if row4[i] == CellOccupancy.OCCUPIED and not team2_decided:
-                        logger.info("war_games: piece on display row=4 col=%d (col>=4) -> team_l=HUMAN", i)
+                    if self.master.get_cell_state(4, i) == CellOccupancy.OCCUPIED and not team2_decided:
                         team2_decided = True
                         self.computer_player_l = False
                 if team1_decided and team2_decided:

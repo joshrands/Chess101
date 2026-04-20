@@ -65,15 +65,7 @@ class Master(BoardSensor):
             0 if a piece is present, 1 if the cell is empty.
         """
         rr, rc = rotate_cell(row, col, self._rotation)
-        # Arduinos 4-7 are wired from the opposite end of the board (bottom half
-        # faces the other player, so their bit-0 is on the display's right side).
-        effective_rr = (7 - rr) if rc >= 4 else rr
-        result = self.grid_states[rc][effective_rr]
-        logger.debug(
-            "get_cell_state(%d,%d) -> rotate->(%d,%d) effective_col=%d -> grid_states[%d][%d] = %d",
-            row, col, rr, rc, effective_rr, rc, effective_rr, result,
-        )
-        return result
+        return self.grid_states[rc][rr]
 
     def print_board_states(self) -> None:
         """Log the full 8x8 grid cache at DEBUG level."""
@@ -91,7 +83,6 @@ class Master(BoardSensor):
             row: Zero-based row index to update in ``grid_states``.
             col_states: Raw byte received from the Arduino for this row.
         """
-        logger.debug("update_row_states: Arduino row %d raw byte = %d (0b%s)", row, col_states, format(col_states, '08b'))
         change = False
         for i in range(7, -1, -1):
             if col_states - 2**i >= 0:
@@ -106,7 +97,6 @@ class Master(BoardSensor):
         if change:
             logger.info("Board Changed: ")
             self.print_board_states()
-            logger.info("grid_states (row=Arduino addr offset, col=bit): %s", self.grid_states)
 
     def read_data(self) -> None:
         """Poll all eight Arduinos and refresh the internal grid cache."""
