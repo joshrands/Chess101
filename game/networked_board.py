@@ -763,6 +763,71 @@ class NetworkedBoard(Board):
 
         logger.info("Remote move: physical move complete %d,%d→%d,%d", fr, fc, tr, tc)
 
+    # ── Local color/war pickers (Pi physical input) ───────────────────────────
+
+    def _local_color_picker_networked(self) -> int:
+        """Wait for the Pi player to place a piece on row 2, selecting team_r color.
+
+        Returns the palette index chosen (0–7).
+        """
+        from core.constants import CellOccupancy
+
+        self.canvas.Clear()
+        for i in range(8):
+            self.light_cell(self.canvas, 2, i,
+                            self.team_array[i].r, self.team_array[i].g, self.team_array[i].b)
+        self.canvas = self.matrix.SwapOnVSync(self.canvas)
+
+        chosen_idx = None
+        while chosen_idx is None:
+            self._drain_incoming()
+            self.master.read_data()
+            for i in range(8):
+                if self.master.get_cell_state(2, i) == CellOccupancy.OCCUPIED:
+                    chosen_idx = i
+                    self.team_r.r = self.team_array[i].r
+                    self.team_r.g = self.team_array[i].g
+                    self.team_r.b = self.team_array[i].b
+                    break
+            if chosen_idx is None:
+                time.sleep(0.05)
+
+        # Brief confirmation flash
+        self.canvas.Clear()
+        self.light_cell(self.canvas, 2, chosen_idx,
+                        self.team_array[chosen_idx].r,
+                        self.team_array[chosen_idx].g,
+                        self.team_array[chosen_idx].b)
+        self.canvas = self.matrix.SwapOnVSync(self.canvas)
+        time.sleep(1.0)
+        return chosen_idx
+
+    def _local_war_games_networked(self) -> None:
+        """Wait for the Pi player to place a piece on row 3, selecting human or AI for team_r.
+
+        Cols 0–3 = Human, cols 4–7 = AI (mirrors ``Board.war_games`` row-3 logic).
+        Sets ``self.computer_player_r``.
+        """
+        from core.constants import CellOccupancy
+
+        decided = False
+        while not decided:
+            self._drain_incoming()
+            self.canvas.Clear()
+            for i in range(4):
+                self.light_cell(self.canvas, 3, i, self.team_r.r, self.team_r.g, self.team_r.b)
+            for i in range(4, 8):
+                self.light_cell(self.canvas, 3, i, 255, 255, 255)
+            self.canvas = self.matrix.SwapOnVSync(self.canvas)
+            self.master.read_data()
+            for i in range(8):
+                if self.master.get_cell_state(3, i) == CellOccupancy.OCCUPIED:
+                    self.computer_player_r = (i >= 4)
+                    decided = True
+                    break
+            if not decided:
+                time.sleep(0.05)
+
     # ── Online play helpers ────────────────────────────────────────────────────
 
     def _show_chessmatrix_waiting(self, room_code: str) -> None:
@@ -994,6 +1059,14 @@ class NetworkedBoard(Board):
 
     # ── run() override ─────────────────────────────────────────────────────────
 
+    def _cleanup(self) -> None:
+        """Stop keepalive thread and network transport."""
+        self._stop_keepalive()
+        try:
+            self._net.stop()
+        except Exception:
+            pass
+
     def run(self, skip_setup: bool = False, init_num: str = "") -> None:  # noqa: ARG002
         """Override Board.run() with the networked game lifecycle.
 
@@ -1001,6 +1074,12 @@ class NetworkedBoard(Board):
         Waits for configuration from the Sim, runs ``interactive_setup``,
         then enters the alternating turn loop.
         """
+        try:
+            self._run_networked()
+        finally:
+            self._cleanup()
+
+    def _run_networked(self) -> None:
         self._start_keepalive()
         self.canvas = self.matrix.CreateFrameCanvas()
 
@@ -1032,20 +1111,49 @@ class NetworkedBoard(Board):
         if self._peer_name is None:
             self._run_waiting_animation()
 
-        logger.info("NetworkedBoard: waiting for configuration from Sim...")
-
-        # ── Wait for Sim-as-UI to send color + war_games choices ──
+        # ── Color pick + war games setup ──────────────────────────
         if self._local_team_key == "r":
-            # Pi is HOST: wait for Sim to send all 4 config messages
+            # Pi is HOST: pick own color/war on physical board, exchange with guest.
+
+            # Step 1: Pi picks team_r color
+            logger.info("NetworkedBoard: waiting for Pi to choose team_r color (row 2)...")
+            local_color_idx = self._local_color_picker_networked()
+            self.team_r.r += 1  # BUG-02 lock-in: mirrors Board.color_picker()
+            self._net_send({"type": "color_chosen", "team_key": "r",
+                            "color_idx": local_color_idx})
+            logger.info("Sent color_chosen r (idx=%d) — waiting for guest color...", local_color_idx)
+
+            # Step 2: wait for guest (team_l) color
             deadline = time.time() + _SETUP_TIMEOUT_S
-            while not self._config_received.is_set() and time.time() < deadline:
+            while self._remote_team_l_color_idx is None and time.time() < deadline:
                 self._drain_incoming()
                 time.sleep(0.05)
-            if not self._config_received.is_set():
-                logger.error("Timed out waiting for config from Sim")
+            if self._remote_team_l_color_idx is None:
+                logger.error("Timed out waiting for team_l color from guest")
                 return
+
+            # Step 3: Pi picks team_r human/AI
+            logger.info("NetworkedBoard: waiting for Pi to choose human/AI (row 3)...")
+            self._local_war_games_networked()
+            self._net_send({"type": "war_games_choice", "team_key": "r",
+                            "is_ai": self.computer_player_r})
+            logger.info("Sent war_games_choice r (ai=%s) — waiting for guest choice...",
+                        self.computer_player_r)
+
+            # Step 4: wait for guest (team_l) war choice
+            deadline = time.time() + _SETUP_TIMEOUT_S
+            while self._remote_team_l_is_ai is None and time.time() < deadline:
+                self._drain_incoming()
+                time.sleep(0.05)
+            if self._remote_team_l_is_ai is None:
+                logger.error("Timed out waiting for team_l war choice from guest")
+                return
+
+            self._net_send({"type": "game_start"})
+            logger.info("Sent game_start — starting physical setup")
         else:
             # Pi is GUEST: wait for game_start from HOST Sim
+            logger.info("NetworkedBoard: waiting for game_start from host Sim...")
             deadline = time.time() + _SETUP_TIMEOUT_S
             while not self._game_start_evt.is_set() and time.time() < deadline:
                 self._drain_incoming()
@@ -1053,11 +1161,6 @@ class NetworkedBoard(Board):
             if not self._game_start_evt.is_set():
                 logger.error("Timed out waiting for game_start")
                 return
-
-        # When Pi is HOST, send game_start after config is ready
-        if self._local_team_key == "r":
-            self._net_send({"type": "game_start"})
-            logger.info("Sent game_start — starting physical setup")
 
         # ── Physical piece placement ───────────────────────────────
         # Clear both buffers so interactive_setup starts clean.

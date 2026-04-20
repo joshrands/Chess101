@@ -699,6 +699,7 @@ let netPhase='idle'; // idle|connecting|waiting_peer|waiting_game_start
 let peerName=null;
 let localColorSent=false,remoteColorReceived=false;
 let localWarSent=false,remoteWarReceived=false;
+let isPhysicalHostMode=false; // Pi is HOST; browser (guest) picks both teams' colors and war choices
 // For local mode these are always true
 function colorReady(){return wsRole==='local'||(localColorSent&&remoteColorReceived);}
 function warReady(){return wsRole==='local'||(localWarSent&&remoteWarReceived);}
@@ -756,6 +757,7 @@ function resetGame(){
   gameOverColors=null;blink=false;
   moveLog.length=0;logLines.length=0;
   localColorSent=false;remoteColorReceived=false;localWarSent=false;remoteWarReceived=false;
+  isPhysicalHostMode=false;
   netPhase='idle';
   moveTrails=[];reactions=[];_pendingKibitz=null;
 }
@@ -1142,7 +1144,11 @@ function handleRelayMsg(msg){
       phase=Phase.COLOR_PICK;
     }
   } else if(t==='game_setup'){
-    if(wsRole==='guest'){peerName=msg.host_name||'Host';phase=Phase.COLOR_PICK;}
+    if(wsRole==='guest'){
+      peerName=msg.host_name||'Host';
+      phase=Phase.COLOR_PICK;
+      if(msg.mode==='physical_host')isPhysicalHostMode=true;
+    }
   } else if(t==='color_chosen'){
     const idx=msg.color_idx,key=msg.team_key;
     const pal=PALETTE[idx];
@@ -1181,8 +1187,8 @@ function checkWarComplete(){
   if(computerR===null||computerL===null)return;
   if(!warReady())return;
   if(wsRole==='host'){netSend({type:'game_start'});}
-  if(wsRole!=='guest')startGame();
-  // GUEST waits for game_start message from host
+  // In physical_host mode Pi sends game_start; browser waits for it
+  if(wsRole!=='guest'&&!isPhysicalHostMode)startGame();
 }
 
 function handleRemoteMove(msg){
@@ -1528,14 +1534,15 @@ function lobbySelect(opt){
 function handleColorPickClick(cell){
   if(!cell||!teamR||!teamL)return;
   const[row,col]=cell;
-  // Online: HOST controls row 2 (team_r), GUEST controls row 5 (team_l)
+  // HOST controls row 2 (team_r), GUEST controls row 5 (team_l).
+  // In physical_host mode Pi picks row 2 on the physical board; guest picks row 5 only.
   if(row===2){
-    if(wsRole==='guest')return; // GUEST doesn't pick team_r
+    if(wsRole==='guest')return;
     selectedRIdx=col;
     const p=PALETTE[col];teamR.r=p[0];teamR.g=p[1];teamR.b=p[2];teamR.name=p[3];
-    if(wsRole!=='local'){netSend({type:'color_chosen',team_key:'r',color_idx:col});localColorSent=true;}
+    if(wsRole!=='local'){netSend({type:'color_chosen',team_key:'r',color_idx:col});}
   } else if(row===5){
-    if(wsRole==='host')return; // HOST doesn't pick team_l
+    if(wsRole==='host')return;
     selectedLIdx=col;
     const p=PALETTE[col];teamL.r=p[0];teamL.g=p[1];teamL.b=p[2];teamL.name=p[3];
     if(wsRole!=='local'){netSend({type:'color_chosen',team_key:'l',color_idx:col});localColorSent=true;}
@@ -1546,11 +1553,13 @@ function handleColorPickClick(cell){
 function handleWarGamesClick(cell){
   if(!cell||!teamR||!teamL)return;
   const[row,col]=cell;
-  // Online: HOST controls row 3 (team_r), GUEST controls row 4 (team_l)
+  // HOST controls row 3 (team_r), GUEST controls row 4 (team_l).
+  // In physical_host mode Pi picks row 3 on the physical board; guest picks row 4 only.
   if(row===3){
     if(wsRole==='guest')return;
     computerR=col>=4; // cols 0-3=Human, cols 4-7=AI
-    if(wsRole!=='local'){netSend({type:'war_games_choice',team_key:'r',is_ai:computerR});localWarSent=true;}
+    if(wsRole!=='local'){netSend({type:'war_games_choice',team_key:'r',is_ai:computerR});}
+    localWarSent=true;
     checkWarComplete();
   } else if(row===4){
     if(wsRole==='host')return;

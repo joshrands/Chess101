@@ -354,6 +354,179 @@ test('renderColorPick dims unselected cells on the selected row', () => {
   assertEqual(row5col0.b, palette0[2]);
 });
 
+// ── Physical-host mode ────────────────────────────────────────────────────────
+
+console.log('\nPhysical-host mode');
+
+test('game_setup with mode=physical_host sets isPhysicalHostMode', () => {
+  const { ctx } = buildSandbox();
+
+  vm.runInContext(`
+    wsRole = 'guest';
+    peerName = '';
+    phase = Phase.LOBBY;
+  `, ctx);
+
+  vm.runInContext(`handleRelayMsg({type:'game_setup', mode:'physical_host', host_name:'Pi'});`, ctx);
+
+  const phm = vm.runInContext(`isPhysicalHostMode`, ctx);
+  assertEqual(phm, true);
+  const ph = vm.runInContext(`phase`, ctx);
+  assertEqual(ph, vm.runInContext(`Phase.COLOR_PICK`, ctx));
+});
+
+test('GUEST in physical_host mode CANNOT pick row 2 (Pi picks that on physical board)', () => {
+  const { ctx, sentMessages } = buildSandbox();
+
+  vm.runInContext(`
+    wsRole = 'guest';
+    isPhysicalHostMode = true;
+    teamR = new Team(64,180,232,'Blue');
+    teamL = new Team(190,25,255,'Purple');
+    selectedRIdx = null; selectedLIdx = null;
+    localColorSent = false; remoteColorReceived = false;
+    phase = Phase.COLOR_PICK;
+  `, ctx);
+  sentMessages.length = 0;
+
+  vm.runInContext(`handleColorPickClick([2, 4]);`, ctx);
+
+  const selectedR = vm.runInContext(`selectedRIdx`, ctx);
+  assertEqual(selectedR, null);
+  const colorMsgs = sentMessages.filter(m => m.type === 'color_chosen');
+  assertEqual(colorMsgs.length, 0);
+});
+
+test('GUEST in physical_host mode CANNOT pick row 3 (Pi picks that on physical board)', () => {
+  const { ctx, sentMessages } = buildSandbox();
+
+  vm.runInContext(`
+    wsRole = 'guest';
+    isPhysicalHostMode = true;
+    computerR = null; computerL = null;
+    localWarSent = false; remoteWarReceived = false;
+    teamR = new Team(255,0,0,'Red');
+    teamL = new Team(0,0,255,'Blue');
+    phase = Phase.WAR_GAMES;
+  `, ctx);
+  sentMessages.length = 0;
+
+  vm.runInContext(`handleWarGamesClick([3, 2]);`, ctx);
+
+  const compR = vm.runInContext(`computerR`, ctx);
+  assertEqual(compR, null);
+  const warMsgs = sentMessages.filter(m => m.type === 'war_games_choice');
+  assertEqual(warMsgs.length, 0);
+});
+
+test('GUEST in physical_host mode advances color phase after Pi sends color_chosen r and guest picks row 5', () => {
+  const { ctx } = buildSandbox();
+
+  vm.runInContext(`
+    wsRole = 'guest';
+    isPhysicalHostMode = true;
+    teamR = new Team(64,180,232,'Blue');
+    teamL = new Team(190,25,255,'Purple');
+    selectedRIdx = null; selectedLIdx = null;
+    localColorSent = false; remoteColorReceived = false;
+    phase = Phase.COLOR_PICK;
+  `, ctx);
+
+  // Pi sends color_chosen r
+  vm.runInContext(`handleRelayMsg({type:'color_chosen',team_key:'r',color_idx:2});`, ctx);
+  // Phase should NOT advance yet — guest hasn't picked
+  assertEqual(vm.runInContext(`phase`, ctx), vm.runInContext(`Phase.COLOR_PICK`, ctx));
+
+  // Guest picks row 5
+  vm.runInContext(`handleColorPickClick([5, 3]);`, ctx);
+  // Now both sides have picked — phase should advance
+  assertEqual(vm.runInContext(`phase`, ctx), vm.runInContext(`Phase.WAR_GAMES`, ctx));
+});
+
+test('GUEST in physical_host mode advances war phase after Pi sends war_games_choice r and guest picks row 4', () => {
+  const { ctx } = buildSandbox();
+
+  vm.runInContext(`
+    wsRole = 'guest';
+    isPhysicalHostMode = true;
+    teamR = new Team(255,0,0,'Red');
+    teamL = new Team(0,0,255,'Blue');
+    computerR = null; computerL = null;
+    localWarSent = false; remoteWarReceived = false;
+    phase = Phase.WAR_GAMES;
+    var _startGameCalled = false;
+    startGame = function(){ _startGameCalled = true; };
+  `, ctx);
+
+  // Pi sends war_games_choice r
+  vm.runInContext(`handleRelayMsg({type:'war_games_choice',team_key:'r',is_ai:false});`, ctx);
+  // startGame should NOT be called yet
+  assertEqual(vm.runInContext(`_startGameCalled`, ctx), false);
+
+  // Guest picks row 4
+  vm.runInContext(`handleWarGamesClick([4, 6]);`, ctx);
+  // warReady: localWarSent && remoteWarReceived — both true, but wsRole=guest so startGame not called
+  assertEqual(vm.runInContext(`_startGameCalled`, ctx), false);
+  // Pi sends game_start to trigger startGame
+  vm.runInContext(`handleRelayMsg({type:'game_start'});`, ctx);
+  assertEqual(vm.runInContext(`_startGameCalled`, ctx), true);
+});
+
+test('checkWarComplete in physical_host mode does NOT call startGame, waits for game_start', () => {
+  const { ctx } = buildSandbox();
+
+  let startGameCalled = false;
+  vm.runInContext(`
+    wsRole = 'guest';
+    isPhysicalHostMode = true;
+    computerR = false; computerL = false;
+    localWarSent = true; remoteWarReceived = true;
+    phase = Phase.WAR_GAMES;
+    var _startGameCalled = false;
+    startGame = function(){ _startGameCalled = true; };
+  `, ctx);
+
+  vm.runInContext(`checkWarComplete();`, ctx);
+
+  const called = vm.runInContext(`_startGameCalled`, ctx);
+  assertEqual(called, false);
+  const ph = vm.runInContext(`phase`, ctx);
+  assertEqual(ph, vm.runInContext(`Phase.WAR_GAMES`, ctx));
+});
+
+test('game_start triggers startGame for guest in physical_host mode', () => {
+  const { ctx } = buildSandbox();
+
+  vm.runInContext(`
+    wsRole = 'guest';
+    isPhysicalHostMode = true;
+    computerR = false; computerL = false;
+    phase = Phase.WAR_GAMES;
+    teamR = new Team(255,0,0,'Red');
+    teamL = new Team(0,0,255,'Blue');
+    var _startGameCalled = false;
+    startGame = function(){ _startGameCalled = true; phase = Phase.PLAYING; };
+  `, ctx);
+
+  vm.runInContext(`handleRelayMsg({type:'game_start'});`, ctx);
+
+  const called = vm.runInContext(`_startGameCalled`, ctx);
+  assertEqual(called, true);
+});
+
+test('isPhysicalHostMode resets after reset()', () => {
+  const { ctx } = buildSandbox();
+
+  vm.runInContext(`
+    isPhysicalHostMode = true;
+  `, ctx);
+
+  vm.runInContext(`resetGame();`, ctx);
+
+  const phm = vm.runInContext(`isPhysicalHostMode`, ctx);
+  assertEqual(phm, false);
+});
+
 // ── Eval bar ──────────────────────────────────────────────────────────────────
 
 console.log('\nEval bar');

@@ -493,10 +493,10 @@ class NetworkedGameRunner(GameRunner):
             self.phase = Phase.PLAYING
             logger.info("Spectator: waiting for board_sync to sync position")
         elif mode == "physical_host":
-            # Pi is the physical host; Sim drives setup for BOTH teams.
+            # Pi is the physical host; each side picks their own color/war.
             self._is_physical_host_mode = True
             self.phase = Phase.COLOR_PICK
-            logger.info("Physical-host mode: Sim will choose colors for both teams")
+            logger.info("Physical-host mode: each side picks their own color and human/AI")
         else:
             self.phase = Phase.COLOR_PICK
 
@@ -785,7 +785,7 @@ class NetworkedGameRunner(GameRunner):
         b = self._b
 
         # HOST controls row 2 (team_r); GUEST controls row 5 (team_l).
-        # In physical_host mode the GUEST (Sim) picks BOTH rows on behalf of Pi.
+        # In physical_host mode Pi picks row 2 on the physical board; guest picks row 5 only.
         if self._local_team_key == "r" and row == 2:
             self._selected_r_idx = col
             t = b.team_array[col]
@@ -804,16 +804,6 @@ class NetworkedGameRunner(GameRunner):
             self._local_color_sent = True
             self._net_send({"type": "color_chosen", "team_key": "l", "color_idx": col})
             logger.info("Sent color_chosen l idx=%d", col)
-            self._check_color_complete()
-
-        elif self._is_physical_host_mode and self._local_team_key == "l" and row == 2:
-            # Physical-host mode: Sim GUEST picks row 2 on Pi's behalf
-            self._selected_r_idx = col
-            t = b.team_array[col]
-            b.team_r.r, b.team_r.g, b.team_r.b = t.r, t.g, t.b
-            b.team_r.name = _COLOR_NAMES[col]
-            self._net_send({"type": "color_chosen", "team_key": "r", "color_idx": col})
-            logger.info("Physical-host: sent color_chosen r idx=%d for Pi", col)
             self._check_color_complete()
 
     # ── Overrides — WAR_GAMES ─────────────────────────────────────────────────
@@ -835,7 +825,7 @@ class NetworkedGameRunner(GameRunner):
         b = self._b
 
         # HOST controls row 3 (team_r); GUEST controls row 4 (team_l).
-        # In physical_host mode the GUEST (Sim) picks BOTH rows on behalf of Pi.
+        # In physical_host mode Pi picks row 3 on the physical board; guest picks row 4 only.
         if self._local_team_key == "r" and row == 3:
             b.computer_player_r = col >= 4
             self._local_war_sent = True
@@ -856,17 +846,6 @@ class NetworkedGameRunner(GameRunner):
                 "is_ai": bool(b.computer_player_l),
             })
             logger.info("Sent war_games_choice l ai=%s", b.computer_player_l)
-            self._check_war_complete()
-
-        elif self._is_physical_host_mode and self._local_team_key == "l" and row == 3:
-            # Physical-host mode: Sim GUEST picks row 3 on Pi's behalf
-            b.computer_player_r = col >= 4
-            self._net_send({
-                "type": "war_games_choice",
-                "team_key": "r",
-                "is_ai": bool(b.computer_player_r),
-            })
-            logger.info("Physical-host: sent war_games_choice r ai=%s for Pi", b.computer_player_r)
             self._check_war_complete()
 
     # ── Overrides — PLAYING ───────────────────────────────────────────────────
