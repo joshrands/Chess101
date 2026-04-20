@@ -5,8 +5,6 @@ import smbus
 import time
 
 from hardware.sensor import BoardSensor
-from hardware.rotation import rotate_cell
-
 logger = logging.getLogger(__name__)
 
 
@@ -64,8 +62,7 @@ class Master(BoardSensor):
         Returns:
             0 if a piece is present, 1 if the cell is empty.
         """
-        rr, rc = rotate_cell(row, col, self._rotation)
-        return self.grid_states[rc][rr]
+        return self.grid_states[col][row]
 
     def print_board_states(self) -> None:
         """Log the full 8x8 grid cache at DEBUG level."""
