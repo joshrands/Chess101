@@ -1081,6 +1081,8 @@ class NetworkedBoard(Board):
 
     def _run_networked(self) -> None:
         self._start_keepalive()
+        from hardware.rotation import RotatingMatrix
+        self.matrix = RotatingMatrix(self.matrix, rotation=self._rotation)
         self.canvas = self.matrix.CreateFrameCanvas()
 
         # ── Relay online play preamble ─────────────────────────────
