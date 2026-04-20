@@ -79,7 +79,9 @@ class CalibrationApp(SampleBase):
             bus = None
 
         print(f"\nDisplay rotation: {self.display_rotation}°  |  Sensor rotation: {self.sensor_rotation}°")
-        print("Place a piece on the highlighted row, then press Enter.\n")
+        print("START WITH AN EMPTY BOARD. Place one piece per highlighted row, leave it there.\n")
+
+        prev_occupied: set = set()
 
         for row in range(8):
             r, g, b = COLORS[row]
@@ -96,11 +98,15 @@ class CalibrationApp(SampleBase):
 
             if bus:
                 grid = read_grid(bus)
-                occupied = find_occupied(grid, cell_rot)
-                if occupied:
-                    print(f"  Sensor sees piece at logical: {occupied}")
+                occupied = set(find_occupied(grid, cell_rot))
+                new_pieces = occupied - prev_occupied
+                if new_pieces:
+                    for pos in sorted(new_pieces):
+                        match = "✓ MATCH" if pos[0] == row else f"✗ expected row {row}"
+                        print(f"  New piece at logical {pos}  {match}")
                 else:
-                    print("  Sensor sees no piece.")
+                    print(f"  No new piece detected (check board is clear, or piece not on a sensor)")
+                prev_occupied = occupied
             print()
 
         canvas.Clear()
