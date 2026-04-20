@@ -87,8 +87,6 @@ load("@rules_python//python:defs.bzl", "py_binary", "py_library")
 # gazelle:resolve py hardware.rotation.RotatingCanvas //hardware
 # gazelle:resolve py samplebase //:Chess101
 # gazelle:resolve py samplebase.SampleBase //:Chess101
-# gazelle:resolve py rgbmatrix //rgbmatrix
-# gazelle:resolve py rgbmatrix.core //rgbmatrix
 
 gazelle(
     name = "gazelle",
@@ -144,6 +142,5 @@ py_library(
         "//ai",
         "//core",
         "//pieces",
-        "//rgbmatrix",
     ],
 )

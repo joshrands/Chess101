@@ -16,7 +16,6 @@ py_library(
         "//hardware",
         "//network",
         "//pieces",
-        "//rgbmatrix",
         "//ui",
         "@pip//chessmatrix",
         "@pip//numpy",
