@@ -1355,17 +1355,17 @@ class Board(SampleBase):
                 if i < 4:
                     if self.master.get_cell_state(3, i) == CellOccupancy.OCCUPIED and not team1_decided:
                         team1_decided = True
-                        self.computer_player_r = False
-                    if self.master.get_cell_state(4, i) == CellOccupancy.OCCUPIED and not team2_decided:
-                        team2_decided = True
-                        self.computer_player_l = True
-                else:
-                    if self.master.get_cell_state(3, i) == CellOccupancy.OCCUPIED and not team1_decided:
-                        team1_decided = True
                         self.computer_player_r = True
                     if self.master.get_cell_state(4, i) == CellOccupancy.OCCUPIED and not team2_decided:
                         team2_decided = True
                         self.computer_player_l = False
+                else:
+                    if self.master.get_cell_state(3, i) == CellOccupancy.OCCUPIED and not team1_decided:
+                        team1_decided = True
+                        self.computer_player_r = False
+                    if self.master.get_cell_state(4, i) == CellOccupancy.OCCUPIED and not team2_decided:
+                        team2_decided = True
+                        self.computer_player_l = True
                 if team1_decided and team2_decided:
                     break
 
