@@ -66,7 +66,7 @@ class CalibrationApp(SampleBase):
         self.display_rotation = display_rotation
         self.sensor_rotation = sensor_rotation
 
-    def run(self):
+    def run(self, *args, **kwargs):
         self.matrix = RotatingMatrix(self.matrix, rotation=self.display_rotation)
         canvas = self.matrix.CreateFrameCanvas()
 
