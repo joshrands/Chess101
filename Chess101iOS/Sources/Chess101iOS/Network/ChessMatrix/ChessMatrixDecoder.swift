@@ -263,6 +263,28 @@ public enum ChessMatrixDecoder {
 
     // MARK: - Step 11: Calibrate and decode
 
+    /// Sample a cell using four 3×3 patches at the ¼/¾ quadrant midpoints, avoiding
+    /// the cell center where the physical reed switch is visible through the board surface.
+    private static func sampleCell(_ img: [UInt8], size: Int, cellSize: Int,
+                                   row: Int, col: Int) -> (r: Float, g: Float, b: Float) {
+        let q = cellSize / 4
+        var sr: Float = 0, sg: Float = 0, sb: Float = 0; var cnt = 0
+        for qy in [q, 3 * q] {
+            for qx in [q, 3 * q] {
+                let cy = row * cellSize + qy
+                let cx = col * cellSize + qx
+                for dy in -1...1 { for dx in -1...1 {
+                    let py = cy + dy, px = cx + dx
+                    guard py >= 0 && py < size && px >= 0 && px < size else { continue }
+                    let i = (py * size + px) * 4
+                    sr += Float(img[i]); sg += Float(img[i+1]); sb += Float(img[i+2]); cnt += 1
+                }}
+            }
+        }
+        guard cnt > 0 else { return (0, 0, 0) }
+        return (sr / Float(cnt), sg / Float(cnt), sb / Float(cnt))
+    }
+
     static func calibrateAndDecode(_ img: [UInt8], size: Int) -> String? {
         let cs = size / 8  // cell size in pixels
         // Sample the 5 anchor cells to calibrate colors.
@@ -270,12 +292,8 @@ public enum ChessMatrixDecoder {
         let anchorCells: [(r: Int, c: Int, label: Int)] = [(1,1,0),(1,6,1),(6,1,2),(6,6,3),(7,0,255)]
         var calibration = [(r: Float, g: Float, b: Float, label: Int)]()
         for a in anchorCells {
-            var sr: Float = 0, sg: Float = 0, sb: Float = 0; var cnt = 0
-            for pr in 0..<cs { for pc in 0..<cs {
-                let px = ((a.r * cs + pr) * size + (a.c * cs + pc)) * 4
-                sr += Float(img[px]); sg += Float(img[px+1]); sb += Float(img[px+2]); cnt += 1
-            }}
-            calibration.append((sr/Float(cnt), sg/Float(cnt), sb/Float(cnt), a.label))
+            let (sr, sg, sb) = sampleCell(img, size: size, cellSize: cs, row: a.r, col: a.c)
+            calibration.append((sr, sg, sb, a.label))
         }
         // Reject if luminance spread is < 60 (prevents all-zero false positives)
         let lums = calibration.map { ($0.r + $0.g + $0.b) / 3 }
@@ -285,12 +303,7 @@ public enum ChessMatrixDecoder {
         var dibits = [UInt8]()
         for r in 0..<8 { for c in 0..<8 {
             guard ChessMatrixEncoder.isDataCell(r: r, c: c) else { continue }
-            var sr: Float = 0, sg: Float = 0, sb: Float = 0; var cnt = 0
-            for pr in 0..<cs { for pc in 0..<cs {
-                let px = ((r * cs + pr) * size + (c * cs + pc)) * 4
-                sr += Float(img[px]); sg += Float(img[px+1]); sb += Float(img[px+2]); cnt += 1
-            }}
-            let (dr, dg, db) = (sr/Float(cnt), sg/Float(cnt), sb/Float(cnt))
+            let (dr, dg, db) = sampleCell(img, size: size, cellSize: cs, row: r, col: c)
             // Nearest calibration point (Euclidean in RGB)
             var best = 0; var bestDist = Float.infinity
             for (i, cal) in calibration.prefix(4).enumerated() {
