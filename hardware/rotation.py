@@ -6,6 +6,17 @@ game appears correctly to the player.
 
 Rotation values are clockwise degrees: 0, 90, 180, or 270.
 Use 270 for 90 degrees counter-clockwise.
+
+Display vs. sensor rotation
+----------------------------
+The display rotation is a *forward* transform: it maps a logical board
+coordinate to the physical pixel location on the LED matrix.
+
+The sensor rotation is the *inverse* transform: it maps a logical board
+coordinate back to the physical reed-switch location.  Because the board
+and LED matrix are mounted together at the same angle, these two transforms
+are inverses of each other.  Master passes ``(360 - rotation) % 360`` to
+``rotate_cell`` so that sensor lookups undo what the display rotation does.
 """
 from __future__ import annotations
 

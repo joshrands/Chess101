@@ -54,8 +54,10 @@ class Master(BoardSensor):
     def get_cell_state(self, row: int, col: int) -> int:
         """Return the cached sensor value for a single cell.
 
-        Applies board rotation then transposes the lookup (col, row) to align
-        physical reed switch layout with the corrected visual rendering.
+        The sensor rotation is the inverse of the display rotation: the display
+        applies a forward transform (logical → physical pixel), so the sensor
+        must apply the reverse (logical → physical reed switch) using the
+        complementary angle (360 - rotation) % 360.
 
         Args:
             row: Zero-based board row (0 = teamR back rank).
@@ -64,8 +66,9 @@ class Master(BoardSensor):
         Returns:
             0 if a piece is present, 1 if the cell is empty.
         """
-        rr, rc = rotate_cell(row, col, self._rotation)
-        return self.grid_states[rr][rc]
+        sensor_rotation = (360 - self._rotation) % 360
+        rr, rc = rotate_cell(row, col, sensor_rotation)
+        return self.grid_states[rc][rr]
 
     def print_board_states(self) -> None:
         """Log the full 8x8 grid cache at DEBUG level."""
