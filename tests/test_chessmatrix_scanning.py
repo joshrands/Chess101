@@ -962,7 +962,7 @@ class _RecordCanvas:
 
     def cell_color(self, row: int, col: int) -> tuple:
         """Return the color of the top-left pixel in board cell (row, col)."""
-        return self.pixels.get((row * 4, col * 4), (0, 0, 0))
+        return self.pixels.get((col * 4, row * 4), (0, 0, 0))
 
 
 # ── grid_from_cell_state ──────────────────────────────────────────────────────

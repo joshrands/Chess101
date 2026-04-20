@@ -487,16 +487,25 @@ function cellCenterPx(row, col) {
   return [col*cell + cell/2, row*cell + cell/2]; // [cx, cy]
 }
 
-function sampleCell(rgba, N, row, col, patch=5) {
-  const [cx, cy] = cellCenterPx(row, col);
-  const r = (patch / 2) | 0;
+function sampleCell(rgba, N, row, col) {
+  // Sample from four off-center quadrant midpoints (¼ and ¾ within the cell)
+  // to avoid the physical reed switch visible at the center of each tile.
+  const cell = N / 8;
+  const q = cell / 4;
+  const r = 1; // 3×3 patch per quadrant
   let sr = 0, sg = 0, sb = 0, n = 0;
-  for (let y = Math.round(cy)-r; y <= Math.round(cy)+r; y++)
-    for (let x = Math.round(cx)-r; x <= Math.round(cx)+r; x++)
-      if (x >= 0 && x < N && y >= 0 && y < N) {
-        const i = (y*N+x)*4;
-        sr += rgba[i]; sg += rgba[i+1]; sb += rgba[i+2]; n++;
-      }
+  for (const qy of [q, 3*q]) {
+    for (const qx of [q, 3*q]) {
+      const cy = row*cell + qy;
+      const cx = col*cell + qx;
+      for (let y = Math.round(cy)-r; y <= Math.round(cy)+r; y++)
+        for (let x = Math.round(cx)-r; x <= Math.round(cx)+r; x++)
+          if (x >= 0 && x < N && y >= 0 && y < N) {
+            const i = (y*N+x)*4;
+            sr += rgba[i]; sg += rgba[i+1]; sb += rgba[i+2]; n++;
+          }
+    }
+  }
   return n ? [sr/n, sg/n, sb/n] : [0, 0, 0];
 }
 

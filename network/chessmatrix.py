@@ -974,15 +974,29 @@ def _sample_cell_rgb(
     row: int,
     col: int,
     cell_px: int,
-    patch: int = 5,
+    patch: int = 3,
 ) -> "tuple[int, int, int]":
-    """Return mean (R, G, B) of a *patch*×*patch* region at the cell centre."""
+    """Return mean (R, G, B) sampled from four off-center quadrant midpoints.
+
+    Samples at the ¼ and ¾ positions within the cell (avoiding the center
+    where the physical reed switch is visible through the white plastic surface).
+    """
     import numpy as np
-    cx = col * cell_px + cell_px // 2
-    cy = row * cell_px + cell_px // 2
+    q = cell_px // 4
     r = patch // 2
-    bgr = warped[cy - r:cy + r + 1, cx - r:cx + r + 1].astype(np.float32).mean(axis=(0, 1))
-    return int(bgr[2]), int(bgr[1]), int(bgr[0])  # R, G, B
+    y0 = row * cell_px
+    x0 = col * cell_px
+    patches = []
+    for qy in (q, 3 * q):
+        for qx in (q, 3 * q):
+            cy, cx = y0 + qy, x0 + qx
+            patches.append(warped[cy - r:cy + r + 1, cx - r:cx + r + 1])
+    mean_bgr = (
+        np.concatenate([p.reshape(-1, p.shape[-1]) for p in patches], axis=0)
+        .astype(np.float32)
+        .mean(axis=0)
+    )
+    return int(mean_bgr[2]), int(mean_bgr[1]), int(mean_bgr[0])  # R, G, B
 
 
 def _timing_strip_ok(warped: "np.ndarray", cell_px: int) -> bool:
