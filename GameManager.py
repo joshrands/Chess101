@@ -85,15 +85,15 @@ def _build_board(args) -> Board:
             relay = RelayClient(relay_url=relay_url, role="host", player_name="Pi")
             board = NetworkedBoard(net=relay, local_team_key="r", relay=relay, rotation=args.board_rotation)
             relay.set_message_handler(board._on_network_message)
-            relay.on_connected    = board.on_connected     # type: ignore[attr-defined]
-            relay.on_disconnected = board.on_disconnected  # type: ignore[attr-defined]
+            relay._on_peer_connected    = board.on_connected
+            relay._on_peer_disconnected = board.on_disconnected
             logger.info("Online host mode — relay: %s", relay_url)
         else:
             relay = RelayClient(relay_url=relay_url, role="guest", player_name="Pi")
             board = NetworkedBoard(net=relay, local_team_key="l", relay=relay, rotation=args.board_rotation)
             relay.set_message_handler(board._on_network_message)
-            relay.on_connected    = board.on_connected     # type: ignore[attr-defined]
-            relay.on_disconnected = board.on_disconnected  # type: ignore[attr-defined]
+            relay._on_peer_connected    = board.on_connected
+            relay._on_peer_disconnected = board.on_disconnected
             logger.info("Online guest mode — relay: %s", relay_url)
 
         return board
