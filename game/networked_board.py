@@ -768,19 +768,38 @@ class NetworkedBoard(Board):
     def _local_color_picker_networked(self) -> int:
         """Wait for the Pi player to place a piece on row 2, selecting team_r color.
 
+        Also shows the remote player's color choice on row 5 as it arrives.
         Returns the palette index chosen (0–7).
         """
         from core.constants import CellOccupancy
 
-        self.canvas.Clear()
-        for i in range(8):
-            self.light_cell(self.canvas, 2, i,
-                            self.team_array[i].r, self.team_array[i].g, self.team_array[i].b)
-        self.canvas = self.matrix.SwapOnVSync(self.canvas)
-
         chosen_idx = None
         while chosen_idx is None:
             self._drain_incoming()
+            self.canvas.Clear()
+
+            # Row 2: Pi picks team_r — show all palette; dim others once chosen
+            for i in range(8):
+                t = self.team_array[i]
+                if chosen_idx is not None and i != chosen_idx:
+                    self.light_cell(self.canvas, 2, i, t.r // 4, t.g // 4, t.b // 4)
+                else:
+                    self.light_cell(self.canvas, 2, i, t.r, t.g, t.b)
+
+            # Row 5: remote's pick — dim all until received, then highlight chosen
+            remote_idx = self._remote_team_l_color_idx
+            for i in range(8):
+                t = self.team_array[i]
+                if remote_idx is not None:
+                    if i == remote_idx:
+                        self.light_cell(self.canvas, 5, i, t.r, t.g, t.b)
+                    else:
+                        self.light_cell(self.canvas, 5, i, t.r // 4, t.g // 4, t.b // 4)
+                else:
+                    self.light_cell(self.canvas, 5, i, t.r // 4, t.g // 4, t.b // 4)
+
+            self.canvas = self.matrix.SwapOnVSync(self.canvas)
+
             self.master.read_data()
             for i in range(8):
                 if self.master.get_cell_state(2, i) == CellOccupancy.OCCUPIED:
@@ -792,41 +811,95 @@ class NetworkedBoard(Board):
             if chosen_idx is None:
                 time.sleep(0.05)
 
-        # Brief confirmation flash
-        self.canvas.Clear()
-        self.light_cell(self.canvas, 2, chosen_idx,
-                        self.team_array[chosen_idx].r,
-                        self.team_array[chosen_idx].g,
-                        self.team_array[chosen_idx].b)
-        self.canvas = self.matrix.SwapOnVSync(self.canvas)
+        # Hold confirmation for 1 s so both rows are visible
         time.sleep(1.0)
         return chosen_idx
 
     def _local_war_games_networked(self) -> None:
         """Wait for the Pi player to place a piece on row 3, selecting human or AI for team_r.
 
-        Cols 0–3 = Human, cols 4–7 = AI (mirrors ``Board.war_games`` row-3 logic).
+        Mirrors the ``Board.war_games`` animation on row 3 and shows the
+        remote player's row 4 choice as it arrives.
+        Cols 0–3 = Human, cols 4–7 = AI (row 3).  Row 4 is kitty-corner.
         Sets ``self.computer_player_r``.
         """
         from core.constants import CellOccupancy
+
+        think   = 0   # bouncing dot index 0-3
+        think_l = 0   # post-decision dot index 0-7 for team_l row
+        think_r = 0   # post-decision dot index 0-7 for team_r row
 
         decided = False
         while not decided:
             self._drain_incoming()
             self.canvas.Clear()
-            for i in range(4):
-                self.light_cell(self.canvas, 3, i, self.team_r.r, self.team_r.g, self.team_r.b)
-            for i in range(4, 8):
-                self.light_cell(self.canvas, 3, i, 255, 255, 255)
+
+            # ── Row 3: Pi's team_r pick ──────────────────────────────────────
+            if decided:
+                if self.computer_player_r:
+                    for i in range(8):
+                        if i == 7 - think_r:
+                            self.light_cell(self.canvas, 3, i,
+                                            self.team_r.r, self.team_r.g, self.team_r.b)
+                        else:
+                            self.light_cell(self.canvas, 3, i, 255, 255, 255)
+                else:
+                    for i in range(8):
+                        self.light_cell(self.canvas, 3, i,
+                                        self.team_r.r, self.team_r.g, self.team_r.b)
+            else:
+                for i in range(8):
+                    if i < 4:
+                        self.light_cell(self.canvas, 3, i,
+                                        self.team_r.r, self.team_r.g, self.team_r.b)
+                    else:
+                        if i == 7 - think:
+                            self.light_cell(self.canvas, 3, i,
+                                            self.team_r.r, self.team_r.g, self.team_r.b)
+                        else:
+                            self.light_cell(self.canvas, 3, i, 255, 255, 255)
+
+            # ── Row 4: remote team_l choice (updates as message arrives) ─────
+            remote_is_ai = self._remote_team_l_is_ai
+            if remote_is_ai is not None:
+                if remote_is_ai:
+                    for i in range(8):
+                        if i == think_l:
+                            self.light_cell(self.canvas, 4, i,
+                                            self.team_l.r, self.team_l.g, self.team_l.b)
+                        else:
+                            self.light_cell(self.canvas, 4, i, 255, 255, 255)
+                else:
+                    for i in range(8):
+                        self.light_cell(self.canvas, 4, i,
+                                        self.team_l.r, self.team_l.g, self.team_l.b)
+            else:
+                # Waiting for remote — show undecided animation (kitty-corner)
+                for i in range(8):
+                    if i < 4:
+                        if i == think:
+                            self.light_cell(self.canvas, 4, i,
+                                            self.team_l.r, self.team_l.g, self.team_l.b)
+                        else:
+                            self.light_cell(self.canvas, 4, i, 255, 255, 255)
+                    else:
+                        self.light_cell(self.canvas, 4, i,
+                                        self.team_l.r, self.team_l.g, self.team_l.b)
+
             self.canvas = self.matrix.SwapOnVSync(self.canvas)
+            self.canvas.Clear()
+            time.sleep(0.2)
+
+            think   = (think   + 1) % 4
+            think_l = (think_l + 1) % 8
+            think_r = (think_r + 1) % 8
+
             self.master.read_data()
             for i in range(8):
                 if self.master.get_cell_state(3, i) == CellOccupancy.OCCUPIED:
                     self.computer_player_r = (i >= 4)
                     decided = True
                     break
-            if not decided:
-                time.sleep(0.05)
 
     # ── Online play helpers ────────────────────────────────────────────────────
 
