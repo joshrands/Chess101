@@ -24,7 +24,7 @@ CELL_ROTATIONS: dict[int, Callable[[int, int], Tuple[int, int]]] = {
     0:   lambda r, c: (r, c),
     90:  lambda r, c: (7 - c, r),
     180: lambda r, c: (7 - r, 7 - c),
-    270: lambda r, c: (c, 7 - r),
+    270: lambda r, c: (r, c),
 }
 
 
