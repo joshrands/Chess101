@@ -58,7 +58,21 @@ class _SMBus:
 _smbus.SMBus = _SMBus
 sys.modules["smbus"] = _smbus
 
-# ── 4. Now safe to import game code ───────────────────────────────────────────
+# ── 4. Block dangerous OS commands (shutdown/reboot must never fire in HIL) ───
+_real_os_system = os.system
+
+
+def _safe_os_system(cmd: str) -> int:
+    _BLOCKED = ("shutdown", "reboot", "halt", "poweroff")
+    if any(tok in cmd for tok in _BLOCKED):
+        logger.warning("HIL blocked os.system(%r)", cmd)
+        return 1
+    return _real_os_system(cmd)
+
+
+os.system = _safe_os_system  # type: ignore[assignment]
+
+# ── 5. Now safe to import game code ───────────────────────────────────────────
 from game.board import Board  # noqa: E402
 from hil.control_server import ControlServer  # noqa: E402
 

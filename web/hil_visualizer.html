@@ -279,7 +279,7 @@
 
             for (let y = 0; y < 32; y++) {
                 for (let x = 0; x < 32; x++) {
-                    const [r, g, b] = pixels[y][x];
+                    const [r, g, b] = pixels[x][y];
                     if (r === 0 && g === 0 && b === 0) continue;
 
                     const cx = x * LED_SIZE + LED_SIZE / 2;
