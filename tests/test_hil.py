@@ -88,6 +88,25 @@ class TestHilSensor:
         sensor.read_data()  # Should not change state
         assert sensor.get_cell_state(2, 3) == CellOccupancy.OCCUPIED
 
+    def test_rotation_uses_inverse_transform(self) -> None:
+        # HilSensor must use the inverse rotation ((360-rot)%360) like Master,
+        # not the forward rotation. At rot=90 these diverge: sensor_rotation=270,
+        # so logical (2,3) maps via rotate_cell(2,3,270)=(3,5) → grid[5][3],
+        # NOT rotate_cell(2,3,90)=(4,2) → grid[2][4] (the old wrong path).
+        from hardware.rotation import rotate_cell
+        sensor = HilSensor(rotation=90)
+        sensor.inject_state(2, 3, occupied=True)
+
+        assert sensor.get_cell_state(2, 3) == CellOccupancy.OCCUPIED
+
+        # Verify internal storage matches inverse rotation (sensor_rotation=270)
+        inv_rr, inv_rc = rotate_cell(2, 3, 270)
+        assert sensor._grid[inv_rc][inv_rr] == CellOccupancy.OCCUPIED
+
+        # The forward-rotation slot must be empty (was the old bug)
+        fwd_rr, fwd_rc = rotate_cell(2, 3, 90)
+        assert sensor._grid[fwd_rc][fwd_rr] == CellOccupancy.EMPTY
+
 
 class TestHilRGBMatrix:
     """Test HilRGBMatrix frame capture."""

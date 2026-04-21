@@ -26,6 +26,8 @@ class HilSensor(BoardSensor):
             rotation: Board rotation in degrees CW (0, 90, 180, or 270).
         """
         self._rotation = rotation
+        # Sensor uses the inverse of the display rotation, matching Master.
+        self._sensor_rotation = (360 - rotation) % 360
         self._grid: list[list[int]] = [
             [CellOccupancy.EMPTY] * 8 for _ in range(8)
         ]
@@ -48,7 +50,7 @@ class HilSensor(BoardSensor):
         Returns:
             0 if piece present, 1 if empty.
         """
-        rr, rc = rotate_cell(row, col, self._rotation)
+        rr, rc = rotate_cell(row, col, self._sensor_rotation)
         with self._lock:
             return self._grid[rc][rr]
 
@@ -63,7 +65,7 @@ class HilSensor(BoardSensor):
             col: Board column (0-7).
             occupied: True if piece present, False if empty.
         """
-        rr, rc = rotate_cell(row, col, self._rotation)
+        rr, rc = rotate_cell(row, col, self._sensor_rotation)
         with self._lock:
             self._grid[rc][rr] = (
                 CellOccupancy.OCCUPIED if occupied else CellOccupancy.EMPTY
@@ -78,7 +80,7 @@ class HilSensor(BoardSensor):
         with self._lock:
             for r in range(8):
                 for c in range(8):
-                    rr, rc = rotate_cell(r, c, self._rotation)
+                    rr, rc = rotate_cell(r, c, self._sensor_rotation)
                     self._grid[rc][rr] = (
                         CellOccupancy.OCCUPIED if r in (0, 1, 6, 7)
                         else CellOccupancy.EMPTY
@@ -97,6 +99,6 @@ class HilSensor(BoardSensor):
             result = [[0] * 8 for _ in range(8)]
             for r in range(8):
                 for c in range(8):
-                    rr, rc = rotate_cell(r, c, self._rotation)
+                    rr, rc = rotate_cell(r, c, self._sensor_rotation)
                     result[r][c] = self._grid[rc][rr]
             return result
