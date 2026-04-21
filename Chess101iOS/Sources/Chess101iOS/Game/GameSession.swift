@@ -113,6 +113,8 @@ public final class GameSession: ObservableObject {
                 _ = try await relay.joinRoom(code: code, playerName: "Guest")
                 roomCode = code.uppercased()
                 onlineStatus = "Waiting for host to start..."
+                // Tell the host we're here — Pi needs this to exit its waiting animation
+                try? relay.send(["type": "hello", "version": "1", "player_name": "iOS"])
                 startRelayListener()
             } catch {
                 onlineStatus = "Error: \(error.localizedDescription)"
