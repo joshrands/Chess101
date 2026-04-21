@@ -6,6 +6,18 @@ import SwiftUI
 import Chess101Engine
 #endif
 
+/// Pi board color palette — matches `Board.team_array` in board.py (indices 0–7).
+let TEAM_PALETTE: [Team] = [
+    Team(r: 64,  g: 180, b: 232, name: "Blue"),
+    Team(r: 190, g: 25,  b: 255, name: "Purple"),
+    Team(r: 254, g: 220, b: 0,   name: "Yellow"),
+    Team(r: 250, g: 125, b: 125, name: "Pink"),
+    Team(r: 25,  g: 255, b: 35,  name: "Green"),
+    Team(r: 245, g: 125, b: 0,   name: "Orange"),
+    Team(r: 0,   g: 25,  b: 230, name: "Dark Blue"),
+    Team(r: 28,  g: 225, b: 180, name: "Cyan"),
+]
+
 /// Central game state owned by the SwiftUI view hierarchy.
 /// All mutations happen on the MainActor.
 @MainActor
@@ -40,6 +52,8 @@ public final class GameSession: ObservableObject {
     @Published public var isMyTurn: Bool = true
     @Published public var onlineStatus: String = ""
     @Published public var connectionLost: Bool = false
+    /// True when the host is a physical Pi board (uses different setup protocol)
+    public var isPhysicalHostMode: Bool = false
 
     /// "r" for host, "l" for joiner, "spectator" for watch-only
     public var localTeamKey: String = "r"
@@ -143,6 +157,12 @@ public final class GameSession: ObservableObject {
                 guard let self else { return }
                 await MainActor.run { self.handleRelayMessage(msg) }
             }
+            // Stream ended — relay connection dropped (server restart or network loss)
+            await MainActor.run { [weak self] in
+                guard let self, self.isOnline else { return }
+                self.connectionLost = true
+                self.onlineStatus = "Disconnected — relay connection lost"
+            }
         }
     }
 
@@ -227,7 +247,7 @@ public final class GameSession: ObservableObject {
         relayListenTask?.cancel(); relayListenTask = nil
         relayClient?.disconnect(); relayClient = nil
         roomCode = nil; isOnline = false; isMyTurn = true; onlineStatus = ""
-        isSpectator = false; connectionLost = false
+        isSpectator = false; connectionLost = false; isPhysicalHostMode = false
         localConfirmedColors = false; peerConfirmedColors = false
         localConfirmedWG = false; peerConfirmedWG = false
     }
@@ -408,10 +428,13 @@ public final class GameSession: ObservableObject {
         case "relay_peer_connected":
             onlineStatus = "Opponent connected!"
             moveLog.append("Opponent connected")
-            // HOST advances to color pick and signals guest to do the same
             if localTeamKey == "r" && phase == .lobby {
+                // iOS HOST: advance to color pick and tell guest to do the same
                 phase = .colorPick
                 try? relayClient?.send(["type": "start_setup"])
+            } else if localTeamKey == "l" {
+                // iOS GUEST: send hello so the Pi host can exit its waiting animation
+                try? relayClient?.send(["type": "hello", "version": "1", "player_name": "iOS"])
             }
 
         case "relay_peer_disconnected":
@@ -419,17 +442,29 @@ public final class GameSession: ObservableObject {
             moveLog.append("Opponent disconnected")
 
         case "start_setup":
-            // Guest advances to color pick
+            // iOS HOST sent this — guest advances to color pick
             guard localTeamKey == "l" && phase == .lobby else { return }
             phase = .colorPick
             onlineStatus = "Choose your color"
 
+        case "game_setup":
+            // Pi HOST sent this — physical board mode
+            guard localTeamKey == "l" && phase == .lobby else { return }
+            isPhysicalHostMode = true
+            phase = .colorPick
+            onlineStatus = "Choose your color"
+
         case "color_chosen":
-            guard let teamKey = msg["team_key"] as? String,
-                  let r = msg["r"] as? Int, let g = msg["g"] as? Int,
-                  let b = msg["b"] as? Int, let name = msg["name"] as? String else { return }
+            guard let teamKey = msg["team_key"] as? String else { return }
             guard teamKey != localTeamKey else { return }  // ignore own echo
-            let team = Team(r: r, g: g, b: b, name: name)
+            // Accept either r/g/b/name (iOS) or color_idx (Pi) format
+            let team: Team
+            if let r = msg["r"] as? Int, let g = msg["g"] as? Int,
+               let b = msg["b"] as? Int, let name = msg["name"] as? String {
+                team = Team(r: r, g: g, b: b, name: name)
+            } else if let idx = msg["color_idx"] as? Int, idx >= 0 && idx < TEAM_PALETTE.count {
+                team = TEAM_PALETTE[idx]
+            } else { return }
             if teamKey == "r" { teamR = team } else { teamL = team }
             peerConfirmedColors = true
             if localConfirmedColors {
@@ -438,10 +473,15 @@ public final class GameSession: ObservableObject {
             }
 
         case "war_games_choice":
-            guard let teamKey = msg["team_key"] as? String,
-                  let ptStr = msg["player_type"] as? String else { return }
+            guard let teamKey = msg["team_key"] as? String else { return }
             guard teamKey != localTeamKey else { return }  // ignore own echo
-            let pt: PlayerType = ptStr == "ai" ? .ai : .human
+            // Accept either player_type string (iOS) or is_ai bool (Pi) format
+            let pt: PlayerType
+            if let ptStr = msg["player_type"] as? String {
+                pt = ptStr == "ai" ? .ai : .human
+            } else if let isAI = msg["is_ai"] as? Bool {
+                pt = isAI ? .ai : .human
+            } else { return }
             if teamKey == "r" { playerTypeR = pt } else { playerTypeL = pt }
             peerConfirmedWG = true
             if localConfirmedWG {

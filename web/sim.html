@@ -1150,13 +1150,21 @@ function handleRelayMsg(msg){
       if(msg.mode==='physical_host')isPhysicalHostMode=true;
     }
   } else if(t==='color_chosen'){
-    const idx=msg.color_idx,key=msg.team_key;
-    const pal=PALETTE[idx];
-    if(key==='r'){teamR.r=pal[0];teamR.g=pal[1];teamR.b=pal[2];teamR.name=pal[3];selectedRIdx=idx;}
-    else{teamL.r=pal[0];teamL.g=pal[1];teamL.b=pal[2];teamL.name=pal[3];selectedLIdx=idx;}
+    const key=msg.team_key;
+    let r,g,b,name,idx;
+    if(msg.color_idx!=null){
+      idx=msg.color_idx;const pal=PALETTE[idx];r=pal[0];g=pal[1];b=pal[2];name=pal[3];
+    } else {
+      // iOS/RGB format — find closest palette entry for idx
+      r=msg.r||0;g=msg.g||0;b=msg.b||0;name=msg.name||'';
+      let bd=Infinity;PALETTE.forEach((p,i)=>{const d=(r-p[0])**2+(g-p[1])**2+(b-p[2])**2;if(d<bd){bd=d;idx=i;}});
+    }
+    if(key==='r'){teamR.r=r;teamR.g=g;teamR.b=b;teamR.name=name;selectedRIdx=idx;}
+    else{teamL.r=r;teamL.g=g;teamL.b=b;teamL.name=name;selectedLIdx=idx;}
     remoteColorReceived=true;checkColorComplete();
   } else if(t==='war_games_choice'){
-    const key=msg.team_key,isAi=!!msg.is_ai;
+    const key=msg.team_key;
+    const isAi=msg.is_ai!=null?!!msg.is_ai:(msg.player_type==='ai');
     if(key==='r')computerR=isAi;else computerL=isAi;
     remoteWarReceived=true;checkWarComplete();
   } else if(t==='game_start'){

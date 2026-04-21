@@ -207,25 +207,40 @@ class NetworkedBoard(Board):
             logger.info("Sent game_setup (physical_host mode)")
 
     def _on_color_chosen(self, msg: dict) -> None:
-        team_key   = msg.get("team_key")
-        color_idx  = msg.get("color_idx")
-        if color_idx is None or team_key is None:
+        team_key  = msg.get("team_key")
+        color_idx = msg.get("color_idx")
+        if team_key is None:
             return
-        t = self.team_array[color_idx]
+        if color_idx is not None:
+            # Python simulator format: color_idx into team_array
+            t = self.team_array[color_idx]
+            r_val, g_val, b_val, name = t.r, t.g, t.b, t.name
+        else:
+            # iOS format: raw r/g/b/name
+            r_val = msg.get("r")
+            g_val = msg.get("g", 0)
+            b_val = msg.get("b", 0)
+            name  = msg.get("name", "")
+            if r_val is None:
+                return
+            color_idx = 0  # placeholder so _check_config_complete can proceed
         if team_key == "r":
-            self.team_r.r, self.team_r.g, self.team_r.b = t.r, t.g, t.b
-            self.team_r.name = t.name
+            self.team_r.r, self.team_r.g, self.team_r.b = r_val, g_val, b_val
+            if name: self.team_r.name = name
             self._remote_team_r_color_idx = color_idx
         else:
-            self.team_l.r, self.team_l.g, self.team_l.b = t.r, t.g, t.b
-            self.team_l.name = t.name
+            self.team_l.r, self.team_l.g, self.team_l.b = r_val, g_val, b_val
+            if name: self.team_l.name = name
             self._remote_team_l_color_idx = color_idx
-        logger.info("Color chosen: team=%s idx=%d", team_key, color_idx)
+        logger.info("Color chosen: team=%s r=%d g=%d b=%d", team_key, r_val, g_val, b_val)
         self._check_config_complete()
 
     def _on_war_games_choice(self, msg: dict) -> None:
         team_key = msg.get("team_key")
-        is_ai    = msg.get("is_ai", False)
+        is_ai    = msg.get("is_ai")
+        if is_ai is None:
+            # iOS/sim sends player_type string format
+            is_ai = msg.get("player_type", "human") == "ai"
         if team_key == "r":
             self.computer_player_r = is_ai
             self._remote_team_r_is_ai = is_ai
@@ -1194,8 +1209,12 @@ class NetworkedBoard(Board):
             logger.info("NetworkedBoard: waiting for Pi to choose team_r color (row 2)...")
             local_color_idx = self._local_color_picker_networked()
             self.team_r.r += 1  # BUG-02 lock-in: mirrors Board.color_picker()
-            self._net_send({"type": "color_chosen", "team_key": "r",
-                            "color_idx": local_color_idx})
+            self._net_send({
+                "type": "color_chosen", "team_key": "r",
+                "color_idx": local_color_idx,
+                "r": int(self.team_r.r), "g": int(self.team_r.g),
+                "b": int(self.team_r.b), "name": self.team_r.name,
+            })
             logger.info("Sent color_chosen r (idx=%d) — waiting for guest color...", local_color_idx)
 
             # Step 2: wait for guest (team_l) color
@@ -1210,8 +1229,11 @@ class NetworkedBoard(Board):
             # Step 3: Pi picks team_r human/AI
             logger.info("NetworkedBoard: waiting for Pi to choose human/AI (row 3)...")
             self._local_war_games_networked()
-            self._net_send({"type": "war_games_choice", "team_key": "r",
-                            "is_ai": self.computer_player_r})
+            self._net_send({
+                "type": "war_games_choice", "team_key": "r",
+                "is_ai": self.computer_player_r,
+                "player_type": "ai" if self.computer_player_r else "human",
+            })
             logger.info("Sent war_games_choice r (ai=%s) — waiting for guest choice...",
                         self.computer_player_r)
 

@@ -16,6 +16,8 @@ public struct LobbyView: View {
     @State private var joinCode: String = ""
     @State private var showScanner: Bool = false
     @State private var scannedCode: String? = nil
+    @State private var scanDebugInfo: ScanDebugInfo = ScanDebugInfo()
+    @State private var showScanDebug: Bool = false
 
     public init() {}
 
@@ -183,16 +185,24 @@ public struct LobbyView: View {
 #if canImport(UIKit)
         ZStack {
             Color.black.ignoresSafeArea()
-            ScannerView(detectedCode: $scannedCode)
+            ScannerView(detectedCode: $scannedCode, debugInfo: $scanDebugInfo)
             VStack {
+                HStack {
+                    Spacer()
+                    Button {
+                        showScanDebug.toggle()
+                    } label: {
+                        Image(systemName: showScanDebug ? "ant.fill" : "ant")
+                            .foregroundColor(showScanDebug ? Color(red: 0.0, green: 1.0, blue: 0.53) : Color(white: 0.5))
+                            .font(.system(size: 20))
+                            .padding(12)
+                    }
+                }
                 Spacer()
-                Text("Point camera at ChessMatrix grid")
-                    .font(.system(size: 14, design: .monospaced))
-                    .foregroundColor(.white)
-                    .padding(8)
-                    .background(Color.black.opacity(0.6))
-                    .cornerRadius(6)
-                    .padding(.bottom, 40)
+                if showScanDebug {
+                    ScanDebugOverlay(info: scanDebugInfo)
+                        .padding(.bottom, 40)
+                }
             }
         }
         .presentationDetents([.large])
@@ -248,3 +258,122 @@ private struct ChessMatrixGridView: View {
         .border(Color.white.opacity(0.3), width: 1)
     }
 }
+
+// MARK: - Scanner debug overlay
+
+#if canImport(UIKit)
+private struct ScanDebugOverlay: View {
+    let info: ScanDebugInfo
+
+    private let stages: [(String, KeyPath<ScanDebugInfo, Bool>)] = [
+        ("Centroid", \.centroidFound),
+        ("Axes",     \.axesFound),
+        ("Quad",     \.quadFound),
+        ("Warp",     \.warpedFound),
+        ("Cal",      \.calFound),
+        ("Grid",     \.gridFound),
+    ]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Point camera at ChessMatrix grid")
+                .font(.system(size: 13, design: .monospaced))
+                .foregroundColor(.white)
+
+            // Pipeline stage indicators
+            HStack(spacing: 10) {
+                ForEach(stages, id: \.0) { label, kp in
+                    let ok = info[keyPath: kp]
+                    VStack(spacing: 2) {
+                        Image(systemName: ok ? "checkmark.circle.fill" : "xmark.circle")
+                            .foregroundColor(ok ? .green : Color(white: 0.4))
+                            .font(.system(size: 14))
+                        Text(label)
+                            .font(.system(size: 9, design: .monospaced))
+                            .foregroundColor(ok ? .white : Color(white: 0.4))
+                    }
+                }
+                // 7th stage: RS decode + room code
+                let codeOk = info.code != nil
+                VStack(spacing: 2) {
+                    Image(systemName: codeOk ? "checkmark.circle.fill" : "xmark.circle")
+                        .foregroundColor(codeOk ? .green : Color(white: 0.4))
+                        .font(.system(size: 14))
+                    Text("RS")
+                        .font(.system(size: 9, design: .monospaced))
+                        .foregroundColor(codeOk ? .white : Color(white: 0.4))
+                }
+            }
+
+            // Binary + warped thumbnails side by side
+            HStack(spacing: 8) {
+                if let thumb = info.binaryThumb {
+                    VStack(spacing: 2) {
+                        pixelsImage(thumb, size: 128, display: 80)
+                        Text("binary").font(.system(size: 9, design: .monospaced)).foregroundColor(.gray)
+                    }
+                }
+                if let warped = info.warpedPixels {
+                    VStack(spacing: 2) {
+                        pixelsImage(warped, size: 128, display: 80)
+                        Text("warped").font(.system(size: 9, design: .monospaced)).foregroundColor(.gray)
+                    }
+                }
+            }
+
+            // Calibration color swatches
+            if let cal = info.calRGB {
+                let names = ["K", "R", "G", "B"]
+                HStack(spacing: 8) {
+                    ForEach(0..<min(cal.count, 4), id: \.self) { i in
+                        let c = cal[i]
+                        HStack(spacing: 3) {
+                            Circle()
+                                .fill(Color(red: Double(c.r)/255, green: Double(c.g)/255, blue: Double(c.b)/255))
+                                .frame(width: 12, height: 12)
+                                .overlay(Circle().stroke(Color.white.opacity(0.4), lineWidth: 0.5))
+                            Text("\(names[i]) \(Int(c.r)),\(Int(c.g)),\(Int(c.b))")
+                                .font(.system(size: 9, design: .monospaced))
+                                .foregroundColor(.white.opacity(0.8))
+                        }
+                    }
+                }
+            }
+
+            if let code = info.code {
+                Text("✓ \(code)")
+                    .font(.system(size: 18, weight: .bold, design: .monospaced))
+                    .foregroundColor(.green)
+            }
+        }
+        .padding(12)
+        .background(Color.black.opacity(0.82))
+        .cornerRadius(10)
+    }
+
+    @ViewBuilder
+    private func pixelsImage(_ rgba: [UInt8], size: Int, display: CGFloat) -> some View {
+        if let img = makeImage(rgba, size: size) {
+            Image(uiImage: img)
+                .resizable()
+                .interpolation(.none)
+                .frame(width: display, height: display)
+                .border(Color.white.opacity(0.3), width: 1)
+        }
+    }
+
+    private func makeImage(_ rgba: [UInt8], size: Int) -> UIImage? {
+        var data = rgba
+        return data.withUnsafeMutableBytes { ptr in
+            guard let base = ptr.baseAddress else { return nil }
+            let space = CGColorSpaceCreateDeviceRGB()
+            guard let ctx = CGContext(data: base, width: size, height: size,
+                                      bitsPerComponent: 8, bytesPerRow: size * 4,
+                                      space: space,
+                                      bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue),
+                  let cgImg = ctx.makeImage() else { return nil }
+            return UIImage(cgImage: cgImg)
+        }
+    }
+}
+#endif
