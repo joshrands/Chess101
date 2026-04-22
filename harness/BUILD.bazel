@@ -1,4 +1,4 @@
-load("@rules_python//python:defs.bzl", "py_binary", "py_library")
+load("@rules_python//python:defs.bzl", "py_binary", "py_library", "py_test")
 
 # gazelle:ignore
 
@@ -129,6 +129,23 @@ py_binary(
         "//web:chessmatrix_scanner_js",
     ],
     deps = [
+        ":corpus",
+        ":lockstep_runner",
+    ],
+)
+
+py_test(
+    name = "test_corpus_regression",
+    srcs = ["fuzz_lockstep.py"],
+    args = ["--test-corpus", "--engines=python,js"],
+    data = [
+        "js_bridge.js",
+        "//web:chess_engine_js",
+        "//web:chessmatrix_scanner_js",
+    ] + glob(["crashes/**/*.corpus.json"]),
+    main = "fuzz_lockstep.py",
+    deps = [
+        ":corpus",
         ":lockstep_runner",
     ],
 )

@@ -25,7 +25,7 @@ from harness.chess_helpers import (
     py_apply_move,
     clear_en_passant,
 )
-from harness.corpus import save_corpus
+from harness.corpus import save_corpus, load_corpus
 from harness.python_bridge import JsBridge
 from harness.swift_bridge import SwiftBridge
 
@@ -406,3 +406,67 @@ class LockstepRunner:
              f"{engine_a}_hash": hash_a[:16], f"{engine_b}_hash": hash_b[:16]},
             game_seed,
         )
+
+    def replay_corpus(self, corpus_path: Path) -> tuple[bool, str]:
+        """Replay corpus file through all engines. Returns (passed, message).
+
+        Tests that all engines now agree on the recorded move sequence.
+        If engines disagree, the corpus represents an unfixed bug.
+        """
+        corpus = load_corpus(corpus_path)
+        moves = corpus["moves"]
+        team_r_rgb = tuple(corpus["team_r_rgb"])
+        team_l_rgb = tuple(corpus["team_l_rgb"])
+
+        for engine in self._engines:
+            engine.init_game(team_r_rgb, team_l_rgb)
+
+        current_key = "r"
+        peace_time = 0
+
+        for ply, move_data in enumerate(moves):
+            move_sets: dict[str, set] = {}
+            for engine in self._engines:
+                move_sets[engine.name] = engine.legal_moves(current_key)
+
+            ref_name = self._engines[0].name
+            ref_moves = move_sets[ref_name]
+
+            for engine in self._engines[1:]:
+                other_moves = move_sets[engine.name]
+                if ref_moves != other_moves:
+                    only_ref = ref_moves - other_moves
+                    only_other = other_moves - ref_moves
+                    return False, (
+                        f"ply {ply}: legal moves disagree "
+                        f"({ref_name} vs {engine.name}): "
+                        f"only_{ref_name}={sorted(only_ref)}, "
+                        f"only_{engine.name}={sorted(only_other)}"
+                    )
+
+            fr = move_data["fr"]
+            fc = move_data["fc"]
+            tr = move_data["tr"]
+            tc = move_data["tc"]
+            next_key = "l" if current_key == "r" else "r"
+
+            results: dict[str, dict] = {}
+            for engine in self._engines:
+                results[engine.name] = engine.apply_move(
+                    fr, fc, tr, tc, current_key, next_key, peace_time
+                )
+
+            ref_hash = results[ref_name]["board_hash"]
+            for engine in self._engines[1:]:
+                other_hash = results[engine.name]["board_hash"]
+                if ref_hash != other_hash:
+                    return False, (
+                        f"ply {ply}: board hash disagree "
+                        f"({ref_name} vs {engine.name}): "
+                        f"{ref_hash[:16]}... vs {other_hash[:16]}..."
+                    )
+
+            current_key = next_key
+            peace_time += 1
+
+        return True, f"passed ({len(moves)} moves)"
