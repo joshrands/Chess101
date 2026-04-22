@@ -179,8 +179,8 @@ def _validate_move(room: Room, msg: dict) -> bool:
             )
         return ok
     except Exception as exc:
-        logger.error("[%s] Validator exception: %s — allowing move", room.code, exc)
-        return True
+        logger.error("[%s] Validator exception: %s — rejecting move", room.code, exc)
+        return False
 
 
 # ── Connection handler ────────────────────────────────────────────────────────

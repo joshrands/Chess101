@@ -141,13 +141,23 @@ class RoomValidator:
         if any(v is None for v in (fr, fc, tr, tc)):
             return False
 
+        # Type check: must be int or convertible to int
+        try:
+            fr, fc, tr, tc = int(fr), int(fc), int(tr), int(tc)
+        except (TypeError, ValueError):
+            return False
+
+        # Bounds check: must be 0-7
+        if not all(0 <= v <= 7 for v in (fr, fc, tr, tc)):
+            return False
+
         raw_flags = msg.get("flags", {})
         flags = (
             MoveFlags.from_dict(raw_flags)
             if isinstance(raw_flags, dict)
             else MoveFlags()
         )
-        return self._validate_and_apply(int(fr), int(fc), int(tr), int(tc), flags)
+        return self._validate_and_apply(fr, fc, tr, tc, flags)
 
     # ── Internals ──────────────────────────────────────────────────────────────
 
