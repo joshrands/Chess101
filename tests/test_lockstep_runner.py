@@ -9,7 +9,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-from harness.lockstep_runner import PythonEngine, JsEngine, SwiftEngine
+from harness.lockstep_runner import PythonEngine, JsEngine, SwiftEngine, HilEngine
 
 
 class TestPythonEngine:
@@ -92,5 +92,22 @@ class TestSwiftEngine:
             engine.init_game((64, 180, 232), (255, 140, 0))
             result = engine.apply_move(1, 4, 3, 4, "r", "l", 0)
             assert "board_hash" in result
+        finally:
+            engine.close()
+
+
+class TestHilEngine:
+    def test_name(self):
+        engine = HilEngine("ws://localhost:8766")
+        assert engine.name == "hil"
+
+    @pytest.mark.skip(reason="Requires running HIL container")
+    def test_connect_and_legal_moves(self):
+        engine = HilEngine("ws://localhost:8766")
+        try:
+            engine.connect()
+            engine.init_game((64, 180, 232), (255, 140, 0))
+            moves = engine.legal_moves("r")
+            assert len(moves) == 20
         finally:
             engine.close()

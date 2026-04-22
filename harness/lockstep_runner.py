@@ -25,6 +25,13 @@ from harness.chess_helpers import (
 from harness.python_bridge import JsBridge
 from harness.swift_bridge import SwiftBridge
 
+try:
+    from hil.client import HilBridge
+    _HAS_HIL = True
+except ImportError:
+    HilBridge = None  # type: ignore
+    _HAS_HIL = False
+
 
 class ChessEngine(ABC):
     """Protocol for lockstep-testable chess engines."""
@@ -198,3 +205,55 @@ class SwiftEngine(ChessEngine):
 
     def close(self) -> None:
         self._bridge.close()
+
+
+class HilEngine(ChessEngine):
+    """HIL Docker container chess engine via WebSocket."""
+
+    def __init__(self, url: str = "ws://localhost:8766") -> None:
+        if not _HAS_HIL:
+            raise ImportError("hil.client not available")
+        self._url = url
+        self._bridge: HilBridge | None = None
+
+    @property
+    def name(self) -> str:
+        return "hil"
+
+    def connect(self, retries: int = 3, delay: float = 1.0) -> None:
+        """Connect to HIL container. Call before init_game."""
+        self._bridge = HilBridge(url=self._url, timeout=10.0)
+        self._bridge.connect(retries=retries, delay=delay)
+        if not self._bridge.ping():
+            raise ConnectionError(f"HIL at {self._url} not responding")
+
+    def init_game(
+        self,
+        team_r_rgb: tuple[int, int, int],
+        team_l_rgb: tuple[int, int, int],
+    ) -> None:
+        if self._bridge is None:
+            raise RuntimeError("Not connected - call connect() first")
+        self._bridge.chess_init(team_r_rgb, team_l_rgb)
+
+    def legal_moves(self, team_key: str) -> Set[Tuple[int, int, int, int]]:
+        if self._bridge is None:
+            raise RuntimeError("Not connected")
+        raw = self._bridge.chess_legal_moves(team_key)
+        return {tuple(m) for m in raw}
+
+    def apply_move(
+        self,
+        fr: int, fc: int, tr: int, tc: int,
+        team_key: str, next_key: str, peace_time: int,
+    ) -> dict:
+        if self._bridge is None:
+            raise RuntimeError("Not connected")
+        return self._bridge.chess_apply_move(
+            fr, fc, tr, tc, team_key, next_key, peace_time
+        )
+
+    def close(self) -> None:
+        if self._bridge:
+            self._bridge.close()
+            self._bridge = None
