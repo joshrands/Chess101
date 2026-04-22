@@ -137,7 +137,7 @@ py_binary(
 py_test(
     name = "test_corpus_regression",
     srcs = ["fuzz_lockstep.py"],
-    args = ["--test-corpus", "--engines=python,js"],
+    args = ["--test-corpus"],
     data = [
         "js_bridge.js",
         "//web:chess_engine_js",

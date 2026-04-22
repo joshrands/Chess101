@@ -62,7 +62,16 @@ def main() -> int:
     )
     parser.add_argument(
         "--engines", type=str, default="python,js,swift",
-        help="Comma-separated engine names (default: python,js,swift)",
+        help="Comma-separated engine names (default: python,js,swift). "
+             "WARNING: Omitting engines means those platforms are NOT tested.",
+    )
+    parser.add_argument(
+        "--require-all", action="store_true", default=True,
+        help="Fail if any engine cannot be initialized (default: true)",
+    )
+    parser.add_argument(
+        "--no-require-all", action="store_false", dest="require_all",
+        help="Allow partial engine list (for debugging only)",
     )
     parser.add_argument(
         "--hil-url", type=str, default=None,
@@ -88,7 +97,14 @@ def main() -> int:
             print(f"[ERROR] Unknown engine: {name}")
             print(f"Available: {', '.join(AVAILABLE_ENGINES.keys())}")
             return 1
-        engines.append(AVAILABLE_ENGINES[name]())
+        try:
+            engines.append(AVAILABLE_ENGINES[name]())
+        except Exception as e:
+            if args.require_all:
+                print(f"[ERROR] Failed to initialize {name} engine: {e}")
+                print("All engines must initialize. Use --no-require-all to skip (debug only).")
+                return 1
+            print(f"[WARN] Skipping {name} engine: {e}")
 
     hil = None
     if args.hil_url:
