@@ -385,3 +385,13 @@ py_test(
         "@pip//pytest",
     ],
 )
+
+py_test(
+    name = "test_lockstep_runner",
+    srcs = ["test_lockstep_runner.py"],
+    deps = [
+        ":conftest",
+        "//harness:lockstep_runner",
+        "@pip//pytest",
+    ],
+)

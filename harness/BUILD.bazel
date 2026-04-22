@@ -122,6 +122,18 @@ py_library(
     visibility = ["//:__subpackages__"],
 )
 
+py_library(
+    name = "lockstep_runner",
+    srcs = ["lockstep_runner.py"],
+    visibility = ["//:__subpackages__"],
+    deps = [
+        ":chess_helpers",
+        "//core",
+        "//network",
+        "//pieces",
+    ],
+)
+
 py_binary(
     name = "fuzz_lockstep_swift",
     srcs = ["fuzz_lockstep_swift.py"],
