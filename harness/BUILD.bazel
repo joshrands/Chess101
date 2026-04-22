@@ -64,24 +64,6 @@ py_binary(
 )
 
 py_binary(
-    name = "fuzz_chess",
-    srcs = ["fuzz_chess.py"],
-    data = [
-        "js_bridge.js",
-        "//web:chess_engine_js",
-        "//web:chessmatrix_scanner_js",
-    ],
-    deps = [
-        ":chess_helpers",
-        ":corpus",
-        ":python_bridge",
-        "//core",
-        "//network",
-        "//pieces",
-    ],
-)
-
-py_binary(
     name = "fuzz_networked",
     srcs = ["fuzz_networked.py"],
     data = [
@@ -128,28 +110,26 @@ py_library(
     visibility = ["//:__subpackages__"],
     deps = [
         ":chess_helpers",
+        ":corpus",
+        ":python_bridge",
+        ":swift_bridge",
         "//core",
+        "//hil",
         "//network",
         "//pieces",
     ],
 )
 
 py_binary(
-    name = "fuzz_lockstep_swift",
-    srcs = ["fuzz_lockstep_swift.py"],
+    name = "fuzz_lockstep",
+    srcs = ["fuzz_lockstep.py"],
     data = [
         "js_bridge.js",
         "//web:chess_engine_js",
         "//web:chessmatrix_scanner_js",
     ],
     deps = [
-        ":chess_helpers",
-        ":corpus",
-        ":python_bridge",
-        ":swift_bridge",
-        "//core",
-        "//network",
-        "//pieces",
+        ":lockstep_runner",
     ],
 )
 
