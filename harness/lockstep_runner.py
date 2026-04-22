@@ -23,6 +23,7 @@ from harness.chess_helpers import (
     clear_en_passant,
 )
 from harness.python_bridge import JsBridge
+from harness.swift_bridge import SwiftBridge
 
 
 class ChessEngine(ABC):
@@ -115,6 +116,54 @@ class JsEngine(ChessEngine):
     @property
     def name(self) -> str:
         return "js"
+
+    def init_game(
+        self,
+        team_r_rgb: tuple[int, int, int],
+        team_l_rgb: tuple[int, int, int],
+    ) -> None:
+        self._team_r_rgb = team_r_rgb
+        self._team_l_rgb = team_l_rgb
+        self._grid = self._bridge.chess_init(team_r_rgb, team_l_rgb)
+
+    def legal_moves(self, team_key: str) -> Set[Tuple[int, int, int, int]]:
+        if self._grid is None:
+            raise RuntimeError("Game not initialized")
+        raw = self._bridge.chess_legal_moves(
+            self._grid, self._team_r_rgb, self._team_l_rgb, team_key
+        )
+        return {tuple(m) for m in raw}
+
+    def apply_move(
+        self,
+        fr: int, fc: int, tr: int, tc: int,
+        team_key: str, next_key: str, peace_time: int,
+    ) -> dict:
+        if self._grid is None:
+            raise RuntimeError("Game not initialized")
+        result = self._bridge.chess_apply_move(
+            self._grid, self._team_r_rgb, self._team_l_rgb,
+            fr, fc, tr, tc, team_key, next_key, peace_time,
+        )
+        self._grid = result["grid"]
+        return result
+
+    def close(self) -> None:
+        self._bridge.close()
+
+
+class SwiftEngine(ChessEngine):
+    """Swift chess engine via SwiftBridge subprocess."""
+
+    def __init__(self) -> None:
+        self._bridge = SwiftBridge()
+        self._grid: list | None = None
+        self._team_r_rgb: tuple[int, int, int] = TEAM_R_RGB
+        self._team_l_rgb: tuple[int, int, int] = TEAM_L_RGB
+
+    @property
+    def name(self) -> str:
+        return "swift"
 
     def init_game(
         self,

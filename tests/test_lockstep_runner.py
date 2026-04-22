@@ -9,7 +9,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-from harness.lockstep_runner import PythonEngine, JsEngine
+from harness.lockstep_runner import PythonEngine, JsEngine, SwiftEngine
 
 
 class TestPythonEngine:
@@ -61,6 +61,33 @@ class TestJsEngine:
 
     def test_apply_move(self):
         engine = JsEngine()
+        try:
+            engine.init_game((64, 180, 232), (255, 140, 0))
+            result = engine.apply_move(1, 4, 3, 4, "r", "l", 0)
+            assert "board_hash" in result
+        finally:
+            engine.close()
+
+
+class TestSwiftEngine:
+    def test_name(self):
+        engine = SwiftEngine()
+        try:
+            assert engine.name == "swift"
+        finally:
+            engine.close()
+
+    def test_init_and_legal_moves(self):
+        engine = SwiftEngine()
+        try:
+            engine.init_game((64, 180, 232), (255, 140, 0))
+            moves = engine.legal_moves("r")
+            assert len(moves) == 20
+        finally:
+            engine.close()
+
+    def test_apply_move(self):
+        engine = SwiftEngine()
         try:
             engine.init_game((64, 180, 232), (255, 140, 0))
             result = engine.apply_move(1, 4, 3, 4, "r", "l", 0)
