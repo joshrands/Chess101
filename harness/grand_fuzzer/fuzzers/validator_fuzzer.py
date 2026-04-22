@@ -22,6 +22,7 @@ sys.path.insert(0, str(ROOT))
 
 from network.validator import RoomValidator
 from harness.chess_helpers import TEAM_R_RGB, TEAM_L_RGB
+from harness.corpus import save_corpus
 
 
 class AttackType(Enum):
@@ -75,9 +76,11 @@ class AttackResult:
 class ValidatorFuzzer:
     """Adversarial fuzzer for RoomValidator."""
 
-    def __init__(self, seed: int):
+    def __init__(self, seed: int, crashes_dir: Path | None = None):
         self._seed = seed
         self._rng = random.Random(seed)
+        self._crashes_dir = crashes_dir or ROOT / "harness" / "crashes" / "validator"
+        self._crashes_dir.mkdir(parents=True, exist_ok=True)
 
     def _fresh_validator(self) -> RoomValidator:
         """Create fresh initialized validator."""
@@ -104,20 +107,49 @@ class ValidatorFuzzer:
 
         try:
             result = validator.validate_and_apply(msg)
-            return AttackResult(
+            attack_result = AttackResult(
                 attack=attack,
                 msg=msg,
                 expected_reject=expected_reject,
                 actual_result=result,
             )
         except Exception as e:
-            return AttackResult(
+            attack_result = AttackResult(
                 attack=attack,
                 msg=msg,
                 expected_reject=expected_reject,
                 actual_result=False,
                 exception=e,
             )
+
+        if not attack_result.passed:
+            self._save_failure(attack_result)
+
+        return attack_result
+
+    def _save_failure(self, result: AttackResult) -> Path:
+        """Save failed attack to corpus."""
+        move_repr = {
+            "fr": result.msg.get("from_row"),
+            "fc": result.msg.get("from_col"),
+            "tr": result.msg.get("to_row"),
+            "tc": result.msg.get("to_col"),
+            "team_key": "r",
+            "flags": result.msg.get("flags", {}),
+        }
+        failure = {
+            "ply": 0,
+            "kind": "validator_attack",
+            "attack_type": result.attack.name,
+            "expected_reject": result.expected_reject,
+            "actual_result": result.actual_result,
+            "exception": str(result.exception) if result.exception else None,
+            "raw_msg": result.msg,
+        }
+        return save_corpus(
+            self._crashes_dir, "chess", "validator_fuzzer",
+            TEAM_R_RGB, TEAM_L_RGB, [move_repr], failure, self._seed,
+        )
 
     def _should_reject(self, attack: AttackType) -> bool:
         """Should validator reject this attack?"""
