@@ -9,7 +9,43 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-from harness.lockstep_runner import PythonEngine, JsEngine, SwiftEngine, HilEngine
+from harness.lockstep_runner import PythonEngine, JsEngine, SwiftEngine, HilEngine, LockstepRunner
+
+
+class TestLockstepRunner:
+    def test_run_game_both_agree(self):
+        """Two engines that agree should return True."""
+        py = PythonEngine()
+        js = JsEngine()
+        try:
+            runner = LockstepRunner(
+                engines=[py, js],
+                crashes_dir=Path("/tmp/test_crashes"),
+                seed=42,
+                max_ply=10,
+            )
+            ok = runner.run_game(12345)
+            assert ok is True
+        finally:
+            js.close()
+
+    def test_run_fuzzing_returns_stats(self):
+        """run_fuzzing should return (total, ok, disagree)."""
+        py = PythonEngine()
+        js = JsEngine()
+        try:
+            runner = LockstepRunner(
+                engines=[py, js],
+                crashes_dir=Path("/tmp/test_crashes"),
+                seed=42,
+                max_ply=20,
+            )
+            total, ok, disagree = runner.run_fuzzing(3)
+            assert total == 3
+            assert ok == 3
+            assert disagree == 0
+        finally:
+            js.close()
 
 
 class TestPythonEngine:

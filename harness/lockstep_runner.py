@@ -8,7 +8,10 @@ detects disagreements.
 """
 from __future__ import annotations
 
+import json
+import random
 from abc import ABC, abstractmethod
+from pathlib import Path
 from typing import Set, Tuple
 
 from core.team import Team
@@ -22,6 +25,7 @@ from harness.chess_helpers import (
     py_apply_move,
     clear_en_passant,
 )
+from harness.corpus import save_corpus
 from harness.python_bridge import JsBridge
 from harness.swift_bridge import SwiftBridge
 
@@ -257,3 +261,148 @@ class HilEngine(ChessEngine):
         if self._bridge:
             self._bridge.close()
             self._bridge = None
+
+
+class LockstepRunner:
+    """Runs games through multiple engines, comparing at each ply."""
+
+    def __init__(
+        self,
+        engines: list[ChessEngine],
+        crashes_dir: Path,
+        seed: int,
+        max_ply: int = 120,
+    ) -> None:
+        if len(engines) < 2:
+            raise ValueError("Need at least 2 engines for lockstep testing")
+        self._engines = engines
+        self._crashes_dir = crashes_dir
+        self._seed = seed
+        self._max_ply = max_ply
+        self._rng = random.Random(seed)
+        self._crashes_dir.mkdir(parents=True, exist_ok=True)
+
+    def run_game(self, game_seed: int) -> bool:
+        """Run one game through all engines. Returns True if all agreed."""
+        game_rng = random.Random(game_seed)
+        team_r_rgb = TEAM_R_RGB
+        team_l_rgb = TEAM_L_RGB
+
+        for engine in self._engines:
+            engine.init_game(team_r_rgb, team_l_rgb)
+
+        current_key = "r"
+        peace_time = 0
+        corpus_moves: list[dict] = []
+
+        for ply in range(self._max_ply):
+            move_sets: dict[str, set] = {}
+            for engine in self._engines:
+                move_sets[engine.name] = engine.legal_moves(current_key)
+
+            ref_name = self._engines[0].name
+            ref_moves = move_sets[ref_name]
+
+            for engine in self._engines[1:]:
+                other_moves = move_sets[engine.name]
+                if ref_moves != other_moves:
+                    self._save_moves_crash(
+                        game_seed, ply, ref_name, engine.name,
+                        ref_moves, other_moves, corpus_moves,
+                    )
+                    return False
+
+            if not ref_moves:
+                break
+
+            move = game_rng.choice(sorted(ref_moves))
+            fr, fc, tr, tc = move
+            next_key = "l" if current_key == "r" else "r"
+
+            results: dict[str, dict] = {}
+            for engine in self._engines:
+                results[engine.name] = engine.apply_move(
+                    fr, fc, tr, tc, current_key, next_key, peace_time
+                )
+
+            corpus_moves.append({
+                "fr": fr, "fc": fc, "tr": tr, "tc": tc,
+                "team_key": current_key, "flags": {},
+            })
+
+            ref_hash = results[ref_name]["board_hash"]
+            for engine in self._engines[1:]:
+                other_hash = results[engine.name]["board_hash"]
+                if ref_hash != other_hash:
+                    self._save_hash_crash(
+                        game_seed, ply, move, ref_name, engine.name,
+                        ref_hash, other_hash, corpus_moves,
+                    )
+                    return False
+
+            current_key = next_key
+            peace_time += 1
+
+        return True
+
+    def run_fuzzing(self, iterations: int) -> tuple[int, int, int]:
+        """Run multiple games. Returns (total, ok, disagree)."""
+        total = 0
+        ok = 0
+        disagree = 0
+
+        i = 0
+        while iterations == 0 or i < iterations:
+            game_seed = self._rng.randint(0, 2**32)
+            if self.run_game(game_seed):
+                ok += 1
+            else:
+                disagree += 1
+            total += 1
+            i += 1
+
+        return total, ok, disagree
+
+    def _save_moves_crash(
+        self, game_seed: int, ply: int,
+        engine_a: str, engine_b: str,
+        moves_a: set, moves_b: set,
+        corpus_moves: list[dict],
+    ) -> None:
+        tag = f"{engine_a}_vs_{engine_b}"
+        fname = f"moves_ply{ply}_{tag}.json"
+        crash = {
+            "seed": game_seed, "ply": ply, "tag": tag,
+            "move_history": corpus_moves,
+            f"only_{engine_a}": sorted(moves_a - moves_b),
+            f"only_{engine_b}": sorted(moves_b - moves_a),
+        }
+        (self._crashes_dir / fname).write_text(json.dumps(crash, indent=2))
+        save_corpus(
+            self._crashes_dir, "chess", "fuzz_lockstep",
+            TEAM_R_RGB, TEAM_L_RGB, corpus_moves,
+            {"ply": ply, "kind": "legal_moves", "detail": tag},
+            game_seed,
+        )
+
+    def _save_hash_crash(
+        self, game_seed: int, ply: int, move: tuple,
+        engine_a: str, engine_b: str,
+        hash_a: str, hash_b: str,
+        corpus_moves: list[dict],
+    ) -> None:
+        tag = f"{engine_a}_vs_{engine_b}"
+        fname = f"hash_ply{ply}_{tag}.json"
+        crash = {
+            "seed": game_seed, "ply": ply, "tag": tag,
+            "move": list(move), "move_history": corpus_moves,
+            f"{engine_a}_hash": hash_a, f"{engine_b}_hash": hash_b,
+        }
+        (self._crashes_dir / fname).write_text(json.dumps(crash, indent=2))
+        save_corpus(
+            self._crashes_dir, "chess", "fuzz_lockstep",
+            TEAM_R_RGB, TEAM_L_RGB, corpus_moves,
+            {"ply": ply, "kind": "board_hash", "detail": tag,
+             f"{engine_a}_hash": hash_a[:16], f"{engine_b}_hash": hash_b[:16]},
+            game_seed,
+        )
