@@ -18,7 +18,7 @@ Chess logic lives in **three engines that must stay in sync**:
 - **JavaScript** — `web/chess-engine.js` (used by browser sim and spectator)
 - **Swift** — `Chess101iOS/Sources/Chess101Engine/` (used by iOS app)
 
-Any chess logic change (legal moves, board hash, move encoding) must be reflected in **all three**. The lockstep fuzzers (`harness/fuzz_chess.py`, `harness/fuzz_networked.py`, `harness/fuzz_lockstep_swift.py`) verify parity — run them after engine changes.
+Any chess logic change (legal moves, board hash, move encoding) must be reflected in **all three**. The lockstep fuzzers (`harness/fuzz_lockstep.py`, `harness/fuzz_networked.py`) verify parity — run them after engine changes.
 
 ### 2. The Physical Board Is the Real Target
 All code runs on a Raspberry Pi with:
@@ -119,12 +119,14 @@ cd Chess101iOS && swift test && cd ..           # Swift
 
 **Lockstep fuzzers** (save disagreements to `harness/crashes/`):
 ```bash
-bazel run //harness:fuzz_chess -- --iterations 100
+bazel run //harness:fuzz_lockstep -- --iterations 100
+bazel run //harness:fuzz_lockstep -- --iterations 100 --engines python,js
+bazel run //harness:fuzz_lockstep -- --hil-url ws://localhost:8766
 bazel run //harness:fuzz_networked -- --iterations 100
 bazel run //harness:fuzz_chessmatrix -- --iterations 1000
 bazel run //harness:fuzz_relay -- --iterations 100
-.venv/bin/python harness/fuzz_lockstep_swift.py --iterations 100   # Python↔JS↔Swift
-.venv/bin/python harness/fuzz_hil.py --iterations 50               # HIL game loop
+.venv/bin/python harness/fuzz_lockstep.py --iterations 100   # Python+JS+Swift
+.venv/bin/python harness/fuzz_hil.py --iterations 50         # HIL game loop
 ```
 
 **Relay tests** need a relay server (Docker by default):
@@ -222,12 +224,11 @@ Chess101/
 │   └── Tests/Chess101IOSTests/
 │
 ├── harness/
-│   ├── fuzz_chess.py           # Chess lockstep fuzzer (Python↔JS)
+│   ├── fuzz_lockstep.py        # Unified lockstep fuzzer (Python↔JS↔Swift↔HIL)
 │   ├── fuzz_networked.py       # Three-way networked lockstep fuzzer
 │   ├── fuzz_chessmatrix.py     # ChessMatrix lockstep fuzzer
 │   ├── fuzz_relay.py           # Relay delivery fuzzer
 │   ├── fuzz_hil.py             # HIL game loop fuzzer
-│   ├── fuzz_lockstep_swift.py  # Python↔JS↔Swift lockstep fuzzer
 │   ├── hil_scenarios.py        # Scripted HIL test scenarios (reed switch sequences)
 │   ├── js_bridge.js            # Node.js stdio bridge for lockstep testing
 │   ├── python_bridge.py        # JsBridge Python wrapper

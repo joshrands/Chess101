@@ -448,11 +448,12 @@ Uses the same `JsBridge` subprocess as the ChessMatrix lockstep tests. Grid stat
 | `TestLegalMovesParity` | Legal move sets agree at starting position for both teams |
 | `TestRandomGames` | 10 seeded random games (80 plies each): legal moves + board hashes agree at every step |
 
-Related: `harness/fuzz_chess.py` is a standalone fuzzer that plays random games and saves disagreements with full move history to `harness/crashes/chess/`.
+Related: `harness/fuzz_lockstep.py` is a unified fuzzer that tests Python, JS, and Swift engines and saves disagreements with full move history to `harness/crashes/chess/`.
 
 ```bash
 bazel test //tests:test_lockstep_chess
-bazel run //harness:fuzz_chess -- --iterations 100
+bazel run //harness:fuzz_lockstep -- --iterations 100
+bazel run //harness:fuzz_lockstep -- --iterations 100 --engines python,js
 ```
 
 ---
