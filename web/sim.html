@@ -675,6 +675,8 @@ let _pendingKibitz=null; // {piece, capture, fr, fc, tr, tc, team} — set by lo
 let threeD=true;
 let threeInited=false;
 let three=null; // {scene,camera,renderer,controls,boardSquares,pool,animMesh,lights}
+let scanModeActive=false;
+let savedCamPos=null,savedCamTarget=null;
 
 // Color pick state
 let selectedRIdx=null,selectedLIdx=null;
@@ -1231,6 +1233,19 @@ function initTeams(){
 // ── Rendering ─────────────────────────────────────────────────────────────────
 function renderLobby(now){
   clearBuf();
+  // When hosting online and waiting for peer, show ChessMatrix barcode
+  if(netPhase==='waiting_peer'&&roomCode){
+    const cmGrid=encodeChessMatrix(roomCode);
+    for(let r=0;r<8;r++){
+      for(let c=0;c<8;c++){
+        const[cr,cg,cb]=cmGrid[r][c];
+        lightCell(r,c,cr,cg,cb);
+      }
+    }
+    if(threeD){renderThree(now);return;}
+    flip();
+    return;
+  }
   for(let opt=0;opt<3;opt++){
     const sel=lobbySelected===opt;
     const[r,g,b]=LOBBY_COLORS[opt];
@@ -1473,7 +1488,10 @@ function renderPanel(){
     html+=`<div style="margin-top:12px;font-size:11px;color:#3a4a60">Press N to play again</div>`;
   }
   if(roomCode&&wsRole!=='local')html+=`<div class="p-alert room">ROOM: ${roomCode}</div>`;
-  if(netPhase==='waiting_peer')html+=`<div class="p-alert ai">Waiting for opponent…</div>`;
+  if(netPhase==='waiting_peer'){
+    html+=`<div class="p-alert ai">Waiting for opponent…</div>`;
+    html+=`<div style="margin-top:8px;font-size:11px;color:#4a6a8a">Scan the ChessMatrix with the iOS app to join</div>`;
+  }
   if(replayCorpus)html+=replayPanelHtml();
   html+=`<div style="margin-top:10px;font-size:10px;color:#2a3a50">Theme: <span style="color:#4a6a8a">${currentThemeObj.name}</span> · <kbd style="color:#3a5070">T</kbd></div>`;
   html+=`<div style="font-size:10px;color:#2a3a50">Kibitzer: <span style="color:${kibOn?'#00ff88':'#3a4a60'}">${kibOn?'ON':'OFF'}</span> · <kbd style="color:#3a5070">K</kbd></div>`;
@@ -1521,6 +1539,7 @@ function handleClick(px,py){
 
 function handleLobbyClick(cell){
   if(!cell)return;
+  if(netPhase==='waiting_peer')return; // ChessMatrix showing, ignore clicks
   const[row]=cell;
   const opt=Math.floor(row/2); // rows 0-1=opt0, 2-3=opt1, 4-5=opt2
   if(opt>=0&&opt<3)lobbySelect(opt);
@@ -1548,7 +1567,7 @@ function handleColorPickClick(cell){
     if(wsRole==='guest')return;
     selectedRIdx=col;
     const p=PALETTE[col];teamR.r=p[0];teamR.g=p[1];teamR.b=p[2];teamR.name=p[3];
-    if(wsRole!=='local'){netSend({type:'color_chosen',team_key:'r',color_idx:col});}
+    if(wsRole!=='local'){netSend({type:'color_chosen',team_key:'r',color_idx:col});localColorSent=true;}
   } else if(row===5){
     if(wsRole==='host')return;
     selectedLIdx=col;
@@ -2176,6 +2195,21 @@ function renderThree(now){
   if(!three){
     if(!threeInited&&typeof THREE!=='undefined'){initThree();threeInited=true;}
     if(!three)return;
+  }
+  // ChessMatrix scan mode: position camera for easy scanning
+  const wantScanMode=netPhase==='waiting_peer'&&roomCode;
+  if(wantScanMode&&!scanModeActive){
+    savedCamPos=three.camera.position.clone();
+    savedCamTarget=three.controls.target.clone();
+    three.camera.position.set(3.5,12,3.5);
+    three.controls.target.set(3.5,0,3.5);
+    three.controls.update();
+    scanModeActive=true;
+  } else if(!wantScanMode&&scanModeActive){
+    if(savedCamPos)three.camera.position.copy(savedCamPos);
+    if(savedCamTarget)three.controls.target.copy(savedCamTarget);
+    three.controls.update();
+    scanModeActive=false;
   }
   updateBoardEmissiveFromBuf();
   if(phase===Phase.PLAYING){

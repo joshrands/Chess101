@@ -458,7 +458,6 @@ public final class GameSession: ObservableObject {
 
         case "color_chosen":
             guard let teamKey = msg["team_key"] as? String else { return }
-            guard teamKey != localTeamKey else { return }  // ignore own echo
             // Accept either r/g/b/name (iOS) or color_idx (Pi) format
             let team: Team
             if let r = msg["r"] as? Int, let g = msg["g"] as? Int,
@@ -468,15 +467,19 @@ public final class GameSession: ObservableObject {
                 team = TEAM_PALETTE[idx]
             } else { return }
             if teamKey == "r" { teamR = team } else { teamL = team }
-            peerConfirmedColors = true
-            if localConfirmedColors {
+            if teamKey == localTeamKey {
+                // Host assigned our color — auto-confirm
+                localConfirmedColors = true
+            } else {
+                peerConfirmedColors = true
+            }
+            if localConfirmedColors && peerConfirmedColors {
                 onlineStatus = "Colors set — choose human or AI"
                 phase = .warGames
             }
 
         case "war_games_choice":
             guard let teamKey = msg["team_key"] as? String else { return }
-            guard teamKey != localTeamKey else { return }  // ignore own echo
             // Accept either player_type string (iOS) or is_ai bool (Pi) format
             let pt: PlayerType
             if let ptStr = msg["player_type"] as? String {
@@ -485,8 +488,14 @@ public final class GameSession: ObservableObject {
                 pt = isAI ? .ai : .human
             } else { return }
             if teamKey == "r" { playerTypeR = pt } else { playerTypeL = pt }
-            peerConfirmedWG = true
-            if localConfirmedWG {
+            if teamKey == localTeamKey {
+                // Host assigned our player type — auto-confirm
+                localConfirmedWG = true
+            } else {
+                peerConfirmedWG = true
+            }
+            // Only host sends game_start; guest waits for it
+            if localConfirmedWG && peerConfirmedWG && localTeamKey == "r" {
                 finishSetupAsHost()
             }
 

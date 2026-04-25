@@ -640,11 +640,67 @@ class ChessMatrixScanner {
   }
 }
 
+// ── RS encoder ─────────────────────────────────────────────────────────────
+function rsEncode(data4) {
+  const msg = [...data4, 0, 0, 0, 0];
+  for (let i = 0; i < 4; i++) {
+    const coef = msg[i];
+    if (coef) for (let j = 1; j < GEN_POLY.length; j++)
+      msg[i + j] ^= gfMul(GEN_POLY[j], coef);
+  }
+  return [...data4, ...msg.slice(4)];
+}
+
+function roomCodeToBytes(code) {
+  let v = 0;
+  for (const ch of code.toUpperCase()) v = v * 32 + (ch.charCodeAt(0) - 65);
+  v = v * 4;
+  return [(v >>> 24) & 0xFF, (v >>> 16) & 0xFF, (v >>> 8) & 0xFF, v & 0xFF];
+}
+
+const CM_RGB = {
+  '-1': [235, 235, 235],
+   '0': [10,  10,  10],
+   '1': [220, 40,  40],
+   '2': [40,  180, 40],
+   '3': [40,  40,  220],
+};
+
+function encodeChessMatrix(code) {
+  const cw = rsEncode(roomCodeToBytes(code));
+  const dibits = [];
+  for (const b of cw) dibits.push((b>>6)&3, (b>>4)&3, (b>>2)&3, b&3);
+
+  const grid = Array.from({length:8}, () => new Array(8).fill(-1));
+  for (let r = 0; r < 8; r++) {
+    grid[r][0] = 0;
+    grid[r][7] = r % 2 === 1 ? 0 : -1;
+  }
+  for (let c = 0; c < 8; c++) {
+    grid[7][c] = 0;
+    grid[0][c] = c % 2 === 0 ? 0 : -1;
+  }
+  grid[1][1]=0; grid[1][6]=1; grid[6][1]=2; grid[6][6]=3;
+  DATA_CELLS.forEach(([r, c], i) => { grid[r][c] = dibits[i]; });
+
+  return Array.from({length:8}, (_, r) =>
+    Array.from({length:8}, (_, c) => {
+      const val = grid[r][c];
+      const isBorder = r===0 || r===7 || c===0 || c===7;
+      if (isBorder) return val === 0 ? [235,235,235] : [10,10,10];
+      return CM_RGB[String(val)];
+    })
+  );
+}
+
 // Node.js compatibility — expose internals needed by test_chessmatrix_js.js
 if (typeof module !== 'undefined') {
   module.exports = {
     decodeFrame,
     ChessMatrixScanner,
+    encodeChessMatrix,
+    roomCodeToBytes,
+    rsEncode,
     // GF(256) primitives (for RS encoder in tests)
     gfMul, gfPow, GEN_POLY,
     // Grid constants
