@@ -1,0 +1,115 @@
+{
+  "version": 2,
+  "type": "chaos",
+  "created": "2026-04-22T19:31:47.538081+00:00",
+  "source": "grand_e2e",
+  "seeds": {
+    "game": 3026113008,
+    "fault": 31920701,
+    "timing": 890564481
+  },
+  "chaos_profile": "aggressive",
+  "mode": "lan_host",
+  "timeline": [
+    {
+      "seq": 0,
+      "ts": 0.0,
+      "type": "phase",
+      "phase": "SETUP"
+    },
+    {
+      "seq": 1,
+      "ts": 0.0,
+      "type": "phase",
+      "phase": "COLOR_PICK"
+    },
+    {
+      "seq": 2,
+      "ts": 0.002,
+      "type": "phase",
+      "phase": "PLAYING"
+    },
+    {
+      "seq": 3,
+      "ts": 0.064,
+      "type": "move",
+      "fr": 1,
+      "fc": 1,
+      "tr": 3,
+      "tc": 1,
+      "team": "r",
+      "flags": {}
+    },
+    {
+      "seq": 4,
+      "ts": 0.064,
+      "type": "fault",
+      "kind": "DROP",
+      "peer": "master",
+      "before": {
+        "type": "move",
+        "from_row": 1,
+        "from_col": 1,
+        "to_row": 3,
+        "to_col": 1,
+        "team_key": "r",
+        "flags": {}
+      }
+    },
+    {
+      "seq": 5,
+      "ts": 0.064,
+      "type": "fault_injected",
+      "ply": 0,
+      "reason": "drop",
+      "peer": "master"
+    },
+    {
+      "seq": 6,
+      "ts": 0.064,
+      "type": "fault",
+      "kind": "DISCONNECT",
+      "peer": "master"
+    },
+    {
+      "seq": 7,
+      "ts": 0.064,
+      "type": "disconnect",
+      "peer": "master",
+      "reason": "fault_injected"
+    },
+    {
+      "seq": 8,
+      "ts": 0.064,
+      "type": "retry_failed",
+      "ply": 0
+    },
+    {
+      "seq": 9,
+      "ts": 0.068,
+      "type": "move",
+      "fr": 6,
+      "fc": 7,
+      "tr": 5,
+      "tc": 7,
+      "team": "l",
+      "flags": {}
+    }
+  ],
+  "failure": {
+    "seq": 10,
+    "kind": "send_failed_already_disconnected",
+    "detail": "master send failed: already_disconnected",
+    "status": "open"
+  },
+  "team_r_rgb": [
+    64,
+    180,
+    232
+  ],
+  "team_l_rgb": [
+    255,
+    140,
+    0
+  ]
+}

@@ -289,3 +289,4 @@ Design debts not locked in by tests but worth tracking.
 | OPEN-03 | En passant capture depends on `move()` return value; silent failure if `None` returned unexpectedly |
 | OPEN-05 | No draw warning when approaching fifty-move or threefold limits |
 | OPEN-07 | State leak between networked game sessions — legal move in a new online game rejected as illegal after completing a previous game. Likely stale board state, piece flags, turn tracking, or sequence numbers carried from the prior session. Suspected: `simulator/networked_runner.py`, `game/networked_board.py`, relay room state. |
+| OPEN-08 | Chaos fuzzer corpus not deterministically replayable — seeds control RNG decisions but not network timing/thread scheduling. Same seeds can produce different outcomes. Need mock-based replay or timeline event injection for true determinism. Suspected: `harness/grand_fuzzer/`, `harness/chaos_replay.py`. |

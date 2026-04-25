@@ -1,0 +1,166 @@
+{
+  "version": 2,
+  "type": "chaos",
+  "created": "2026-04-22T19:13:59.471883+00:00",
+  "source": "grand_e2e",
+  "seeds": {
+    "game": 956779753,
+    "fault": 78454328,
+    "timing": 1571814640
+  },
+  "chaos_profile": "standard",
+  "mode": "lan_host",
+  "timeline": [
+    {
+      "seq": 0,
+      "ts": 0.0,
+      "type": "phase",
+      "phase": "SETUP"
+    },
+    {
+      "seq": 1,
+      "ts": 0.0,
+      "type": "phase",
+      "phase": "COLOR_PICK"
+    },
+    {
+      "seq": 2,
+      "ts": 0.002,
+      "type": "phase",
+      "phase": "PLAYING"
+    },
+    {
+      "seq": 3,
+      "ts": 0.06,
+      "type": "move",
+      "fr": 1,
+      "fc": 4,
+      "tr": 2,
+      "tc": 4,
+      "team": "r",
+      "flags": {}
+    },
+    {
+      "seq": 4,
+      "ts": 0.06,
+      "type": "send",
+      "peer": "master",
+      "msg": {
+        "type": "move",
+        "from_row": 1,
+        "from_col": 4,
+        "to_row": 2,
+        "to_col": 4,
+        "team_key": "r",
+        "flags": {}
+      }
+    },
+    {
+      "seq": 5,
+      "ts": 0.06,
+      "type": "recv",
+      "peer": "slave",
+      "msg": {
+        "type": "move",
+        "from_row": 1,
+        "from_col": 4,
+        "to_row": 2,
+        "to_col": 4,
+        "team_key": "r",
+        "flags": {}
+      }
+    },
+    {
+      "seq": 6,
+      "ts": 0.064,
+      "type": "move",
+      "fr": 7,
+      "fc": 1,
+      "tr": 5,
+      "tc": 2,
+      "team": "l",
+      "flags": {}
+    },
+    {
+      "seq": 7,
+      "ts": 0.064,
+      "type": "send",
+      "peer": "master",
+      "msg": {
+        "type": "move",
+        "from_row": 7,
+        "from_col": 1,
+        "to_row": 5,
+        "to_col": 2,
+        "team_key": "l",
+        "flags": {}
+      }
+    },
+    {
+      "seq": 8,
+      "ts": 0.064,
+      "type": "recv",
+      "peer": "slave",
+      "msg": {
+        "type": "move",
+        "from_row": 7,
+        "from_col": 1,
+        "to_row": 5,
+        "to_col": 2,
+        "team_key": "l",
+        "flags": {}
+      }
+    },
+    {
+      "seq": 9,
+      "ts": 0.068,
+      "type": "move",
+      "fr": 0,
+      "fc": 6,
+      "tr": 2,
+      "tc": 5,
+      "team": "r",
+      "flags": {}
+    },
+    {
+      "seq": 10,
+      "ts": 0.068,
+      "type": "fault",
+      "kind": "DROP",
+      "peer": "master",
+      "before": {
+        "type": "move",
+        "from_row": 0,
+        "from_col": 6,
+        "to_row": 2,
+        "to_col": 5,
+        "team_key": "r",
+        "flags": {}
+      }
+    },
+    {
+      "seq": 11,
+      "ts": 0.068,
+      "type": "fault_injected",
+      "ply": 2,
+      "reason": "drop",
+      "peer": "master"
+    }
+  ],
+  "failure": {
+    "seq": 12,
+    "kind": "recovery_failed_drop",
+    "detail": "Production failed to recover from drop",
+    "status": "open"
+  },
+  "team_r_rgb": [
+    64,
+    180,
+    232
+  ],
+  "team_l_rgb": [
+    255,
+    140,
+    0
+  ]
+}

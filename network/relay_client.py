@@ -115,7 +115,8 @@ class RelayClient:
 
     @property
     def connected(self) -> bool:
-        return self._ws is not None
+        """True if WebSocket is open and not stopping."""
+        return self._ws is not None and not self._stop.is_set()
 
     # ── Public API (same interface as GameServer / GameClient) ─────────────────
 

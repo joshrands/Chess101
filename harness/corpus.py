@@ -178,6 +178,7 @@ def save_chaos_corpus(
     failure: dict,
     team_r_rgb: tuple[int, int, int] | None = None,
     team_l_rgb: tuple[int, int, int] | None = None,
+    mode: str | None = None,
 ) -> Path:
     """Write a chaos corpus file (v2) and return its path.
 
@@ -197,6 +198,8 @@ def save_chaos_corpus(
         Dict with ``seq`` (int), ``kind`` (str), ``detail`` (str), etc.
     team_r_rgb, team_l_rgb:
         Optional team colours for board reconstruction.
+    mode:
+        Slave mode used (e.g. ``"lan_host"``, ``"online_host"``).
     """
     crashes_dir.mkdir(parents=True, exist_ok=True)
     now = datetime.now(timezone.utc)
@@ -219,6 +222,8 @@ def save_chaos_corpus(
         corpus["team_r_rgb"] = list(team_r_rgb)
     if team_l_rgb:
         corpus["team_l_rgb"] = list(team_l_rgb)
+    if mode:
+        corpus["mode"] = mode
 
     path = crashes_dir / fname
     path.write_text(json.dumps(corpus, indent=2))

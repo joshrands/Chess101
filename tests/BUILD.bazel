@@ -356,6 +356,7 @@ py_test(
     deps = [
         ":conftest",
         "//core",
+        "//harness:chaos_replay",
         "//harness:chess_helpers",
         "//harness:corpus",
         "//harness:python_bridge",

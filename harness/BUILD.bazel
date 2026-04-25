@@ -48,6 +48,16 @@ py_library(
     ],
 )
 
+py_library(
+    name = "chaos_replay",
+    srcs = ["chaos_replay.py"],
+    visibility = ["//:__subpackages__"],
+    deps = [
+        ":corpus",
+        "//harness/grand_fuzzer/fuzzers:grand_e2e",
+    ],
+)
+
 py_binary(
     name = "fuzz_chessmatrix",
     srcs = ["fuzz_chessmatrix.py"],

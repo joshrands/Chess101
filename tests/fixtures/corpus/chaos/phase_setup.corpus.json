@@ -1,0 +1,43 @@
+{
+  "version": 2,
+  "type": "chaos",
+  "created": "2026-04-22T15:07:45.905941+00:00",
+  "source": "grand_e2e",
+  "seeds": {
+    "game": 911062883,
+    "fault": 800003107,
+    "timing": 3760660250
+  },
+  "chaos_profile": "standard",
+  "mode": "lan_host",
+  "timeline": [
+    {
+      "seq": 0,
+      "ts": 0.0,
+      "type": "phase",
+      "phase": "SETUP"
+    },
+    {
+      "seq": 1,
+      "ts": 0.0,
+      "type": "phase",
+      "phase": "COLOR_PICK"
+    }
+  ],
+  "failure": {
+    "seq": 2,
+    "kind": "phase_setup",
+    "detail": "slave didn't receive color_r: None",
+    "status": "open"
+  },
+  "team_r_rgb": [
+    64,
+    180,
+    232
+  ],
+  "team_l_rgb": [
+    255,
+    140,
+    0
+  ]
+}

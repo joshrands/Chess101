@@ -35,8 +35,9 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "harness"))
 
 from python_bridge import JsBridge  # noqa: E402
-from corpus import load_corpus, discover_corpus  # noqa: E402
+from corpus import load_corpus, discover_corpus, is_chaos_corpus  # noqa: E402
 from replay import ReplayEngine  # noqa: E402
+from chaos_replay import ChaosReplayEngine  # noqa: E402
 
 _FIXTURES_DIR = Path(__file__).resolve().parent / "fixtures" / "corpus"
 _CRASHES_DIR = Path(__file__).resolve().parent.parent / "harness" / "crashes"
@@ -92,12 +93,33 @@ class TestCorpusReplay:
     )
     def test_replay(self, bridge, corpus_path):
         corpus = load_corpus(corpus_path)
+        status = corpus["failure"].get("status", "open")
+        failure_kind = corpus["failure"].get("kind", "unknown")
+
+        # ── Chaos corpus (network resilience) ────────────────────────────
+        if is_chaos_corpus(corpus):
+            engine = ChaosReplayEngine(corpus)
+            result = engine.replay()
+
+            if status == "fixed":
+                # Bug is fixed — replay must succeed. Failure is regression.
+                assert result.success, (
+                    f"REGRESSION: chaos corpus failed after fix: "
+                    f"{result.error}"
+                )
+            else:
+                # Bug is open — failure is expected.
+                if not result.success:
+                    pytest.xfail(
+                        f"Known chaos bug ({failure_kind}): {result.error}"
+                    )
+            return
+
+        # ── Lockstep corpus (chess engine parity) ────────────────────────
         engine = ReplayEngine(corpus, bridge)
         engine.init()
 
         failure_ply = corpus["failure"]["ply"]
-        failure_kind = corpus["failure"].get("kind", "unknown")
-        status = corpus["failure"].get("status", "open")
 
         while not engine.is_complete:
             result = engine.step()

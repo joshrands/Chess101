@@ -791,8 +791,17 @@ class GrandE2EFuzzer:
         master_peer: NetworkPeer | None = None,
         slave_peer: NetworkPeer | None = None,
         spectator_peer: NetworkPeer | None = None,
+        fault_seed: int | None = None,
+        timing_seed: int | None = None,
     ) -> FuzzResult:
-        """Run one complete game with chaos injection and lockstep verification."""
+        """Run one complete game with chaos injection and lockstep verification.
+
+        Parameters
+        ----------
+        fault_seed, timing_seed:
+            Optional explicit seeds for deterministic replay. If None,
+            derived from game_seed for variety during fuzzing.
+        """
         game_rng = random.Random(game_seed)
         team_r_rgb = TEAM_R_RGB
         team_l_rgb = TEAM_L_RGB
@@ -800,9 +809,11 @@ class GrandE2EFuzzer:
         timeline = TimelineRecorder()
         timeline.record_phase("SETUP")
 
-        # Derive per-game fault and timing seeds from game_seed for variety
-        fault_seed = game_rng.randint(0, 2**32)
-        timing_seed = game_rng.randint(0, 2**32)
+        # Use explicit seeds if provided (replay), else derive from game_seed
+        if fault_seed is None:
+            fault_seed = game_rng.randint(0, 2**32)
+        if timing_seed is None:
+            timing_seed = game_rng.randint(0, 2**32)
 
         seeds = {
             "game": game_seed,
@@ -1064,6 +1075,7 @@ class GrandE2EFuzzer:
             failure={"seq": len(timeline.events), "kind": kind, "detail": detail},
             team_r_rgb=team_r_rgb,
             team_l_rgb=team_l_rgb,
+            mode=self._mode.name.lower(),
         )
         return FuzzResult.failure(
             f"ply {ply}: {kind} - {detail}",

@@ -60,6 +60,11 @@ class GameClient:
     # Public API
     # ------------------------------------------------------------------
 
+    @property
+    def is_connected(self) -> bool:
+        """True if currently connected and not stopping."""
+        return self._ws is not None and self._connected.is_set() and not self._stop.is_set()
+
     def set_message_handler(self, handler: Callable[[dict], None]) -> None:
         """Register the callback invoked for every inbound JSON message."""
         self._handler = handler

@@ -120,18 +120,54 @@ class NetworkedBoard(Board):
         self._peer_disconnected = False
         self._awaiting_reconnect = False
         self._reconnect_deadline: Optional[float] = None
+        self._reconnect_epoch: int = 0  # Incremented on each reconnect
 
         # Track whose turn it is for board_sync
         self._current_turn_key: str = "r"  # team_r goes first
+
+        # ACK tracking for setup messages
+        self._received_acks: set[str] = set()
 
         super().__init__(*args, **kwargs)
         self._net.set_message_handler(self._on_network_message)
 
     # ── Helpers ────────────────────────────────────────────────────────────────
 
-    def _net_send(self, msg: dict) -> None:
-        """Send over the active connection (thread-safe)."""
+    def _net_send(self, msg: dict) -> bool:
+        """Send over the active connection (thread-safe).
+
+        Returns False if peer is disconnected or awaiting reconnect.
+        """
+        if self._peer_disconnected or self._awaiting_reconnect:
+            logger.debug("Skip send (disconnected): %s", msg.get("type"))
+            return False
         self._net.send(msg)
+        return True
+
+    def _send_with_ack(
+        self, msg: dict, ack_type: str, timeout: float = 5.0, max_retries: int = 3
+    ) -> bool:
+        """Send message and wait for ACK with exponential backoff retry.
+
+        Returns True if ACK received, False on timeout after all retries.
+        """
+        for attempt in range(max_retries):
+            if not self._net_send(msg):
+                return False
+            deadline = time.time() + timeout * (2 ** attempt)
+            while time.time() < deadline:
+                self._drain_incoming()
+                if ack_type in self._received_acks:
+                    self._received_acks.discard(ack_type)
+                    return True
+                time.sleep(0.05)
+            logger.debug("ACK timeout for %s (attempt %d)", ack_type, attempt + 1)
+        return False
+
+    def _on_ack(self, msg: dict) -> None:
+        """Handle ACK messages by recording them for _send_with_ack."""
+        ack_type = msg.get("type", "")
+        self._received_acks.add(ack_type)
 
     def _local_team(self):
         return self.team_r if self._local_team_key == "r" else self.team_l
@@ -166,7 +202,9 @@ class NetworkedBoard(Board):
         handlers = {
             "hello":            self._on_hello,
             "color_chosen":     self._on_color_chosen,
+            "color_chosen_ack": self._on_ack,
             "war_games_choice": self._on_war_games_choice,
+            "war_games_choice_ack": self._on_ack,
             "game_start":       self._on_game_start,
             "move":             self._on_remote_move,
             "move_ack":         self._on_move_ack,
@@ -188,7 +226,8 @@ class NetworkedBoard(Board):
     def on_connected(self) -> None:
         """Peer connected — send hello or request board_sync on reconnect."""
         if self._has_connected_once and self._peer_disconnected:
-            logger.info("Reconnected — requesting board_sync")
+            self._reconnect_epoch += 1
+            logger.info("Reconnected (epoch=%d) — requesting board_sync", self._reconnect_epoch)
             self._peer_disconnected = False
             self._awaiting_reconnect = False
             self._reconnect_deadline = None
@@ -260,6 +299,7 @@ class NetworkedBoard(Board):
             if name: self.team_l.name = name
             self._remote_team_l_color_idx = color_idx
         logger.info("Color chosen: team=%s r=%d g=%d b=%d", team_key, r_val, g_val, b_val)
+        self._net_send({"type": "color_chosen_ack", "team_key": team_key})
         self._check_config_complete()
 
     def _on_war_games_choice(self, msg: dict) -> None:
@@ -275,6 +315,7 @@ class NetworkedBoard(Board):
             self.computer_player_l = is_ai
             self._remote_team_l_is_ai = is_ai
         logger.info("War games choice: team=%s ai=%s", team_key, is_ai)
+        self._net_send({"type": "war_games_choice_ack", "team_key": team_key})
         self._check_config_complete()
 
     def _check_config_complete(self) -> None:
@@ -299,9 +340,19 @@ class NetworkedBoard(Board):
         self._game_start_evt.set()
 
     def _on_remote_move(self, msg: dict) -> None:
+        # Filter stale messages from older epochs (relay replay after reconnect)
+        msg_epoch = msg.get("epoch", 0)
+        if msg_epoch < self._reconnect_epoch:
+            logger.debug("Ignoring stale move (epoch %d < %d)", msg_epoch, self._reconnect_epoch)
+            return
         self._pending_remote_move = msg
 
     def _on_move_ack(self, msg: dict) -> None:
+        # Filter stale ACKs from older epochs
+        msg_epoch = msg.get("epoch", 0)
+        if msg_epoch < self._reconnect_epoch:
+            logger.debug("Ignoring stale move_ack (epoch %d < %d)", msg_epoch, self._reconnect_epoch)
+            return
         self._last_move_ack_status = msg.get("status", "ok")
         self._move_ack_evt.set()
         if self._last_move_ack_status == "desync":
@@ -590,6 +641,7 @@ class NetworkedBoard(Board):
         h = board_hash(self.grid, self.peace_time, team_key, self.team_r)
         msg = build_move_msg(self._net_seq, fr, fc, tr, tc,
                              type(piece).__name__, flags, h)
+        msg["epoch"] = self._reconnect_epoch
         self._net_send(msg)
         logger.info("Sent move seq=%d %d%d→%d%d", self._net_seq, fr, fc, tr, tc)
 
@@ -762,7 +814,12 @@ class NetworkedBoard(Board):
         h          = board_hash(self.grid, self.peace_time, team_key, self.team_r)
         remote_h   = msg.get("board_hash", "")
         status     = "ok" if h == remote_h else "desync"
-        self._net_send({"type": "move_ack", "seq": msg.get("seq", 0), "status": status})
+        self._net_send({
+            "type": "move_ack",
+            "seq": msg.get("seq", 0),
+            "epoch": self._reconnect_epoch,
+            "status": status,
+        })
         if status == "desync":
             self._net_send({"type": "board_sync_request"})
             # Log moved pieces and en_passant state for debugging
@@ -1291,12 +1348,14 @@ class NetworkedBoard(Board):
             logger.info("NetworkedBoard: waiting for Pi to choose team_r color (row 2)...")
             local_color_idx = self._local_color_picker_networked()
             self.team_r.r += 1  # BUG-02 lock-in: mirrors Board.color_picker()
-            self._net_send({
+            if not self._send_with_ack({
                 "type": "color_chosen", "team_key": "r",
                 "color_idx": local_color_idx,
                 "r": int(self.team_r.r), "g": int(self.team_r.g),
                 "b": int(self.team_r.b), "name": self.team_r.name,
-            })
+            }, "color_chosen_ack"):
+                logger.error("Failed to get ACK for color_chosen r")
+                return
             logger.info("Sent color_chosen r (idx=%d) — waiting for guest color...", local_color_idx)
 
             # Step 2: wait for guest (team_l) color
@@ -1311,11 +1370,13 @@ class NetworkedBoard(Board):
             # Step 3: Pi picks team_r human/AI
             logger.info("NetworkedBoard: waiting for Pi to choose human/AI (row 3)...")
             self._local_war_games_networked()
-            self._net_send({
+            if not self._send_with_ack({
                 "type": "war_games_choice", "team_key": "r",
                 "is_ai": self.computer_player_r,
                 "player_type": "ai" if self.computer_player_r else "human",
-            })
+            }, "war_games_choice_ack"):
+                logger.error("Failed to get ACK for war_games_choice r")
+                return
             logger.info("Sent war_games_choice r (ai=%s) — waiting for guest choice...",
                         self.computer_player_r)
 

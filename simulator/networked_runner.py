@@ -116,6 +116,8 @@ class NetworkedGameRunner(GameRunner):
         self._reconnect_attempted = False   # True once a relay reconnect thread is running
         self._session_lost = False          # True when relay restarted and room is gone
         self._connecting = False            # True while background relay connect is in progress
+        self._reconnect_epoch: int = 0      # Incremented on reconnect, filters stale messages
+        self._received_acks: set[str] = set()  # ACK tracking for setup messages
 
         # Negotiation state
         self._local_color_sent = False
@@ -272,14 +274,46 @@ class NetworkedGameRunner(GameRunner):
         self._close_camera()
         super()._reset()
 
-    def _net_send(self, msg: dict) -> None:
-        """Send a message over the active connection (thread-safe)."""
+    def _net_send(self, msg: dict) -> bool:
+        """Send a message over the active connection (thread-safe).
+
+        Returns False if peer is disconnected.
+        """
+        if self._peer_disconnected:
+            logger.debug("Skip send (disconnected): %s", msg.get("type"))
+            return False
         if self._server:
             self._server.send(msg)
         elif self._client:
             self._client.send(msg)
         elif self._relay_client:
             self._relay_client.send(msg)
+        return True
+
+    def _send_with_ack(
+        self, msg: dict, ack_type: str, timeout: float = 5.0, max_retries: int = 3
+    ) -> bool:
+        """Send message and wait for ACK with exponential backoff retry.
+
+        Returns True if ACK received, False on timeout after all retries.
+        """
+        for attempt in range(max_retries):
+            if not self._net_send(msg):
+                return False
+            deadline = time.time() + timeout * (2 ** attempt)
+            while time.time() < deadline:
+                self._drain_incoming()
+                if ack_type in self._received_acks:
+                    self._received_acks.discard(ack_type)
+                    return True
+                time.sleep(0.05)
+            logger.debug("ACK timeout for %s (attempt %d)", ack_type, attempt + 1)
+        return False
+
+    def _on_ack(self, msg: dict) -> None:
+        """Handle ACK messages by recording them for _send_with_ack."""
+        ack_type = msg.get("type", "")
+        self._received_acks.add(ack_type)
 
     def _on_network_message(self, msg: dict) -> None:
         """Called from the network daemon thread for every inbound message.
@@ -304,7 +338,9 @@ class NetworkedGameRunner(GameRunner):
             "hello":             self._on_hello,
             "game_setup":        self._on_game_setup,
             "color_chosen":      self._on_color_chosen,
+            "color_chosen_ack":  self._on_ack,
             "war_games_choice":  self._on_war_games_choice,
+            "war_games_choice_ack": self._on_ack,
             "game_start":        self._on_game_start,
             "move":              self._on_remote_move,
             "move_ack":          self._on_move_ack,
@@ -397,7 +433,8 @@ class NetworkedGameRunner(GameRunner):
     def _on_reconnect_result(self, msg: dict) -> None:
         """Internal: result of a background relay reconnect attempt."""
         if msg.get("ok"):
-            logger.info("Relay reconnect succeeded")
+            self._reconnect_epoch += 1
+            logger.info("Relay reconnect succeeded (epoch=%d)", self._reconnect_epoch)
             self._peer_disconnected = False
             self._reconnect_attempted = False
             self._disconnect_time_ms = None
@@ -518,6 +555,7 @@ class NetworkedGameRunner(GameRunner):
             self._selected_l_idx = color_idx
         self._remote_color_received = True
         logger.info("Remote color_chosen: team=%s idx=%d", team_key, color_idx)
+        self._net_send({"type": "color_chosen_ack", "team_key": team_key})
         self._check_color_complete()
 
     def _check_color_complete(self) -> None:
@@ -538,6 +576,7 @@ class NetworkedGameRunner(GameRunner):
             b.computer_player_l = is_ai
         self._remote_war_received = True
         logger.info("Remote war_games_choice: team=%s ai=%s", team_key, is_ai)
+        self._net_send({"type": "war_games_choice_ack", "team_key": team_key})
         self._check_war_complete()
 
     def _check_war_complete(self) -> None:
@@ -580,10 +619,20 @@ class NetworkedGameRunner(GameRunner):
 
     def _on_remote_move(self, msg: dict) -> None:
         """Inbound move from opponent — queue for main thread application."""
+        # Filter stale messages from older epochs (relay replay after reconnect)
+        msg_epoch = msg.get("epoch", 0)
+        if msg_epoch < self._reconnect_epoch:
+            logger.debug("Ignoring stale move (epoch %d < %d)", msg_epoch, self._reconnect_epoch)
+            return
         # Store for processing in _update() during opponent's turn
         self._pending_remote_move = msg
 
     def _on_move_ack(self, msg: dict) -> None:
+        # Filter stale ACKs from older epochs
+        msg_epoch = msg.get("epoch", 0)
+        if msg_epoch < self._reconnect_epoch:
+            logger.debug("Ignoring stale move_ack (epoch %d < %d)", msg_epoch, self._reconnect_epoch)
+            return
         status = msg.get("status", "ok")
         if status == "ok":
             self._waiting_for_ack = False
@@ -971,6 +1020,7 @@ class NetworkedGameRunner(GameRunner):
                     pm["fr"], pm["fc"], pm["tr"], pm["tc"],
                     pm["piece"], pm["flags"], h,
                 )
+                msg["epoch"] = self._reconnect_epoch
                 self._net_send(msg)
                 self._waiting_for_ack = True
             self._log_move(
@@ -1163,6 +1213,7 @@ class NetworkedGameRunner(GameRunner):
         self._net_send({
             "type": "move_ack",
             "seq": msg.get("seq", 0),
+            "epoch": self._reconnect_epoch,
             "status": status,
         })
 
