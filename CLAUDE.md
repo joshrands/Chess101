@@ -37,6 +37,9 @@ Every bug fix and feature change needs a regression test. If the fix touches:
 - `web/chess-engine.js` or `web/sim.html` → add to `tests/test_sim_js.js`
 - `Chess101iOS/Sources/Chess101Engine/` → add to `Chess101iOS/Tests/`
 
+### 5. Fuzzers Must Use Real Game Code
+Fuzzers should exercise as much actual game code as possible. Don't create parallel implementations or mock the game layer — run the real `NetworkedGameRunner`, `NetworkedBoard`, `GameServer`, `GameClient`, etc. If a fix goes into game code, the fuzzer must run that code to verify the fix works.
+
 ---
 
 ## Shell notes
