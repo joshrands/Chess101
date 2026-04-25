@@ -57,6 +57,7 @@ logger = logging.getLogger(__name__)
 _ACK_TIMEOUT_S    = 30.0   # seconds to wait for move_ack before declaring disconnect
 _REMOTE_TIMEOUT_S = 300.0  # 5 minutes for the opponent to move before timeout
 _SETUP_TIMEOUT_S  = 300.0  # 5 minutes for physical setup before timeout
+_RECOVERY_TIMEOUT_S = 30.0 # seconds to wait for reconnect/board_sync recovery
 
 
 class NetworkedBoard(Board):
@@ -114,6 +115,15 @@ class NetworkedBoard(Board):
         self._keepalive_stop = threading.Event()
         self._ping_seq = 0
 
+        # Reconnect tracking
+        self._has_connected_once = False
+        self._peer_disconnected = False
+        self._awaiting_reconnect = False
+        self._reconnect_deadline: Optional[float] = None
+
+        # Track whose turn it is for board_sync
+        self._current_turn_key: str = "r"  # team_r goes first
+
         super().__init__(*args, **kwargs)
         self._net.set_message_handler(self._on_network_message)
 
@@ -165,6 +175,7 @@ class NetworkedBoard(Board):
             "board_sync":       self._on_board_sync,
             "game_event":       self._on_game_event,
             "ping":             self._on_ping,
+            "_peer_lost":       self._on_peer_lost,
         }
         handler = handlers.get(msg.get("type", ""))
         if handler:
@@ -175,7 +186,16 @@ class NetworkedBoard(Board):
     # ── Connection callbacks (called from network thread) ─────────────────────
 
     def on_connected(self) -> None:
-        """Peer connected — send hello and (if HOST) send game_setup."""
+        """Peer connected — send hello or request board_sync on reconnect."""
+        if self._has_connected_once and self._peer_disconnected:
+            logger.info("Reconnected — requesting board_sync")
+            self._peer_disconnected = False
+            self._awaiting_reconnect = False
+            self._reconnect_deadline = None
+            self._net_send({"type": "board_sync_request"})
+            return
+
+        self._has_connected_once = True
         self._peer_name = None
         self._net_send({
             "type": "hello",
@@ -185,10 +205,17 @@ class NetworkedBoard(Board):
         logger.info("Peer connected — sent hello")
 
     def on_disconnected(self) -> None:
-        """Peer disconnected."""
-        logger.warning("Peer disconnected")
+        """Peer disconnected — will auto-reconnect if using GameClient."""
+        logger.warning("Peer disconnected — waiting for reconnect")
+        self._peer_disconnected = True
         with self._net_lock:
             self._incoming.append({"type": "_peer_lost"})
+
+    def _on_peer_lost(self, msg: dict) -> None:
+        """Handle peer disconnect — pause game loop, wait for reconnect."""
+        logger.warning("Peer lost — pausing for reconnect")
+        self._awaiting_reconnect = True
+        self._reconnect_deadline = time.time() + _RECOVERY_TIMEOUT_S
 
     # ── Message handlers ───────────────────────────────────────────────────────
 
@@ -287,12 +314,16 @@ class NetworkedBoard(Board):
 
     def _on_board_sync(self, msg: dict) -> None:
         from network.protocol import decode_grid
-        logger.warning("Applying board_sync from peer")
+        logger.warning("Applying board_sync from peer: turn=%s seq=%d",
+                       msg.get("current_team_key", "?"), msg.get("seq", -1))
         decoded = decode_grid(msg["grid"], self.team_r, self.team_l)
         for r in range(8):
             for c in range(8):
                 self.grid[r][c] = decoded[r][c]
         self.peace_time = msg.get("peace_time", self.peace_time)
+        # Sync seq so next move uses correct number
+        if "seq" in msg:
+            self._net_seq = msg["seq"]
 
     def _on_game_event(self, msg: dict) -> None:
         event = msg.get("event")
@@ -327,12 +358,12 @@ class NetworkedBoard(Board):
         self._send_board_sync()
 
     def _send_board_sync(self) -> None:
-        team_key = "r" if self._local_team_key == "r" else "l"
         self._net_send({
             "type": "board_sync",
             "grid": encode_grid(self.grid, self.team_r),
             "peace_time": self.peace_time,
-            "current_team_key": team_key,
+            "current_team_key": self._current_turn_key,
+            "seq": self._net_seq,
         })
 
     # ── Waiting animation ──────────────────────────────────────────────────────
@@ -548,7 +579,7 @@ class NetworkedBoard(Board):
     # ── _on_local_move hook (called by Board.do_turn after each physical move) ─
 
     def _on_local_move(self, fr: int, fc: int, tr: int, tc: int, pre_capture) -> None:
-        """Build MoveFlags, send move message, wait for move_ack."""
+        """Build MoveFlags, send move message, wait for move_ack with retry."""
         piece = self.grid[tr][tc]  # grid[tr][tc] = moving piece after do_turn assignment
         if piece is None:
             return
@@ -562,14 +593,42 @@ class NetworkedBoard(Board):
         self._net_send(msg)
         logger.info("Sent move seq=%d %d%d→%d%d", self._net_seq, fr, fc, tr, tc)
 
-        # Wait for ack
+        # Wait for ack with retry
         self._move_ack_evt.clear()
         deadline = time.time() + _ACK_TIMEOUT_S
+        retry_sent = False
+
         while not self._move_ack_evt.is_set() and time.time() < deadline:
             self._drain_incoming()
             time.sleep(0.05)
+
+        if self._move_ack_evt.is_set():
+            return
+
+        # First timeout — retry the move
+        logger.warning("move_ack timeout — resending move")
+        self._net_send(msg)
+        retry_sent = True
+        deadline = time.time() + _ACK_TIMEOUT_S / 2
+
+        while not self._move_ack_evt.is_set() and time.time() < deadline:
+            self._drain_incoming()
+            time.sleep(0.05)
+
+        if self._move_ack_evt.is_set():
+            return
+
+        # Second timeout — try board_sync recovery
+        logger.warning("move_ack retry timeout — requesting board_sync")
+        self._net_send({"type": "board_sync_request"})
+        deadline = time.time() + _RECOVERY_TIMEOUT_S
+
+        while not self._move_ack_evt.is_set() and time.time() < deadline:
+            self._drain_incoming()
+            time.sleep(0.05)
+
         if not self._move_ack_evt.is_set():
-            logger.error("move_ack timeout — treating as disconnect")
+            logger.error("move_ack recovery failed — game over")
             self.game_over = True
 
     def _on_game_over(self, event: str, losing_team) -> None:
@@ -622,23 +681,46 @@ class NetworkedBoard(Board):
     # ── Remote move application ────────────────────────────────────────────────
 
     def _wait_for_remote_move(self, timeout: float = _REMOTE_TIMEOUT_S) -> None:
-        """Block until a remote move arrives or the timeout expires.
+        """Block until a remote move arrives, with recovery on timeout.
 
-        Sets ``self.game_over = True`` on timeout.
+        On initial timeout: sends board_sync_request and waits again.
+        Only sets ``self.game_over = True`` after recovery fails.
         """
         deadline = time.time() + timeout
-        while not self.game_over and time.time() < deadline:
+        recovery_attempted = False
+
+        while not self.game_over:
+            # Check for reconnect in progress — extend deadline
+            if self._awaiting_reconnect:
+                if self._reconnect_deadline and time.time() > self._reconnect_deadline:
+                    logger.error("Reconnect timeout — game over")
+                    self.game_over = True
+                    return
+                time.sleep(0.1)
+                continue
+
             self._drain_incoming()
+
             if self._pending_remote_move is not None:
                 msg = self._pending_remote_move
                 self._pending_remote_move = None
                 self._apply_remote_move(msg)
                 return
-            time.sleep(0.05)
 
-        if not self.game_over:
-            logger.error("Timeout waiting for remote move — game over")
-            self.game_over = True
+            if time.time() > deadline:
+                if not recovery_attempted:
+                    # First timeout — try recovery
+                    logger.warning("Remote move timeout — requesting board_sync")
+                    self._net_send({"type": "board_sync_request"})
+                    recovery_attempted = True
+                    deadline = time.time() + _RECOVERY_TIMEOUT_S
+                else:
+                    # Recovery failed
+                    logger.error("Recovery timeout — game over")
+                    self.game_over = True
+                    return
+
+            time.sleep(0.05)
 
     def _apply_remote_move(self, msg: dict) -> None:
         """Apply an incoming move message by guiding the human to physically
@@ -1340,6 +1422,9 @@ class NetworkedBoard(Board):
 
     def _do_turn_networked(self, team) -> None:
         """Route to local physical turn or remote wait based on team ownership."""
+        # Track current turn for board_sync
+        self._current_turn_key = "r" if team.r == self.team_r.r else "l"
+
         local_team = self._local_team()
         if team.r == local_team.r:
             self.do_turn(team)   # triggers _on_local_move hook when move made

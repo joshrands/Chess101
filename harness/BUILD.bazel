@@ -179,3 +179,72 @@ filegroup(
     srcs = ["js_bridge.js"],
     visibility = ["//:__subpackages__"],
 )
+
+# Grand Fuzzer - modular fuzzer infrastructure
+py_library(
+    name = "grand_fuzzer_lib",
+    srcs = glob(["grand_fuzzer/**/*.py"]),
+    visibility = ["//:__subpackages__"],
+    deps = [
+        ":chess_helpers",
+        ":corpus",
+        "//network",
+    ],
+)
+
+py_binary(
+    name = "validator_fuzzer",
+    srcs = ["grand_fuzzer/fuzzers/validator_fuzzer.py"],
+    main = "grand_fuzzer/fuzzers/validator_fuzzer.py",
+    deps = [
+        ":chess_helpers",
+        ":corpus",
+        "//network",
+    ],
+)
+
+py_binary(
+    name = "phase_fuzzer",
+    srcs = ["grand_fuzzer/fuzzers/phase_fuzzer.py"],
+    main = "grand_fuzzer/fuzzers/phase_fuzzer.py",
+    deps = [
+        ":chess_helpers",
+        ":corpus",
+    ],
+)
+
+py_binary(
+    name = "reconnect_fuzzer",
+    srcs = ["grand_fuzzer/fuzzers/reconnect_fuzzer.py"],
+    main = "grand_fuzzer/fuzzers/reconnect_fuzzer.py",
+    deps = [
+        ":chess_helpers",
+        ":corpus",
+    ],
+)
+
+py_binary(
+    name = "state_machine_fuzzer",
+    srcs = ["grand_fuzzer/fuzzers/state_machine.py"],
+    main = "grand_fuzzer/fuzzers/state_machine.py",
+    deps = [
+        ":chess_helpers",
+        ":corpus",
+    ],
+)
+
+py_binary(
+    name = "grand_e2e",
+    srcs = ["grand_fuzzer/fuzzers/grand_e2e.py"],
+    main = "grand_fuzzer/fuzzers/grand_e2e.py",
+    data = [
+        "js_bridge.js",
+        "//web:chess_engine_js",
+    ],
+    deps = [
+        ":chess_helpers",
+        ":corpus",
+        ":lockstep_runner",
+        "//network",
+    ],
+)

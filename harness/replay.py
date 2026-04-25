@@ -27,6 +27,7 @@ from chess_helpers import (
     grids_equal,
     clear_en_passant,
 )
+from corpus import is_chaos_corpus, extract_moves_from_timeline
 
 
 @dataclass
@@ -56,14 +57,22 @@ class ReplayEngine:
     def __init__(self, corpus: dict, bridge=None):
         self.corpus = corpus
         self.bridge = bridge
-        self.team_r = Team(*corpus["team_r_rgb"])
-        self.team_l = Team(*corpus["team_l_rgb"])
+        self.is_chaos = is_chaos_corpus(corpus)
+
+        if self.is_chaos:
+            self.team_r = Team(*corpus.get("team_r_rgb", TEAM_R_RGB))
+            self.team_l = Team(*corpus.get("team_l_rgb", TEAM_L_RGB))
+            self._moves = extract_moves_from_timeline(corpus["timeline"])
+        else:
+            self.team_r = Team(*corpus["team_r_rgb"])
+            self.team_l = Team(*corpus["team_l_rgb"])
+            self._moves = corpus["moves"]
+
         self.py_grid: list = []
         self.peace_time: int = 0
         self.current_key: str = "r"
         self.ply: int = 0
 
-        # JS state (when bridge is provided)
         self._js_grid_json: Optional[list] = None
         self._spec_grid: Optional[list] = None
 
@@ -78,12 +87,13 @@ class ReplayEngine:
             self._js_grid_json = self.bridge.chess_init(
                 TEAM_R_RGB, TEAM_L_RGB,
             )
-            if self.corpus["type"] == "networked":
+            corpus_type = self.corpus.get("type", "chess")
+            if corpus_type == "networked":
                 self._spec_grid = self.bridge.spectator_init()
 
     def step(self) -> ReplayResult:
         """Apply the next move from the corpus. Returns comparison results."""
-        move = self.corpus["moves"][self.ply]
+        move = self._moves[self.ply]
         fr, fc, tr, tc = move["fr"], move["fc"], move["tr"], move["tc"]
 
         team = self.team_r if self.current_key == "r" else self.team_l
@@ -132,7 +142,8 @@ class ReplayEngine:
             hashes_match = py_hash == js_hash
 
             # Apply on JS spectator (networked corpus only)
-            if self.corpus["type"] == "networked" and self._spec_grid is not None:
+            corpus_type = self.corpus.get("type", "chess")
+            if corpus_type == "networked" and self._spec_grid is not None:
                 self._spec_grid = self.bridge.spectator_apply_move(
                     self._spec_grid, fr, fc, tr, tc, flags,
                 )
@@ -158,12 +169,12 @@ class ReplayEngine:
     @property
     def remaining(self) -> int:
         """Number of moves left to replay."""
-        return len(self.corpus["moves"]) - self.ply
+        return len(self._moves) - self.ply
 
     @property
     def is_complete(self) -> bool:
         """True when all corpus moves have been replayed."""
-        return self.ply >= len(self.corpus["moves"])
+        return self.ply >= len(self._moves)
 
     def grid_snapshot(self) -> list:
         """Current Python grid as JSON (for interactive mode)."""

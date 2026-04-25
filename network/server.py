@@ -123,7 +123,10 @@ class GameServer:
             self._started.set()
             return
         try:
-            server_cm = websockets.serve(self._accept, self._host, self._port)  # type: ignore[attr-defined]
+            server_cm = websockets.serve(  # type: ignore[attr-defined]
+                self._accept, self._host, self._port,
+                reuse_address=True,
+            )
             async with server_cm:
                 self._bound = True
                 self._started.set()

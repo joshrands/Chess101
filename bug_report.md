@@ -234,6 +234,50 @@ Purely cosmetic. On the Pi, team names appear only in display strings. In the si
 
 ---
 
+## Network Chaos Bugs (Grand Fuzzer)
+
+Discovered by `harness/grand_fuzzer` chaos testing on 2026-04-22. Total: **637 corpus files** across 7 failure categories. These are network resilience bugs — the system fails to handle connection drops, timeouts, and reconnection under adversarial conditions.
+
+| Category | Count | Sample Error |
+|---|---|---|
+| `chaos_disconnect` | 291 | master disconnected by fault injection |
+| `phase_setup` | 177 | slave didn't receive color_r: None |
+| `network_timeout` | 83 | slave did not receive move (or dropped by fault) |
+| `send_failed_already_disconnected` | 38 | master send failed: already_disconnected |
+| `chaos_drop` | 30 | master drop by fault injection |
+| `recovery_failed_drop` | 12 | Production failed to recover from drop |
+| `chaos_already_disconnected` | 6 | master already_disconnected by fault injection |
+
+**Corpus location:** `harness/crashes/grand_e2e/`
+
+**Suspected files:** `game/networked_board.py`, `network/server.py`, `network/relay_client.py`, `simulator/networked_runner.py`
+
+### BUG-16 — Phase setup fails under network chaos
+
+**Severity: High**
+
+Color pick phase does not reliably complete when network faults occur during handshake. Slave client receives `None` instead of `color_r` value after retry.
+
+**Root cause:** Retry logic in phase setup doesn't handle mid-handshake disconnection gracefully.
+
+### BUG-17 — Send fails on already-disconnected connection
+
+**Severity: Medium**
+
+Code attempts to send messages on connections that have already been disconnected, raising `already_disconnected` errors instead of checking connection state first.
+
+**Root cause:** Missing connection state check before send operations.
+
+### BUG-18 — Recovery fails after network drop
+
+**Severity: High**
+
+After fault injection drops a connection, the reconnection/recovery logic fails to restore game state. 12 corpus files show "Production failed to recover from drop".
+
+**Root cause:** Reconnection logic does not properly replay or resync game state.
+
+---
+
 ## Open issues
 
 Design debts not locked in by tests but worth tracking.

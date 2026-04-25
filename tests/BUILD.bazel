@@ -395,3 +395,23 @@ py_test(
         "@pip//pytest",
     ],
 )
+
+py_test(
+    name = "test_validator_adversarial",
+    srcs = ["test_validator_adversarial.py"],
+    deps = [
+        ":conftest",
+        "//network",
+        "@pip//pytest",
+    ],
+)
+
+py_test(
+    name = "test_networked_board_phases",
+    srcs = ["test_networked_board_phases.py"],
+    deps = [
+        ":conftest",
+        "//core",
+        "@pip//pytest",
+    ],
+)

@@ -107,8 +107,11 @@ class PythonEngine(ChessEngine):
         fr: int, fc: int, tr: int, tc: int,
         team_key: str, next_key: str, peace_time: int,
     ) -> dict:
-        if self._grid is None or self._team_r is None:
+        if self._grid is None or self._team_r is None or self._team_l is None:
             raise RuntimeError("Game not initialized")
+        # Clear en_passant for the team that just moved (window expired)
+        moving_team = self._team_r if team_key == "r" else self._team_l
+        clear_en_passant(self._grid, moving_team)
         py_apply_move(self._grid, fr, fc, tr, tc)
         grid_json = py_grid_to_json(self._grid, self._team_r)
         hash_val = board_hash(self._grid, peace_time, next_key, self._team_r)
