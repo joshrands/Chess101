@@ -163,16 +163,29 @@ class Board(SampleBase):
             self.canvas = self.matrix.SwapOnVSync(self.canvas)
 
     def _transition_to_networked(self, mode: str) -> None:
+        import threading
         from game.networked_board import NetworkedBoard
         from network.relay_client import RelayClient
 
-        role = "host" if mode == "host" else "guest"
-        local_team_key = "r" if mode == "host" else "l"
+        if mode == "host":
+            self._transition_host(NetworkedBoard, RelayClient, threading)
+        else:
+            self._transition_join(NetworkedBoard, RelayClient)
 
-        relay = RelayClient(role=role, player_name="Pi")
+    def _transition_host(self, NetworkedBoard, RelayClient, threading) -> None:
+        from network.server import GameServer
+        from network.discovery import BeaconBroadcaster
+
+        lan_server = GameServer(port=65101)
+        lan_server.start()
+        beacon = BeaconBroadcaster(host_name="Chess101", port=65101)
+        beacon.start()
+        logger.info("LAN server started on port 65101, broadcasting beacons")
+
+        relay = RelayClient(role="host", player_name="Pi")
         nb = NetworkedBoard(
             net=relay,
-            local_team_key=local_team_key,
+            local_team_key="r",
             relay=relay,
             rotation=self._rotation,
             sensor=self.master,
@@ -180,6 +193,76 @@ class Board(SampleBase):
         relay.set_message_handler(nb._on_network_message)
         relay._on_peer_connected = nb.on_connected
         relay._on_peer_disconnected = nb.on_disconnected
+
+        lan_connected = threading.Event()
+
+        def _on_lan_connect():
+            lan_connected.set()
+            nb.on_connected()
+
+        lan_server._on_connected = _on_lan_connect
+        lan_server._on_disconnected = nb.on_disconnected
+        nb._lan_server = lan_server
+        nb._lan_connected = lan_connected
+        nb._beacon = beacon
+
+        nb.matrix = self.matrix
+        nb.canvas = self.canvas
+
+        try:
+            nb._run_networked(skip_matrix_init=True)
+        finally:
+            beacon.stop()
+            lan_server.stop()
+            nb._cleanup()
+
+    def _transition_join(self, NetworkedBoard, RelayClient) -> None:
+        from network.discovery import BeaconListener
+
+        listener = BeaconListener()
+        listener.start()
+        logger.info("Scanning for LAN hosts...")
+
+        lan_host = None
+        deadline = time.monotonic() + 3.0
+        while time.monotonic() < deadline:
+            games = listener.games
+            if games:
+                game = next(iter(games.values()))
+                lan_host = (game.ip, game.port)
+                logger.info("LAN host found: %s:%d", game.ip, game.port)
+                break
+            time.sleep(0.1)
+        listener.stop()
+
+        if lan_host:
+            from network.client import GameClient
+            client = GameClient(host_ip=lan_host[0], port=lan_host[1])
+            nb = NetworkedBoard(
+                net=client,
+                local_team_key="l",
+                rotation=self._rotation,
+                sensor=self.master,
+            )
+            client._on_connected = nb.on_connected
+            client._on_disconnected = nb.on_disconnected
+            client.set_message_handler(nb._on_network_message)
+            if not client.connect(timeout=10.0):
+                logger.error("Failed to connect to LAN host %s:%d", lan_host[0], lan_host[1])
+                return
+        else:
+            logger.info("No LAN host found, using relay")
+            relay = RelayClient(role="guest", player_name="Pi")
+            nb = NetworkedBoard(
+                net=relay,
+                local_team_key="l",
+                relay=relay,
+                rotation=self._rotation,
+                sensor=self.master,
+            )
+            relay.set_message_handler(nb._on_network_message)
+            relay._on_peer_connected = nb.on_connected
+            relay._on_peer_disconnected = nb.on_disconnected
 
         nb.matrix = self.matrix
         nb.canvas = self.canvas

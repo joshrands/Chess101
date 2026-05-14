@@ -1059,15 +1059,17 @@ class NetworkedBoard(Board):
 
     def _show_chessmatrix_waiting(self, room_code: str) -> None:
         """Display the ChessMatrix barcode on the LED matrix and block until
-        the relay peer connects.
+        the relay peer or a LAN client connects.
 
         Re-blits the barcode every 5 s so the display stays fresh.  Returns
-        as soon as ``_relay._peer_joined`` is set.
+        as soon as ``_relay._peer_joined`` is set or ``_lan_connected`` fires.
+        If LAN connects first, switches ``_net`` to the LAN server.
         """
         from network import chessmatrix as _cm_mod
 
         grid = _cm_mod.encode(room_code)
         relay = self._relay
+        lan_evt = getattr(self, "_lan_connected", None)
 
         def _blit() -> None:
             self.canvas.Clear()
@@ -1078,14 +1080,22 @@ class NetworkedBoard(Board):
         logger.info("Displaying ChessMatrix for room %s — waiting for peer...", room_code)
 
         last_blit = time.time()
-        while relay is not None and not relay._peer_joined.is_set():  # type: ignore[attr-defined]
+        while True:
+            if relay is not None and relay._peer_joined.is_set():  # type: ignore[attr-defined]
+                logger.info("Relay peer connected — proceeding")
+                break
+            if lan_evt is not None and lan_evt.is_set():
+                logger.info("LAN client connected — switching transport to GameServer")
+                lan_server = getattr(self, "_lan_server", None)
+                if lan_server is not None:
+                    self._net = lan_server
+                    lan_server.set_message_handler(self._on_network_message)
+                break
             self._drain_incoming()
             if time.time() - last_blit >= 5.0:
                 _blit()
                 last_blit = time.time()
             time.sleep(0.1)
-
-        logger.info("Relay peer connected — proceeding")
 
     def _chessmatrix_input_ux(self) -> "str | None":
         """Reed-switch–driven ChessMatrix code entry for the Pi GUEST.
@@ -1314,15 +1324,31 @@ class NetworkedBoard(Board):
             self.canvas = self.matrix.CreateFrameCanvas()
 
         # ── Relay online play preamble ─────────────────────────────
+        lan_evt = getattr(self, "_lan_connected", None)
         if self._relay is not None:
             if self._local_team_key == "r":
-                # HOST: create room, show ChessMatrix, wait for peer
+                # HOST: create room, show ChessMatrix, wait for peer (or LAN)
                 room_code = self._relay.create_room(timeout=60.0)
                 if room_code is None:
-                    logger.error("Failed to create relay room — aborting")
-                    return
-                logger.info("Relay room created: %s", room_code)
-                self._show_chessmatrix_waiting(room_code)
+                    if lan_evt is not None:
+                        logger.warning("Relay room creation failed — waiting for LAN only")
+                        while not lan_evt.is_set():
+                            time.sleep(0.1)
+                        lan_server = getattr(self, "_lan_server", None)
+                        if lan_server is not None:
+                            self._net = lan_server
+                            lan_server.set_message_handler(self._on_network_message)
+                        logger.info("LAN client connected (no relay)")
+                    else:
+                        logger.error("Failed to create relay room — aborting")
+                        return
+                else:
+                    logger.info("Relay room created: %s", room_code)
+                    self._show_chessmatrix_waiting(room_code)
+                    if lan_evt is not None and lan_evt.is_set():
+                        logger.info("LAN took priority over relay")
+                    elif self._relay is not None:
+                        self._relay.set_message_handler(self._on_network_message)
             else:
                 # GUEST: enter room code via reed-switch ChessMatrix input
                 room_code = self._chessmatrix_input_ux()
@@ -1334,8 +1360,17 @@ class NetworkedBoard(Board):
                     logger.error("Failed to join relay room %s — aborting", room_code)
                     return
                 logger.info("Joined relay room: %s", room_code)
-            # Wire up message handler now that peer is connected
-            self._relay.set_message_handler(self._on_network_message)
+                self._relay.set_message_handler(self._on_network_message)
+        elif lan_evt is not None:
+            # No relay at all — pure LAN host waiting for connection
+            logger.info("No relay configured — waiting for LAN client")
+            while not lan_evt.is_set():
+                time.sleep(0.1)
+            lan_server = getattr(self, "_lan_server", None)
+            if lan_server is not None:
+                self._net = lan_server
+                lan_server.set_message_handler(self._on_network_message)
+            logger.info("LAN client connected")
 
         # ── Waiting animation — light chases board edges until peer connects ──
         if self._peer_name is None:
