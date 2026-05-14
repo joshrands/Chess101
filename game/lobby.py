@@ -8,6 +8,9 @@ from __future__ import annotations
 
 import random
 import time
+from enum import Enum, auto
+
+from core.constants import CellOccupancy
 
 AMBER_LIT = (160, 105, 25)
 AMBER_DARK = (10, 7, 2)
@@ -156,3 +159,139 @@ def spread_color(
         base = GREEN_LIT if checker else GREEN_DARK
         rb = rain_brightness(row, col, t)
         return (base[0], _clamp(base[1] + int(200 * rb)), base[2])
+
+
+CHOICE_HOST = (2, 0)
+CHOICE_JOIN = (5, 0)
+BLINK_PERIOD = 0.3
+FRAME_SLEEP = 0.02
+
+
+class _Phase(Enum):
+    L1_IDLE = auto()
+    L1_COUNTDOWN = auto()
+    L2_IDLE = auto()
+    L2_COUNTDOWN = auto()
+    BLINK_REMOVE = auto()
+
+
+class Lobby:
+    def __init__(self, board: object) -> None:
+        self._b = board
+
+    def run(self) -> str:
+        result = self._level1()
+        if result == "local":
+            self._blink_and_remove([result])
+            return "local"
+        rain_pos = result
+        mode = self._level2(rain_pos)
+        if mode == "__local__":
+            return "local"
+        self._blink_and_remove([rain_pos, CHOICE_HOST if mode == "host" else CHOICE_JOIN])
+        return mode
+
+    # -- Level 1 -------------------------------------------------------
+
+    def _level1(self) -> "str | tuple[int, int]":
+        """Run L1. Returns 'local' or (row, col) of the rain piece."""
+        chosen_side = None
+        piece_pos = None
+        countdown_start = None
+
+        while True:
+            t = time.monotonic()
+            self._b.master.read_data()
+
+            if chosen_side is None:
+                # Scan for any piece on rows 2-5
+                found_side = None
+                found_pos = None
+                for row in range(2, 6):
+                    for col in range(8):
+                        if self._b.master.get_cell_state(row, col) == CellOccupancy.OCCUPIED:
+                            found_side = "amber" if col <= 3 else "rain"
+                            found_pos = (row, col)
+                            break
+                    if found_side:
+                        break
+
+                if found_side:
+                    chosen_side = found_side
+                    piece_pos = found_pos
+                    countdown_start = t
+
+                self._render_l1_idle(t)
+            else:
+                # Check piece is still there
+                r, c = piece_pos
+                if self._b.master.get_cell_state(r, c) != CellOccupancy.OCCUPIED:
+                    chosen_side = None
+                    piece_pos = None
+                    countdown_start = None
+                    continue
+
+                elapsed = t - countdown_start
+                progress = min(1.0, elapsed / SPREAD_DURATION)
+
+                if progress >= 1.0:
+                    if chosen_side == "amber":
+                        return "local"
+                    else:
+                        return piece_pos
+
+                self._render_l1_spread(t, progress, chosen_side)
+
+            self._b.canvas = self._b.matrix.SwapOnVSync(self._b.canvas)
+            self._b.canvas.Clear()
+            time.sleep(FRAME_SLEEP)
+
+    def _render_l1_idle(self, t: float) -> None:
+        for row in range(8):
+            for col in range(8):
+                if col <= 3:
+                    r, g, b = amber_color(row, col)
+                else:
+                    base = green_color(row, col)
+                    rb = rain_brightness(row, col, t)
+                    r, g, b = base[0], _clamp(base[1] + int(200 * rb)), base[2]
+                self._b.light_cell(self._b.canvas, row, col, r, g, b)
+
+    def _render_l1_spread(self, t: float, progress: float, chosen: str) -> None:
+        for row in range(8):
+            for col in range(8):
+                r, g, b = spread_color(row, col, progress, chosen, t)
+                self._b.light_cell(self._b.canvas, row, col, r, g, b)
+
+    # -- Level 2 (placeholder — implemented in Task 5) --
+
+    def _level2(self, rain_pos: "tuple[int, int]") -> str:
+        raise NotImplementedError("L2 implemented in Task 5")
+
+    # -- Blink and remove -----------------------------------------------
+
+    def _blink_and_remove(self, positions: list) -> None:
+        """Blink cells at given positions until all are empty."""
+        # Filter out string values (like 'local')
+        cells = [p for p in positions if isinstance(p, tuple)]
+        if not cells:
+            return
+
+        while True:
+            self._b.master.read_data()
+            all_empty = all(
+                self._b.master.get_cell_state(r, c) == CellOccupancy.EMPTY
+                for r, c in cells
+            )
+            if all_empty:
+                break
+
+            t = time.monotonic()
+            on = int(t / BLINK_PERIOD) % 2 == 0
+            self._b.canvas.Clear()
+            if on:
+                for r, c in cells:
+                    self._b.light_cell(self._b.canvas, r, c, 255, 255, 255)
+            self._b.canvas = self._b.matrix.SwapOnVSync(self._b.canvas)
+            self._b.canvas.Clear()
+            time.sleep(FRAME_SLEEP)
