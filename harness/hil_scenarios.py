@@ -191,6 +191,55 @@ def full_game_setup() -> Generator[Action, None, None]:
     yield from setup_starting_position()
 
 
+def lobby_choose_local(col: int = 2, row: int = 3) -> Generator[Action, None, None]:
+    """Place piece on amber side -> wait for spread -> lift piece when it blinks."""
+    yield Action(ActionType.PLACE, row, col, description=f"place on amber side ({row},{col})")
+    yield Action(ActionType.WAIT, frames=200, description="wait for 3s spread")
+    yield Action(ActionType.LIFT, row, col, description="remove blinking piece")
+    yield Action(ActionType.WAIT, frames=30, description="wait for transition")
+
+
+def lobby_choose_network(col: int = 5, row: int = 3) -> Generator[Action, None, None]:
+    """Place piece on rain side -> wait for spread. Piece stays for L2."""
+    yield Action(ActionType.PLACE, row, col, description=f"place on rain side ({row},{col})")
+    yield Action(ActionType.WAIT, frames=200, description="wait for 3s spread")
+
+
+def lobby_choose_host(rain_row: int = 3, rain_col: int = 5) -> Generator[Action, None, None]:
+    """After network chosen, place on (2,0) for host -> wait -> remove both."""
+    yield Action(ActionType.PLACE, 2, 0, description="place on Host (2,0)")
+    yield Action(ActionType.WAIT, frames=200, description="wait for 3s confirmation")
+    yield Action(ActionType.LIFT, 2, 0, description="remove host piece")
+    yield Action(ActionType.LIFT, rain_row, rain_col, description="remove rain piece")
+    yield Action(ActionType.WAIT, frames=30, description="wait for transition")
+
+
+def lobby_choose_join(rain_row: int = 3, rain_col: int = 5) -> Generator[Action, None, None]:
+    """After network chosen, place on (5,0) for join -> wait -> remove both."""
+    yield Action(ActionType.PLACE, 5, 0, description="place on Join (5,0)")
+    yield Action(ActionType.WAIT, frames=200, description="wait for 3s confirmation")
+    yield Action(ActionType.LIFT, 5, 0, description="remove join piece")
+    yield Action(ActionType.LIFT, rain_row, rain_col, description="remove rain piece")
+    yield Action(ActionType.WAIT, frames=30, description="wait for transition")
+
+
+def lobby_full_local() -> Generator[Action, None, None]:
+    """Complete lobby flow -> local play."""
+    yield from lobby_choose_local()
+
+
+def lobby_full_host() -> Generator[Action, None, None]:
+    """Complete lobby flow -> host."""
+    yield from lobby_choose_network()
+    yield from lobby_choose_host()
+
+
+def lobby_full_join() -> Generator[Action, None, None]:
+    """Complete lobby flow -> join."""
+    yield from lobby_choose_network()
+    yield from lobby_choose_join()
+
+
 # Scenario registry for easy access
 SCENARIOS = {
     "color_picker_team_r": color_picker_team_r,
@@ -202,4 +251,11 @@ SCENARIOS = {
     "move_e7_e5": move_e7_e5,
     "scholars_mate": scholars_mate,
     "full_game_setup": full_game_setup,
+    "lobby_choose_local": lobby_choose_local,
+    "lobby_choose_network": lobby_choose_network,
+    "lobby_choose_host": lobby_choose_host,
+    "lobby_choose_join": lobby_choose_join,
+    "lobby_full_local": lobby_full_local,
+    "lobby_full_host": lobby_full_host,
+    "lobby_full_join": lobby_full_join,
 }
