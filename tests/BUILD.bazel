@@ -416,3 +416,13 @@ py_test(
         "@pip//pytest",
     ],
 )
+
+py_test(
+    name = "test_lobby",
+    srcs = ["test_lobby.py"],
+    deps = [
+        ":conftest",
+        "//game",
+        "@pip//pytest",
+    ],
+)
