@@ -196,8 +196,11 @@ class Board(SampleBase):
 
         lan_connected = threading.Event()
 
+        lan_server.set_message_handler(nb._on_network_message)
+
         def _on_lan_connect():
             lan_connected.set()
+            nb._net = lan_server
             nb.on_connected()
 
         lan_server._on_connected = _on_lan_connect
