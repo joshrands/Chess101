@@ -5,6 +5,8 @@ from game.lobby import (
     green_color,
     rain_brightness,
     AMBER_LIT, AMBER_DARK, GREEN_LIT, GREEN_DARK,
+    l2_idle_color,
+    ring_intensity,
 )
 
 
@@ -206,7 +208,6 @@ class TestLobbyL1:
         result = lobby.run()
         assert result == "local"
 
-    @pytest.mark.skip(reason="L2 not implemented until Task 5")
     def test_network_choice_proceeds_to_l2(self):
         board = _make_mock_board()
         lobby = Lobby(board)
@@ -237,6 +238,7 @@ class TestLobbyL1:
 
         # Monkey-patch time.monotonic to speed through countdowns
         original_monotonic = time.monotonic
+        original_sleep = time.sleep
         fast_time = [original_monotonic()]
 
         def fast_monotonic():
@@ -244,6 +246,7 @@ class TestLobbyL1:
             return fast_time[0]
 
         time.monotonic = fast_monotonic
+        time.sleep = lambda _: None  # no-op to avoid real delays
 
         def advance_phase(*args, **kwargs):
             """Advance phase after enough SwapOnVSync calls."""
@@ -260,3 +263,35 @@ class TestLobbyL1:
             assert result == "host"
         finally:
             time.monotonic = original_monotonic
+            time.sleep = original_sleep
+
+
+OPPONENT_POS = (3, 6)
+
+
+class TestL2IdleColor:
+    def test_green_base(self):
+        r, g, b = l2_idle_color(4, 4, t=0.0, opponent_pos=OPPONENT_POS)
+        gr, gg, gb = green_color(4, 4)
+        assert (r, g, b) == (gr, gg, gb)
+
+    def test_opponent_cell_is_bright_green(self):
+        r, g, b = l2_idle_color(3, 6, t=0.0, opponent_pos=OPPONENT_POS)
+        assert g > 200
+
+    def test_choice_host_blinks_white(self):
+        colors = set()
+        for tick in range(24):
+            t = tick * 0.1
+            colors.add(l2_idle_color(2, 0, t, OPPONENT_POS))
+        assert len(colors) > 1, "choice cell should blink"
+
+
+class TestRingIntensity:
+    def test_zero_at_large_distance(self):
+        val = ring_intensity(7, 7, 2, 0, t=0.0, contracting=True)
+        assert val < 0.1
+
+    def test_varies_over_time(self):
+        values = {ring_intensity(3, 1, 2, 0, t * 0.1, contracting=True) for t in range(30)}
+        assert len(values) > 1

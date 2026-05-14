@@ -161,10 +161,57 @@ def spread_color(
         return (base[0], _clamp(base[1] + int(200 * rb)), base[2])
 
 
+OPPONENT_GREEN = (0, 255, 100)
+L2_FADE_DURATION = 3.0
+CELL_SIZE_PX = 38
+RING_MAX_DIST = CELL_SIZE_PX * 10
+RING_SPEED = 120
+RING_WIDTH = CELL_SIZE_PX * 1.5
+RING_INTENSITY = 0.25
+
 CHOICE_HOST = (2, 0)
 CHOICE_JOIN = (5, 0)
 BLINK_PERIOD = 0.3
 FRAME_SLEEP = 0.02
+
+
+def _pixel_dist(r1: int, c1: int, r2: int, c2: int) -> float:
+    dx = (c2 - c1) * CELL_SIZE_PX
+    dy = (r2 - r1) * CELL_SIZE_PX
+    return (dx * dx + dy * dy) ** 0.5
+
+
+def ring_intensity(
+    row: int, col: int, center_r: int, center_c: int,
+    t: float, contracting: bool,
+) -> float:
+    d = _pixel_dist(row, col, center_r, center_c)
+    dist_falloff = max(0.0, 1.0 - d / RING_MAX_DIST)
+    if contracting:
+        radius = RING_MAX_DIST - ((t * RING_SPEED) % RING_MAX_DIST)
+    else:
+        radius = (t * RING_SPEED) % RING_MAX_DIST
+    dist_from_ring = abs(d - radius)
+    if dist_from_ring >= RING_WIDTH:
+        return 0.0
+    return (1.0 - dist_from_ring / RING_WIDTH) * dist_falloff * RING_INTENSITY
+
+
+def l2_idle_color(
+    row: int, col: int, t: float,
+    opponent_pos: tuple[int, int],
+) -> tuple[int, int, int]:
+    if (row, col) == opponent_pos:
+        return OPPONENT_GREEN
+
+    if (row, col) == CHOICE_HOST or (row, col) == CHOICE_JOIN:
+        phase = (t / BLINK_PERIOD) % 2
+        is_host = (row, col) == CHOICE_HOST
+        on = (int(phase) == 0) if is_host else (int(phase) == 1)
+        if on:
+            return (255, 255, 255)
+
+    return green_color(row, col)
 
 
 class _Phase(Enum):
@@ -263,10 +310,134 @@ class Lobby:
                 r, g, b = spread_color(row, col, progress, chosen, t)
                 self._b.light_cell(self._b.canvas, row, col, r, g, b)
 
-    # -- Level 2 (placeholder — implemented in Task 5) --
+    # -- Level 2 --------------------------------------------------------
 
     def _level2(self, rain_pos: "tuple[int, int]") -> str:
-        raise NotImplementedError("L2 implemented in Task 5")
+        chosen = None
+        countdown_start = None
+        signal_path: list[tuple[int, int]] = []
+        signal_idx = 0
+        signal_dir = "host"
+        last_signal_step = 0.0
+        signal_gap = 0
+
+        def new_signal():
+            nonlocal signal_path, signal_idx, signal_dir, signal_gap
+            if chosen:
+                if chosen == "host":
+                    signal_path = monotonic_random_path(
+                        rain_pos[0], rain_pos[1], CHOICE_HOST[0], CHOICE_HOST[1],
+                        exclude=CHOICE_HOST,
+                    )
+                else:
+                    signal_path = monotonic_random_path(
+                        CHOICE_JOIN[0], CHOICE_JOIN[1], rain_pos[0], rain_pos[1],
+                        exclude=CHOICE_JOIN,
+                    )
+            else:
+                if signal_dir == "host":
+                    signal_path = monotonic_random_path(
+                        rain_pos[0], rain_pos[1], CHOICE_HOST[0], CHOICE_HOST[1],
+                        exclude=CHOICE_HOST,
+                    )
+                    signal_dir = "join"
+                else:
+                    signal_path = monotonic_random_path(
+                        CHOICE_JOIN[0], CHOICE_JOIN[1], rain_pos[0], rain_pos[1],
+                        exclude=CHOICE_JOIN,
+                    )
+                    signal_dir = "host"
+            signal_idx = 0
+            signal_gap = 0
+
+        new_signal()
+
+        while True:
+            t = time.monotonic()
+            self._b.master.read_data()
+
+            if chosen is None:
+                host_occ = self._b.master.get_cell_state(*CHOICE_HOST) == CellOccupancy.OCCUPIED
+                join_occ = self._b.master.get_cell_state(*CHOICE_JOIN) == CellOccupancy.OCCUPIED
+
+                if self._b.master.get_cell_state(*rain_pos) != CellOccupancy.OCCUPIED:
+                    return self._back_to_l1(rain_pos)
+
+                if host_occ:
+                    chosen = "host"
+                    countdown_start = t
+                    new_signal()
+                elif join_occ:
+                    chosen = "join"
+                    countdown_start = t
+                    new_signal()
+            else:
+                choice_pos = CHOICE_HOST if chosen == "host" else CHOICE_JOIN
+                if self._b.master.get_cell_state(*choice_pos) != CellOccupancy.OCCUPIED:
+                    chosen = None
+                    countdown_start = None
+                    continue
+
+                if self._b.master.get_cell_state(*rain_pos) != CellOccupancy.OCCUPIED:
+                    return self._back_to_l1(rain_pos)
+
+                elapsed = t - countdown_start
+                progress = min(1.0, elapsed / L2_FADE_DURATION)
+                if progress >= 1.0:
+                    return chosen
+
+            # Render frame
+            trail_colors: dict[tuple[int, int], tuple[int, int, int]] = {}
+            if signal_path:
+                add_signal_trail(trail_colors, signal_path, signal_idx)
+
+            self._b.canvas.Clear()
+            for row in range(8):
+                for col in range(8):
+                    if chosen is None:
+                        r, g, b = l2_idle_color(row, col, t, rain_pos)
+                    else:
+                        r, g, b = green_color(row, col)
+                        if (row, col) == rain_pos:
+                            r, g, b = OPPONENT_GREEN
+                        ri = ring_intensity(
+                            row, col,
+                            CHOICE_HOST[0] if chosen == "host" else CHOICE_JOIN[0],
+                            CHOICE_HOST[1] if chosen == "host" else CHOICE_JOIN[1],
+                            t, contracting=(chosen == "host"),
+                        )
+                        if ri > 0:
+                            r = _clamp(r + int(255 * ri))
+                            g = _clamp(g + int(255 * ri))
+                            b = _clamp(b + int(255 * ri))
+
+                    if (row, col) in trail_colors:
+                        tr, tg, tb = trail_colors[(row, col)]
+                        r = _clamp(r + tr)
+                        g = _clamp(g + tg)
+                        b = _clamp(b + tb)
+
+                    self._b.light_cell(self._b.canvas, row, col, r, g, b)
+
+            self._b.canvas = self._b.matrix.SwapOnVSync(self._b.canvas)
+            self._b.canvas.Clear()
+
+            # Step signal
+            if t - last_signal_step >= 0.1:
+                signal_idx += 1
+                last_signal_step = t
+                if signal_idx >= len(signal_path) + 4:
+                    new_signal()
+
+            time.sleep(FRAME_SLEEP)
+
+    def _back_to_l1(self, rain_pos: "tuple[int, int]") -> str:
+        """Rain piece removed during L2 -- re-run full lobby."""
+        result = self._level1()
+        if result == "local":
+            self._blink_and_remove([result])
+            return "__local__"
+        return self._level2(result)
 
     # -- Blink and remove -----------------------------------------------
 
