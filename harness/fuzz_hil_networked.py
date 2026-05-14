@@ -108,6 +108,22 @@ def wait_for_game_server(host: str, port: int, timeout: float = 30.0) -> bool:
     return False
 
 
+def wait_for_port_free(host: str, port: int, timeout: float = 15.0) -> bool:
+    """Poll until the port is no longer accepting connections."""
+    import socket
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        try:
+            s = socket.socket()
+            s.settimeout(1.0)
+            s.connect((host, port))
+            s.close()
+            time.sleep(0.5)
+        except (ConnectionRefusedError, OSError, socket.timeout):
+            return True
+    return False
+
+
 def run_host_test(
     hil_url: str,
     game_host: str,
@@ -327,6 +343,19 @@ def main() -> int:
     for i in range(args.iterations):
         game_seed = rng.randint(0, 2**32)
         logger.info("\n========== Iteration %d (seed=%d) ==========", i + 1, game_seed)
+
+        if i > 0:
+            logger.info("Restarting HIL container for clean state...")
+            import subprocess
+            subprocess.run(
+                ["docker-compose", "-f", "docker-compose.hil.yml", "restart"],
+                capture_output=True, timeout=30,
+            )
+            logger.info("Waiting for HIL to come back up...")
+            tmp_bridge = HilBridge(url=args.hil_url, timeout=10.0)
+            tmp_bridge.connect(retries=10, delay=2.0)
+            tmp_bridge.close()
+            time.sleep(3.0)
 
         if args.mode == "host":
             success, message = run_host_test(
