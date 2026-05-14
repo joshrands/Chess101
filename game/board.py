@@ -25,6 +25,7 @@ from hardware.sensor import BoardSensor
 from hardware.rotation import RotatingMatrix
 from core.constants import CellOccupancy
 from game import rules as _rules
+from game.lobby import Lobby
 from ui.renderer import light_cell as _light_cell
 from ai.tree import Tree
 from ai.ai import AI
@@ -113,8 +114,12 @@ class Board(SampleBase):
         self.canvas = self.matrix.CreateFrameCanvas()
 
         if not skip_setup:
-            self.color_picker()
-            self.war_games()
+            lobby = Lobby(self)
+            self._lobby_result = lobby.run()
+
+            single = self._lobby_result != "local"
+            self.color_picker(single_player=single)
+            self.war_games(single_player=single)
             self.create_players()
 
             self.canvas.Clear()
@@ -1211,7 +1216,7 @@ class Board(SampleBase):
         self.choose_light_checker_town()
         self.canvas = self.matrix.SwapOnVSync(self.canvas)
 
-    def color_picker(self):
+    def color_picker(self, single_player: bool = False):
         """Display the colour-selection UI and wait for both teams to choose colours.
 
         Shows eight colour swatches on rows 2 and 5 of the LED matrix. Players
@@ -1235,6 +1240,46 @@ class Board(SampleBase):
         restart_key2 = False
 
         self.canvas = self.matrix.SwapOnVSync(self.canvas)
+
+        if single_player:
+            is_host = getattr(self, '_lobby_result', 'host') == 'host'
+            pick_row = 2 if is_host else 5
+            other_team = self.team_l if is_host else self.team_r
+
+            self.canvas.Clear()
+            for i in range(8):
+                self.light_cell(self.canvas, pick_row, i,
+                                self.team_array[i].r, self.team_array[i].g, self.team_array[i].b)
+            self.canvas = self.matrix.SwapOnVSync(self.canvas)
+
+            while True:
+                self.master.read_data()
+                found = False
+                for i in range(8):
+                    if self.master.get_cell_state(pick_row, i) == CellOccupancy.OCCUPIED:
+                        found = True
+                        local_team = self.team_r if is_host else self.team_l
+                        local_team.r = self.team_array[i].r
+                        local_team.g = self.team_array[i].g
+                        local_team.b = self.team_array[i].b
+                        break
+                if found:
+                    other_team.r = self.team_array[(i + 4) % 8].r
+                    other_team.g = self.team_array[(i + 4) % 8].g
+                    other_team.b = self.team_array[(i + 4) % 8].b
+                    self.canvas.Clear()
+                    self.light_cell(self.canvas, pick_row, i,
+                                    local_team.r, local_team.g, local_team.b)
+                    self.canvas = self.matrix.SwapOnVSync(self.canvas)
+                    time.sleep(2)
+                    break
+                self.canvas.Clear()
+                for i in range(8):
+                    self.light_cell(self.canvas, pick_row, i,
+                                    self.team_array[i].r, self.team_array[i].g, self.team_array[i].b)
+                self.canvas = self.matrix.SwapOnVSync(self.canvas)
+            self.team_r.r = self.team_r.r + 1
+            return
 
         while not (team1_found and team2_found):
             team1_found = False
@@ -1329,7 +1374,7 @@ class Board(SampleBase):
                 self.canvas = self.matrix.SwapOnVSync(self.canvas)
         self.team_r.r = self.team_r.r + 1
 
-    def war_games(self):
+    def war_games(self, single_player: bool = False):
         """Display the human-vs-computer selection UI and wait for both teams to decide.
 
         Rows 3 and 4 are used as input rows. Columns 0–3 select "Human" and
@@ -1339,6 +1384,59 @@ class Board(SampleBase):
         """
         self.canvas.Clear()
         logger.info("The only winning move is not to play")
+
+        if single_player:
+            is_host = getattr(self, '_lobby_result', 'host') == 'host'
+            pick_row = 3 if is_host else 4
+            local_team = self.team_r if is_host else self.team_l
+
+            think = 0
+            while True:
+                self.master.read_data()
+                decided = False
+                for i in range(8):
+                    if self.master.get_cell_state(pick_row, i) == CellOccupancy.OCCUPIED:
+                        decided = True
+                        if is_host:
+                            self.computer_player_r = i >= 4
+                        else:
+                            self.computer_player_l = i < 4
+                        break
+
+                self.canvas.Clear()
+                if decided:
+                    is_ai = (self.computer_player_r if is_host else self.computer_player_l)
+                    if is_ai:
+                        for j in range(8):
+                            if j == 7 - think:
+                                self.light_cell(self.canvas, pick_row, 7 - think,
+                                                local_team.r, local_team.g, local_team.b)
+                            else:
+                                self.light_cell(self.canvas, pick_row, j, 255, 255, 255)
+                    else:
+                        for j in range(8):
+                            self.light_cell(self.canvas, pick_row, j,
+                                            local_team.r, local_team.g, local_team.b)
+                    self.canvas = self.matrix.SwapOnVSync(self.canvas)
+                    self.canvas.Clear()
+                    break
+                else:
+                    for j in range(8):
+                        if j < 4:
+                            self.light_cell(self.canvas, pick_row, j,
+                                            local_team.r, local_team.g, local_team.b)
+                        else:
+                            if j == 7 - think:
+                                self.light_cell(self.canvas, pick_row, 7 - think,
+                                                local_team.r, local_team.g, local_team.b)
+                            else:
+                                self.light_cell(self.canvas, pick_row, j, 255, 255, 255)
+
+                self.canvas = self.matrix.SwapOnVSync(self.canvas)
+                self.canvas.Clear()
+                time.sleep(0.2)
+                think = (think + 1) % 4
+            return
 
         team1_decided = False
         team2_decided = False
