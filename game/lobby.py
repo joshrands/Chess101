@@ -227,6 +227,7 @@ class Lobby:
         self._b = board
 
     def run(self) -> str:
+        self._final_rain_pos: tuple[int, int] | None = None
         piece_pos = self._level1()
         if piece_pos[1] <= 3:
             self._blink_and_remove([piece_pos])
@@ -235,7 +236,8 @@ class Lobby:
         mode = self._level2(rain_pos)
         if mode == "__local__":
             return "local"
-        self._blink_and_remove([rain_pos, CHOICE_HOST if mode == "host" else CHOICE_JOIN])
+        blink_rain = self._final_rain_pos or rain_pos
+        self._blink_and_remove([blink_rain, CHOICE_HOST if mode == "host" else CHOICE_JOIN])
         return mode
 
     # -- Level 1 -------------------------------------------------------
@@ -284,7 +286,7 @@ class Lobby:
                 if progress >= 1.0:
                     return piece_pos
 
-                self._render_l1_spread(t, progress, chosen_side)
+                self._render_l1_spread(t, progress, chosen_side, piece_pos)
 
             self._b.canvas = self._b.matrix.SwapOnVSync(self._b.canvas)
             self._b.canvas.Clear()
@@ -301,10 +303,19 @@ class Lobby:
                     r, g, b = base[0], _clamp(base[1] + int(200 * rb)), base[2]
                 self._b.light_cell(self._b.canvas, row, col, r, g, b)
 
-    def _render_l1_spread(self, t: float, progress: float, chosen: str) -> None:
+    def _render_l1_spread(
+        self, t: float, progress: float, chosen: str,
+        piece_pos: "tuple[int, int] | None" = None,
+    ) -> None:
         for row in range(8):
             for col in range(8):
-                r, g, b = spread_color(row, col, progress, chosen, t)
+                if piece_pos and (row, col) == piece_pos:
+                    if chosen == "rain":
+                        r, g, b = OPPONENT_GREEN
+                    else:
+                        r, g, b = (255, 200, 80)
+                else:
+                    r, g, b = spread_color(row, col, progress, chosen, t)
                 self._b.light_cell(self._b.canvas, row, col, r, g, b)
 
     # -- Level 2 --------------------------------------------------------
@@ -381,6 +392,7 @@ class Lobby:
                 elapsed = t - countdown_start
                 progress = min(1.0, elapsed / L2_FADE_DURATION)
                 if progress >= 1.0:
+                    self._final_rain_pos = rain_pos
                     return chosen
 
             # Render frame
