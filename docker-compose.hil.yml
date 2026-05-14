@@ -34,7 +34,7 @@ services:
     environment:
       - HIL_PORT=8766
       - HIL_FAST_MODE=${HIL_FAST_MODE:-0}
-      - HIL_REAL_PI_MODE=${HIL_REAL_PI_MODE:-1}
+      - HIL_REAL_PI_MODE=${HIL_REAL_PI_MODE:-0}
     volumes:
       # Optional: mount code for live reload during development
       # Uncomment these lines for faster iteration without rebuilding

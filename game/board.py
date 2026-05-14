@@ -117,9 +117,12 @@ class Board(SampleBase):
             lobby = Lobby(self)
             self._lobby_result = lobby.run()
 
-            single = self._lobby_result != "local"
-            self.color_picker(single_player=single)
-            self.war_games(single_player=single)
+            if self._lobby_result in ("host", "join"):
+                self._transition_to_networked(self._lobby_result)
+                return
+
+            self.color_picker()
+            self.war_games()
             self.create_players()
 
             self.canvas.Clear()
@@ -158,6 +161,33 @@ class Board(SampleBase):
                 self.do_turn(self.team_l)
 
             self.canvas = self.matrix.SwapOnVSync(self.canvas)
+
+    def _transition_to_networked(self, mode: str) -> None:
+        from game.networked_board import NetworkedBoard
+        from network.relay_client import RelayClient
+
+        role = "host" if mode == "host" else "guest"
+        local_team_key = "r" if mode == "host" else "l"
+
+        relay = RelayClient(role=role, player_name="Pi")
+        nb = NetworkedBoard(
+            net=relay,
+            local_team_key=local_team_key,
+            relay=relay,
+            rotation=self._rotation,
+            sensor=self.master,
+        )
+        relay.set_message_handler(nb._on_network_message)
+        relay._on_peer_connected = nb.on_connected
+        relay._on_peer_disconnected = nb.on_disconnected
+
+        nb.matrix = self.matrix
+        nb.canvas = self.canvas
+
+        try:
+            nb._run_networked(skip_matrix_init=True)
+        finally:
+            nb._cleanup()
 
     def light_path(self, start_row, start_col, end_row, end_col):
         """Compute incremental steps for animating a path between two cells.

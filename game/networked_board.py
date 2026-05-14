@@ -1306,11 +1306,12 @@ class NetworkedBoard(Board):
         finally:
             self._cleanup()
 
-    def _run_networked(self) -> None:
+    def _run_networked(self, skip_matrix_init: bool = False) -> None:
         self._start_keepalive()
-        from hardware.rotation import RotatingMatrix
-        self.matrix = RotatingMatrix(self.matrix, rotation=self._rotation)
-        self.canvas = self.matrix.CreateFrameCanvas()
+        if not skip_matrix_init:
+            from hardware.rotation import RotatingMatrix
+            self.matrix = RotatingMatrix(self.matrix, rotation=self._rotation)
+            self.canvas = self.matrix.CreateFrameCanvas()
 
         # ── Relay online play preamble ─────────────────────────────
         if self._relay is not None:

@@ -227,11 +227,11 @@ class Lobby:
         self._b = board
 
     def run(self) -> str:
-        result = self._level1()
-        if result == "local":
-            self._blink_and_remove([result])
+        piece_pos = self._level1()
+        if piece_pos[1] <= 3:
+            self._blink_and_remove([piece_pos])
             return "local"
-        rain_pos = result
+        rain_pos = piece_pos
         mode = self._level2(rain_pos)
         if mode == "__local__":
             return "local"
@@ -240,8 +240,8 @@ class Lobby:
 
     # -- Level 1 -------------------------------------------------------
 
-    def _level1(self) -> "str | tuple[int, int]":
-        """Run L1. Returns 'local' or (row, col) of the rain piece."""
+    def _level1(self) -> tuple[int, int]:
+        """Run L1. Returns (row, col) of the piece placed."""
         chosen_side = None
         piece_pos = None
         countdown_start = None
@@ -282,10 +282,7 @@ class Lobby:
                 progress = min(1.0, elapsed / SPREAD_DURATION)
 
                 if progress >= 1.0:
-                    if chosen_side == "amber":
-                        return "local"
-                    else:
-                        return piece_pos
+                    return piece_pos
 
                 self._render_l1_spread(t, progress, chosen_side)
 
@@ -433,11 +430,11 @@ class Lobby:
 
     def _back_to_l1(self, rain_pos: "tuple[int, int]") -> str:
         """Rain piece removed during L2 -- re-run full lobby."""
-        result = self._level1()
-        if result == "local":
-            self._blink_and_remove([result])
+        piece_pos = self._level1()
+        if piece_pos[1] <= 3:
+            self._blink_and_remove([piece_pos])
             return "__local__"
-        return self._level2(result)
+        return self._level2(piece_pos)
 
     # -- Blink and remove -----------------------------------------------
 

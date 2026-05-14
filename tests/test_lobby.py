@@ -195,15 +195,22 @@ class TestLobbyL1:
         lobby = Lobby(board)
 
         call_count = [0]
+        swap_count = [0]
 
         def fake_cell_state(row, col):
             call_count[0] += 1
-            # After a few frames, place piece at (3, 2) — amber side
             if call_count[0] > 200 and row == 3 and col == 2:
-                return 0  # OCCUPIED
+                # Piece present during countdown, removed after spread completes
+                if swap_count[0] < 500:
+                    return 0  # OCCUPIED
             return 1  # EMPTY
 
+        def fake_swap(canvas):
+            swap_count[0] += 1
+            return canvas
+
         board.master.get_cell_state = MagicMock(side_effect=fake_cell_state)
+        board.matrix.SwapOnVSync = MagicMock(side_effect=fake_swap)
 
         result = lobby.run()
         assert result == "local"
