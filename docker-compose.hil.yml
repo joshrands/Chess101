@@ -31,6 +31,8 @@ services:
     platform: linux/arm64
     ports:
       - "8766:8766"
+      - "65101:65101"
+      - "65102:65102/udp"
     environment:
       - HIL_PORT=8766
       - HIL_FAST_MODE=${HIL_FAST_MODE:-0}
