@@ -82,10 +82,8 @@ class ControlServer:
         self._running = False
         self._loop: asyncio.AbstractEventLoop | None = None
 
-        # Lockstep fuzzing state
-        self._lockstep_grid: Optional[list] = None
-        self._lockstep_team_r: Optional[Team] = None
-        self._lockstep_team_l: Optional[Team] = None
+        # Lockstep fuzzing state — per-client so concurrent callers don't clobber
+        self._lockstep: dict = {}  # ws -> {"grid", "team_r", "team_l"}
 
     async def _handle_client(self, ws: WebSocketServerProtocol) -> None:
         """Handle a single WebSocket client connection."""
@@ -111,6 +109,7 @@ class ControlServer:
         finally:
             self._clients.discard(ws)
             self._frame_subscribers.pop(ws, None)
+            self._lockstep.pop(ws, None)
             if ws in self._frame_tasks:
                 self._frame_tasks[ws].cancel()
                 self._frame_tasks.pop(ws, None)
@@ -180,24 +179,28 @@ class ControlServer:
                 return {"error": "Lockstep methods require harness module", "id": req_id}
             team_r_rgb = tuple(params.get("team_r_rgb", [64, 180, 232]))
             team_l_rgb = tuple(params.get("team_l_rgb", [255, 140, 0]))
-            self._lockstep_team_r = Team(*team_r_rgb)
-            self._lockstep_team_l = Team(*team_l_rgb)
-            self._lockstep_grid = py_init_board(
-                self._lockstep_team_r, self._lockstep_team_l
-            )
+            team_r = Team(*team_r_rgb)
+            team_l = Team(*team_l_rgb)
+            self._lockstep[ws] = {
+                "grid": py_init_board(team_r, team_l),
+                "team_r": team_r,
+                "team_l": team_l,
+            }
             return {"result": "ok", "id": req_id}
 
         elif method == "chess_legal_moves":
-            if self._lockstep_grid is None:
+            ls = self._lockstep.get(ws)
+            if ls is None:
                 return {"error": "No game initialized. Call chess_init first.", "id": req_id}
             team_key = params.get("team_key", "r")
-            team = self._lockstep_team_r if team_key == "r" else self._lockstep_team_l
-            clear_en_passant(self._lockstep_grid, team)
-            moves = py_legal_moves(self._lockstep_grid, team)
+            team = ls["team_r"] if team_key == "r" else ls["team_l"]
+            clear_en_passant(ls["grid"], team)
+            moves = py_legal_moves(ls["grid"], team)
             return {"result": [list(m) for m in sorted(moves)], "id": req_id}
 
         elif method == "chess_apply_move":
-            if self._lockstep_grid is None:
+            ls = self._lockstep.get(ws)
+            if ls is None:
                 return {"error": "No game initialized. Call chess_init first.", "id": req_id}
             fr = params.get("fr", 0)
             fc = params.get("fc", 0)
@@ -207,13 +210,13 @@ class ControlServer:
             next_key = params.get("next_key", "l")
             peace_time = params.get("peace_time", 0)
 
-            team = self._lockstep_team_r if team_key == "r" else self._lockstep_team_l
-            clear_en_passant(self._lockstep_grid, team)
+            team = ls["team_r"] if team_key == "r" else ls["team_l"]
+            clear_en_passant(ls["grid"], team)
 
-            flags = py_apply_move(self._lockstep_grid, fr, fc, tr, tc)
-            grid_json = py_grid_to_json(self._lockstep_grid, self._lockstep_team_r)
+            flags = py_apply_move(ls["grid"], fr, fc, tr, tc)
+            grid_json = py_grid_to_json(ls["grid"], ls["team_r"])
             hash_val = board_hash(
-                self._lockstep_grid, peace_time, next_key, self._lockstep_team_r
+                ls["grid"], peace_time, next_key, ls["team_r"]
             )
             return {
                 "result": {
@@ -225,18 +228,20 @@ class ControlServer:
             }
 
         elif method == "chess_board_state":
-            if self._lockstep_grid is None:
+            ls = self._lockstep.get(ws)
+            if ls is None:
                 return {"error": "No game initialized. Call chess_init first.", "id": req_id}
-            grid_json = py_grid_to_json(self._lockstep_grid, self._lockstep_team_r)
+            grid_json = py_grid_to_json(ls["grid"], ls["team_r"])
             return {"result": {"grid": grid_json}, "id": req_id}
 
         elif method == "chess_board_hash":
-            if self._lockstep_grid is None:
+            ls = self._lockstep.get(ws)
+            if ls is None:
                 return {"error": "No game initialized. Call chess_init first.", "id": req_id}
             peace_time = params.get("peace_time", 0)
             current_key = params.get("current_key", "r")
             hash_val = board_hash(
-                self._lockstep_grid, peace_time, current_key, self._lockstep_team_r
+                ls["grid"], peace_time, current_key, ls["team_r"]
             )
             return {"result": hash_val, "id": req_id}
 

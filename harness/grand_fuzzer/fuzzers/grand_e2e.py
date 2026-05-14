@@ -642,7 +642,7 @@ class GrandE2EFuzzer:
                 server.close()
                 client.close()
                 raise RuntimeError("Client did not connect")
-            return client, server  # master=client, slave=server
+            return client, server, None  # master=client, slave=server
 
         if self._mode == SlaveMode.LAN_BEACON_HOST:
             # Master=server+beacon, slave discovers
@@ -667,7 +667,7 @@ class GrandE2EFuzzer:
                 server.close()
                 client.close()
                 raise RuntimeError("Client did not connect")
-            return server, client  # master=server, slave=client
+            return server, client, None  # master=server, slave=client
 
         if self._mode == SlaveMode.LAN_BEACON_GUEST:
             # Slave=server+beacon, master discovers
@@ -692,7 +692,7 @@ class GrandE2EFuzzer:
                 server.close()
                 client.close()
                 raise RuntimeError("Client did not connect")
-            return client, server  # master=client (discovers), slave=server (broadcasts)
+            return client, server, None  # master=client (discovers), slave=server (broadcasts)
 
         if self._mode == SlaveMode.LAN_MDNS_HOST:
             # Master=server+mDNS, slave discovers
@@ -716,7 +716,7 @@ class GrandE2EFuzzer:
                 server.close()
                 client.close()
                 raise RuntimeError("Client did not connect")
-            return server, client  # master=server, slave=client
+            return server, client, None  # master=server, slave=client
 
         if self._mode == SlaveMode.LAN_MDNS_GUEST:
             # Slave=server+mDNS, master discovers
@@ -740,7 +740,7 @@ class GrandE2EFuzzer:
                 server.close()
                 client.close()
                 raise RuntimeError("Client did not connect")
-            return client, server  # master=client, slave=server
+            return client, server, None  # master=client, slave=server
 
         if self._mode == SlaveMode.ONLINE_HOST:
             host = RelayHostPeer(self._relay_url)
