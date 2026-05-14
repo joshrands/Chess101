@@ -54,7 +54,7 @@ py_library(
     visibility = ["//:__subpackages__"],
     deps = [
         ":corpus",
-        "//harness/grand_fuzzer/fuzzers:grand_e2e",
+        ":grand_e2e",
     ],
 )
 
