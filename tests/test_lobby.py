@@ -127,3 +127,42 @@ class TestAddSignalTrail:
         colors = {}
         add_signal_trail(colors, path, step_idx=2, trail_len=2)
         assert (3, 4) not in colors
+
+
+from game.lobby import spread_color, SPREAD_DURATION
+
+
+class TestSpreadColor:
+    def test_zero_progress_rain_side_unchanged(self):
+        # col 5 is rain side — should be green at progress 0
+        r, g, b = spread_color(0, 5, 0.0, "rain", t=0.0)
+        assert g > r and g > b
+
+    def test_zero_progress_amber_side_unchanged(self):
+        r, g, b = spread_color(0, 0, 0.0, "rain", t=0.0)
+        assert r > g  # amber
+
+    def test_full_progress_rain_takes_over(self):
+        # At progress 1.0, col 0 should be green
+        r, g, b = spread_color(0, 0, 1.0, "rain", t=0.0)
+        gr, gg, gb = green_color(0, 0)
+        # Base should be green (rain brightness may add more green)
+        assert g >= gg
+
+    def test_full_progress_amber_takes_over(self):
+        r, g, b = spread_color(0, 7, 1.0, "amber", t=0.0)
+        assert (r, g, b) == amber_color(0, 7)
+
+    def test_spread_duration_constant(self):
+        assert SPREAD_DURATION == 3.0
+
+    def test_rain_spreads_left_from_center(self):
+        # At progress 0.3 (1.5 cols taken), col 3 should be transitioning
+        # but col 0 should still be amber
+        r0, g0, b0 = spread_color(0, 0, 0.3, "rain", t=0.0)
+        assert r0 > g0, "col 0 should still be amber at 30%"
+
+    def test_amber_spreads_right_from_center(self):
+        r7, g7, b7 = spread_color(0, 7, 0.3, "amber", t=0.0)
+        # col 7 is far right, should still be green at 30%
+        assert g7 > r7, "col 7 should still be green at 30%"

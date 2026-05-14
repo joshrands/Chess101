@@ -95,3 +95,64 @@ def add_signal_trail(
             b = SIGNAL_TRAIL_BRIGHTNESSES[ti]
             val = int(255 * b)
             colors[path[idx]] = (val, val, val)
+
+
+SPREAD_DURATION = 3.0
+
+
+def _clamp(v: int) -> int:
+    return max(0, min(255, v))
+
+
+def spread_color(
+    row: int, col: int, progress: float, chosen: str, t: float,
+) -> tuple[int, int, int]:
+    checker = is_checker(row, col)
+    cols_taken = int(progress * 5)
+    col_frac = (progress * 5) - cols_taken
+
+    if chosen == "rain":
+        if col >= 4:
+            base = GREEN_LIT if checker else GREEN_DARK
+            rb = rain_brightness(row, col, t)
+            return (base[0], _clamp(base[1] + int(200 * rb)), base[2])
+
+        amber_col_dist = 3 - col
+        if amber_col_dist < cols_taken:
+            base = GREEN_LIT if checker else GREEN_DARK
+            rb = rain_brightness(row, col, t)
+            return (base[0], _clamp(base[1] + int(200 * rb)), base[2])
+
+        if amber_col_dist == cols_taken and cols_taken < 4:
+            f = col_frac
+            a = AMBER_LIT if checker else AMBER_DARK
+            g = GREEN_LIT if checker else GREEN_DARK
+            r = int(a[0] * (1 - f) + g[0] * f)
+            gv = int(a[1] * (1 - f) + g[1] * f)
+            b = int(a[2] * (1 - f) + g[2] * f)
+            rb = rain_brightness(row, col, t)
+            return (r, _clamp(gv + int(200 * rb * f)), b)
+
+        return AMBER_LIT if checker else AMBER_DARK
+
+    else:
+        if col <= 3:
+            return AMBER_LIT if checker else AMBER_DARK
+
+        rain_col_dist = col - 4
+        if rain_col_dist < cols_taken:
+            return AMBER_LIT if checker else AMBER_DARK
+
+        if rain_col_dist == cols_taken and cols_taken < 4:
+            f = col_frac
+            g = GREEN_LIT if checker else GREEN_DARK
+            a = AMBER_LIT if checker else AMBER_DARK
+            r = int(g[0] * (1 - f) + a[0] * f)
+            gv = int(g[1] * (1 - f) + a[1] * f)
+            b = int(g[2] * (1 - f) + a[2] * f)
+            rb = rain_brightness(row, col, t)
+            return (r, _clamp(gv + int(200 * rb * (1 - f))), b)
+
+        base = GREEN_LIT if checker else GREEN_DARK
+        rb = rain_brightness(row, col, t)
+        return (base[0], _clamp(base[1] + int(200 * rb)), base[2])
