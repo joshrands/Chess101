@@ -127,6 +127,7 @@ class NetworkedBoard(Board):
 
         # ACK tracking for setup messages
         self._received_acks: set[str] = set()
+        self._game_setup_sent = False
 
         super().__init__(*args, **kwargs)
         self._net.set_message_handler(self._on_network_message)
@@ -261,8 +262,8 @@ class NetworkedBoard(Board):
     def _on_hello(self, msg: dict) -> None:
         self._peer_name = msg.get("player_name", "Opponent")
         logger.info("Hello from %r", self._peer_name)
-        if self._local_team_key == "r":
-            # Pi is HOST — send game_setup with physical_host mode
+        if self._local_team_key == "r" and not self._game_setup_sent:
+            self._game_setup_sent = True
             self._net_send({
                 "type": "game_setup",
                 "version": "1",

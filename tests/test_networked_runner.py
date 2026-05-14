@@ -708,6 +708,55 @@ class TestRelayReconnectGuards:
 
         assert runner._peer_disconnected is False
 
+    def test_game_setup_ignored_when_war_games(self, _pygame):
+        """Duplicate game_setup during WAR_GAMES must not reset phase to COLOR_PICK."""
+        runner = NetworkedGameRunner(role=NetworkRole.ONLINE_GUEST)
+        runner._init_board()
+        b = runner._b
+        b.team_r.r, b.team_r.g, b.team_r.b = 65, 180, 232
+        b.team_l.r, b.team_l.g, b.team_l.b = 255, 140, 0
+        runner._relay_client = _FakeRelay()
+        runner._peer_name = "Host"
+        runner._peer_connected = True
+        runner._selected_r_idx = 0
+        runner._selected_l_idx = 5
+        runner._local_color_sent = True
+        runner.phase = Phase.WAR_GAMES
+
+        runner._dispatch({
+            "type": "game_setup",
+            "version": "1",
+            "host_name": "Host",
+            "guest_name": "Guest",
+        })
+
+        assert runner.phase == Phase.WAR_GAMES, (
+            "Duplicate game_setup during WAR_GAMES must not reset to COLOR_PICK"
+        )
+
+    def test_check_color_complete_idempotent(self, _pygame):
+        """_check_color_complete must not double-increment team_r.r."""
+        runner = NetworkedGameRunner(role=NetworkRole.ONLINE_GUEST)
+        runner._init_board()
+        b = runner._b
+        b.team_r.r, b.team_r.g, b.team_r.b = 65, 180, 232
+        b.team_l.r, b.team_l.g, b.team_l.b = 255, 140, 0
+        runner._relay_client = _FakeRelay()
+        runner._peer_name = "Host"
+        runner._peer_connected = True
+        runner._selected_r_idx = 0
+        runner._selected_l_idx = 5
+        runner.phase = Phase.COLOR_PICK
+
+        runner._check_color_complete()
+        first_r = b.team_r.r
+
+        runner._check_color_complete()
+
+        assert b.team_r.r == first_r, (
+            "_check_color_complete must not increment team_r.r twice"
+        )
+
     def test_host_still_sends_rejoin_sync_on_guest_hello(self, _pygame):
         """HOST receiving GUEST's hello (sent by the reconnect fix) sends rejoin_sync."""
         host = _make_host(_pygame)

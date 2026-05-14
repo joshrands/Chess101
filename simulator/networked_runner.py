@@ -509,16 +509,15 @@ class NetworkedGameRunner(GameRunner):
                 self.phase = Phase.COLOR_PICK
                 logger.info("Sent game_setup — advancing to COLOR_PICK")
         elif self.phase in (Phase.COLOR_PICK, Phase.WAR_GAMES, Phase.PLAYING):
-            # Send hello back so HOST processes it.
-            # - Initial connection (COLOR_PICK/WAR_GAMES): HOST receives hello → sets _peer_name → sends game_setup
-            # - Mid-game reconnect (PLAYING): HOST receives hello → sends rejoin_sync
+            # Reply with hello so the HOST learns our name and can send game_setup/rejoin_sync.
+            # Required for relay GUEST (where on_peer_connected may not fire).
             self._on_connected()
-            logger.info("Sending hello response (phase=%s) — HOST will send game_setup or rejoin_sync", self.phase.name)
+            logger.info("Sending hello response (phase=%s)", self.phase.name)
 
     def _on_game_setup(self, msg: dict) -> None:
         """GUEST or SPECTATOR receives game_setup."""
-        if self.phase == Phase.PLAYING:
-            return   # replayed from relay history during reconnect — ignore
+        if self.phase in (Phase.PLAYING, Phase.WAR_GAMES):
+            return   # already past setup — ignore duplicate
         mode = msg.get("mode", "")
         logger.info("Received game_setup (mode=%r)", mode)
 
@@ -560,6 +559,8 @@ class NetworkedGameRunner(GameRunner):
 
     def _check_color_complete(self) -> None:
         """Advance to WAR_GAMES once both sides have picked colors."""
+        if self.phase != Phase.COLOR_PICK:
+            return
         if self._selected_r_idx is not None and self._selected_l_idx is not None:
             self._b.team_r.r += 1   # BUG LOCK-IN: mirrors local play
             self.phase = Phase.WAR_GAMES

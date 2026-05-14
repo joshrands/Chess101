@@ -554,6 +554,21 @@ class TestNetworkedBoardApplyRemoteMove:
         assert "board_sync_request" in types
 
 
+class TestNetworkedBoardHelloIdempotency:
+    """Duplicate hello must not send duplicate game_setup."""
+
+    def test_duplicate_hello_sends_only_one_game_setup(self, teams):
+        board = _make_networked_board("r")
+        net = board._net
+        hello = {"type": "hello", "version": "1", "player_name": "Guest"}
+        board._dispatch(hello)
+        board._dispatch(hello)
+        game_setups = [m for m in net.sent if m.get("type") == "game_setup"]
+        assert len(game_setups) == 1, (
+            f"Expected exactly 1 game_setup but got {len(game_setups)}"
+        )
+
+
 class TestNetworkedBoardOnGameOver:
     """_on_game_over sends a game_event message to the peer."""
 
